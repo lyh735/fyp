@@ -1,42 +1,80 @@
-exports.evaluateTransaction = (txn) => {
+const net = require("net");
+const { getRiskLevel, getTransactionStatus } = require("./riskScoring");
+
+const HIGH_RISK_COUNTRIES = new Set([
+  "iran",
+  "north korea",
+  "myanmar",
+  "syria",
+  "russia",
+]);
+
+function isSingapore(country) {
+  return String(country || "").trim().toLowerCase() === "singapore";
+}
+
+function isOutsideOperatingHours(timestamp) {
+  const hour = new Date(timestamp).getHours();
+  return hour >= 23 || hour < 6;
+}
+
+function hasInvalidIp(txn) {
+  if (txn.transaction_type !== "online") return false;
+  return !txn.ip_address || net.isIP(txn.ip_address) === 0;
+}
+
+function evaluateTransaction(txn, context = {}) {
   let risk_score = 0;
-  const reasons = [];
+  const triggered_rules = [];
 
-  // ── Amount thresholds ─────────────────────────────────────
-  if (txn.amount > 5000) {
-    risk_score += 45;
-    reasons.push("Extremely high amount (>$5,000 SGD)");
-  } else if (txn.amount > 2000) {
-    risk_score += 25;
-    reasons.push("High amount (>$2,000 SGD)");
-  } else if (txn.amount > 1000) {
-    risk_score += 15;
-    reasons.push("Elevated amount (>$1,000 SGD)");
+  function trigger(rule, points) {
+    risk_score += points;
+    triggered_rules.push(rule);
   }
 
-  // ── Foreign origin ────────────────────────────────────────
-  if (txn.country && txn.country !== "Singapore") {
-    risk_score += 20;
-    reasons.push(`Foreign origin: ${txn.country}`);
+  if (txn.amount > 3 * txn.merchant_average_amount) {
+    trigger("Significant amount compared to merchant average", 30);
   }
 
-  // ── Late-night window (11 PM – 5 AM) ─────────────────────
-  const hour = new Date(txn.txn_time || Date.now()).getHours();
-  if (hour >= 23 || hour < 5) {
-    risk_score += 15;
-    reasons.push("Late-night transaction (11 PM – 5 AM)");
+  if ((context.recentMerchantTransactionCount || 0) >= 5) {
+    trigger("Repeated transactions within short period", 25);
   }
 
-  // ── High-value UnionQR Pay (tourist-heavy method) ─────────
-  if (txn.payment_method === "UnionQR Pay" && txn.amount > 3000) {
-    risk_score += 15;
-    reasons.push("High-value UnionQR Pay transaction");
+  if (isOutsideOperatingHours(txn.timestamp)) {
+    trigger("Transaction outside operating hours", 15);
   }
 
-  // ── Status classification ─────────────────────────────────
-  let status = "normal";
-  if (risk_score >= 50)      status = "suspicious";
-  else if (risk_score >= 25) status = "review";
+  if (txn.customer_risk_profile === "high") {
+    trigger("High-risk customer profile", 25);
+  }
 
-  return { risk_score, status, reasons };
-};
+  if (HIGH_RISK_COUNTRIES.has(String(txn.country || "").trim().toLowerCase())) {
+    trigger("High-risk country/jurisdiction", 30);
+  }
+
+  if (context.countryWasDefaulted) {
+    trigger("Missing or insufficient information", 20);
+  }
+
+  if (hasInvalidIp(txn)) {
+    trigger("Online transaction with missing/invalid IP", 20);
+  }
+
+  if (!isSingapore(txn.country) && txn.currency === "SGD" && txn.amount > 1500) {
+    trigger("Large cross-border transfer amount if country is not Singapore", 25);
+  }
+
+  const risk_level = getRiskLevel(risk_score);
+  const status = getTransactionStatus(risk_level);
+
+  return {
+    risk_score,
+    risk_level,
+    status,
+    triggered_rules,
+    alert_required: risk_level === "High",
+    alert_status: risk_level === "High" ? "Pending Review" : null,
+  };
+}
+
+module.exports = { evaluateTransaction };

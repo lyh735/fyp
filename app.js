@@ -16,6 +16,7 @@ app.use(express.static(path.join(__dirname, "public")));
 
 const transactionRoutes = require("./routes/transactionRoutes");
 const authRoutes = require("./routes/authRoutes");
+const { ensureComplianceSchema } = require("./services/schema");
 
 app.use("/api", transactionRoutes);
 app.use("/api/auth", authRoutes);
@@ -30,8 +31,14 @@ io.on("connection", (socket) => {
 
 app.set("io", io);
 
-const PORT = 3005;
+const PORT = 3006;
 
-server.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+ensureComplianceSchema()
+  .catch((err) => {
+    console.error("Compliance schema setup failed:", err);
+  })
+  .finally(() => {
+    server.listen(PORT, () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  });
