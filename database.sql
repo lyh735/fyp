@@ -145,4 +145,10 @@ CALL add_column_if_missing('alerts', 'reviewed_at', 'DATETIME NULL');
 
 DROP PROCEDURE add_column_if_missing;
 
+INSERT INTO alerts
+(transaction_id, risk_level, status, reason)
+VALUES
+(1020, 'High', 'Pending', 'Dormant Account Activation'),
+(1021, 'Medium', 'Pending', 'Multiple rapid transactions'),
+(1022, 'Low', 'Reviewed', 'Small unusual transaction');
 
