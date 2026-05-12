@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login — Compliance Monitoring System</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body class="auth-page">
+
+<div class="auth-card">
+  <div class="auth-brand">
+    <div class="brand-icon">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
+      </svg>
+    </div>
+    <h1>Compliance Monitor</h1>
+    <p>Sign in to your account</p>
+  </div>
+
+  <div id="msg" class="message"></div>
+
+  <form id="loginForm" novalidate>
+    <div class="form-group">
+      <label for="email">Email Address</label>
+      <input
+        type="email"
+        id="email"
+        placeholder="you@example.com"
+        autocomplete="email"
+        required
+      />
+    </div>
+
+    <div class="form-group">
+      <label for="password">Password</label>
+      <div class="input-wrap">
+        <input
+          type="password"
+          id="password"
+          placeholder="Enter your password"
+          autocomplete="current-password"
+          required
+        />
+        <button type="button" class="toggle-pw" id="togglePw" aria-label="Show/hide password">
+          <svg id="eyeIcon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary" id="submitBtn">
+      Sign In
+    </button>
+  </form>
+</div>
+
+<script src="/js/auth.js"></script>
+<script>
+  // Redirect if already logged in
+  (function () {
+    const token = getToken();
+    const user = getUser();
+    if (token && user) {
+      window.location.href = user.first_login ? "/change-password.html" : "/dashboard.html";
+    }
+  })();
+
+  const form = document.getElementById("loginForm");
+  const submitBtn = document.getElementById("submitBtn");
+  const togglePw = document.getElementById("togglePw");
+  const pwInput = document.getElementById("password");
+
+  togglePw.addEventListener("click", () => {
+    const show = pwInput.type === "password";
+    pwInput.type = show ? "text" : "password";
+    togglePw.querySelector("svg").innerHTML = show
+      ? `<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>`
+      : `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`;
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    hideMessage("msg");
+
+    const email    = document.getElementById("email").value.trim();
+    const password = pwInput.value;
+
+    if (!email || !password) {
+      showMessage("msg", "Please enter your email and password.", "error");
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Signing in…";
+
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        showMessage("msg", data.message || "Login failed. Please try again.", "error");
+        return;
+      }
+
+      setSession(data.token, data.user);
+
+      if (data.user.first_login) {
+        window.location.href = "/change-password.html";
+      } else {
+        window.location.href = "/dashboard.html";
+      }
+    } catch {
+      showMessage("msg", "Network error. Please check your connection.", "error");
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Sign In";
+    }
+  });
+</script>
+</body>
+</html>

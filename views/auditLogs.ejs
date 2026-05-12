@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Audit Logs</title>
+</head>
+<body>
+  <h1>Audit Logs</h1>
+
+  <p>
+    <a href="/officer/alerts">Alerts</a> |
+    <a href="/officer/audit-logs">Audit Logs</a> |
+    <a href="/officer/report">Reports</a>
+  </p>
+
+  <table border="1" cellpadding="10">
+    <tr>
+      <th>Log ID</th>
+      <th>Officer</th>
+      <th>Action</th>
+      <th>Details</th>
+      <th>Created At</th>
+    </tr>
+
+    <% logs.forEach(log => { %>
+      <tr>
+        <td><%= log.log_id %></td>
+        <td><%= log.officer_name %></td>
+        <td><%= log.action %></td>
+        <td><%= log.details %></td>
+        <td><%= log.created_at %></td>
+      </tr>
+    <% }) %>
+  </table>
+</body>
+</html>

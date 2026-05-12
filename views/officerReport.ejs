@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Officer Report</title>
+</head>
+<body>
+  <h1>Compliance Report</h1>
+
+  <p>
+    <a href="/officer/alerts">Alerts</a> |
+    <a href="/officer/audit-logs">Audit Logs</a> |
+    <a href="/officer/report">Reports</a>
+  </p>
+
+  <h2>Alert Summary</h2>
+
+  <table border="1" cellpadding="10">
+    <tr>
+      <th>Total Alerts</th>
+      <td><%= report.total_alerts || 0 %></td>
+    </tr>
+    <tr>
+      <th>Pending</th>
+      <td><%= report.pending_alerts || 0 %></td>
+    </tr>
+    <tr>
+      <th>Reviewed</th>
+      <td><%= report.reviewed_alerts || 0 %></td>
+    </tr>
+    <tr>
+      <th>Dismissed</th>
+      <td><%= report.dismissed_alerts || 0 %></td>
+    </tr>
+    <tr>
+      <th>Escalated</th>
+      <td><%= report.escalated_alerts || 0 %></td>
+    </tr>
+  </table>
+</body>
+</html>

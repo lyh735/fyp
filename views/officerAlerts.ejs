@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Officer Alerts</title>
+</head>
+<body>
+  <h1>Compliance Officer Dashboard</h1>
+
+  <p>
+    <a href="/officer/alerts">Alerts</a> |
+    <a href="/officer/audit-logs">Audit Logs</a> |
+    <a href="/officer/report">Reports</a>
+  </p>
+
+  <h2>Alert Review Queue</h2>
+
+  <table border="1" cellpadding="10">
+    <tr>
+      <th>Alert ID</th>
+      <th>Transaction ID</th>
+      <th>Risk Level</th>
+      <th>Status</th>
+      <th>Reason</th>
+      <th>Officer Action</th>
+    </tr>
+
+    <% alerts.forEach(alert => { %>
+      <tr>
+        <td><%= alert.alert_id %></td>
+        <td><%= alert.transaction_id %></td>
+        <td><%= alert.risk_level %></td>
+        <td><%= alert.status %></td>
+        <td><%= alert.reason %></td>
+        <td>
+          <form action="/officer/action" method="POST">
+            <input type="hidden" name="alert_id" value="<%= alert.alert_id %>">
+
+            <input type="text" name="officer_name" placeholder="Officer name" required>
+            <br><br>
+
+            <select name="action_type" required>
+              <option value="review">Review</option>
+              <option value="dismiss">Dismiss</option>
+              <option value="escalate">Escalate</option>
+            </select>
+            <br><br>
+
+            <input type="text" name="remarks" placeholder="Remarks">
+            <br><br>
+
+            <button type="submit">Submit Action</button>
+          </form>
+        </td>
+      </tr>
+    <% }) %>
+  </table>
+</body>
+</html>
