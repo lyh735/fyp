@@ -68,6 +68,32 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     created_at     DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE alerts (
+  alert_id INT AUTO_INCREMENT PRIMARY KEY,
+  transaction_id INT,
+  risk_level VARCHAR(20),
+  status VARCHAR(30) DEFAULT 'Pending',
+  reason TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE officer_actions (
+  action_id INT AUTO_INCREMENT PRIMARY KEY,
+  alert_id INT,
+  officer_name VARCHAR(100),
+  action_type VARCHAR(30),
+  remarks TEXT,
+  action_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE audit_logs (
+  log_id INT AUTO_INCREMENT PRIMARY KEY,
+  officer_name VARCHAR(100),
+  action VARCHAR(100),
+  details TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Add missing columns to older prototype tables without deleting data.
 DROP PROCEDURE IF EXISTS add_column_if_missing;
 
@@ -118,3 +144,11 @@ CALL add_column_if_missing('alerts', 'status', 'VARCHAR(50) DEFAULT ''Pending'''
 CALL add_column_if_missing('alerts', 'reviewed_at', 'DATETIME NULL');
 
 DROP PROCEDURE add_column_if_missing;
+
+INSERT INTO alerts
+(transaction_id, risk_level, status, reason)
+VALUES
+(1020, 'High', 'Pending', 'Dormant Account Activation'),
+(1021, 'Medium', 'Pending', 'Multiple rapid transactions'),
+(1022, 'Low', 'Reviewed', 'Small unusual transaction');
+

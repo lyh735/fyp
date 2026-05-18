@@ -14,12 +14,22 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
+app.set("view engine", "ejs");
+app.set("views", "./views");
+
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+
 const transactionRoutes = require("./routes/transactionRoutes");
 const authRoutes = require("./routes/authRoutes");
 const { ensureComplianceSchema } = require("./services/schema");
 
 app.use("/api", transactionRoutes);
 app.use("/api/auth", authRoutes);
+
+const officerRoutes = require("./routes/officerRoutes");
+app.use("/api/officer", officerRoutes);
+
 
 app.get("/", (req, res) => {
   res.redirect("/login.html");
@@ -30,6 +40,7 @@ io.on("connection", (socket) => {
 });
 
 app.set("io", io);
+
 
 const PORT = 3006;
 
