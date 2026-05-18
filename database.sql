@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS alerts (
     risk_score      INT,
     risk_level      VARCHAR(20),
     triggered_rules TEXT,
-    status          VARCHAR(50) DEFAULT 'Pending Review',
+    status          VARCHAR(50) DEFAULT 'Pending',
     message         TEXT,
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
     reviewed_at     DATETIME NULL
@@ -114,7 +114,7 @@ CALL add_column_if_missing('alerts', 'merchant_id', 'VARCHAR(100)');
 CALL add_column_if_missing('alerts', 'risk_score', 'INT');
 CALL add_column_if_missing('alerts', 'risk_level', 'VARCHAR(20)');
 CALL add_column_if_missing('alerts', 'triggered_rules', 'TEXT');
-CALL add_column_if_missing('alerts', 'status', 'VARCHAR(50) DEFAULT ''Pending Review''');
+CALL add_column_if_missing('alerts', 'status', 'VARCHAR(50) DEFAULT ''Pending''');
 CALL add_column_if_missing('alerts', 'reviewed_at', 'DATETIME NULL');
 
 DROP PROCEDURE add_column_if_missing;
