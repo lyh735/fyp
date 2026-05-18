@@ -47,6 +47,14 @@
         Alerts
         <span id="alertCount" class="badge badge-admin" style="margin-left:auto;display:none"></span>
       </div>
+      <div class="nav-item" onclick="window.location.href='/flagged-transactions.html'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 17H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <path d="M17 7l5 5-5 5"/>
+          <line x1="12" y1="12" x2="22" y2="12"/>
+        </svg>
+        Flagged Transactions
+      </div>
 
       <div id="adminNav" style="display:none">
         <div class="nav-section-label">Administration</div>
@@ -115,7 +123,7 @@
       <div class="section active" id="section-overview">
 
         <div class="stats-grid">
-          <div class="stat-card">
+          <div class="stat-card" data-target="transactions">
             <div class="stat-icon blue">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="12" y1="1" x2="12" y2="23"/>
@@ -127,7 +135,7 @@
               <div class="value" id="statTxnTotal">—</div>
             </div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card" data-target="transactions" data-filter="High">
             <div class="stat-icon red">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
@@ -135,11 +143,34 @@
               </svg>
             </div>
             <div class="stat-info">
-              <div class="label">Suspicious</div>
-              <div class="value" id="statSuspicious">—</div>
+              <div class="label">High Risk</div>
+              <div class="value" id="statHigh">—</div>
             </div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card" data-target="transactions" data-filter="Medium">
+            <div class="stat-icon orange">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2a10 10 0 0 0-3.22 19.48"/>
+                <path d="M12 2a10 10 0 0 1 3.22 19.48"/>
+              </svg>
+            </div>
+            <div class="stat-info">
+              <div class="label">Medium Risk</div>
+              <div class="value" id="statMedium">—</div>
+            </div>
+          </div>
+          <div class="stat-card" data-target="transactions" data-filter="Low">
+            <div class="stat-icon green">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 6L9 17l-5-5"/>
+              </svg>
+            </div>
+            <div class="stat-info">
+              <div class="label">Low Risk</div>
+              <div class="value" id="statLow">—</div>
+            </div>
+          </div>
+          <div class="stat-card" data-target="alerts">
             <div class="stat-icon yellow">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -151,7 +182,7 @@
               <div class="value" id="statAlerts">—</div>
             </div>
           </div>
-          <div class="stat-card" id="statUsersCard" style="display:none">
+          <div class="stat-card" id="statUsersCard" data-href="/create-user.html" style="display:none">
             <div class="stat-icon green">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
@@ -197,6 +228,13 @@
               <input class="search-input" id="txnSearch" type="text"
                 placeholder="Search by ID, user, country, status…" oninput="filterTable('txnBody','txnSearch','txnNoResults')" />
             </div>
+            <div class="risk-filter-group">
+              <button type="button" class="filter-chip active" onclick="setTransactionFilter(null); highlightTxnFilter(this)">All</button>
+              <button type="button" class="filter-chip" onclick="setTransactionFilter('High'); highlightTxnFilter(this)">High</button>
+              <button type="button" class="filter-chip" onclick="setTransactionFilter('Medium'); highlightTxnFilter(this)">Medium</button>
+              <button type="button" class="filter-chip" onclick="setTransactionFilter('Low'); highlightTxnFilter(this)">Low</button>
+            </div>
+            <div id="txnFilterLabel" class="filter-label" style="display:none">Filter: <span id="txnFilterValue"></span></div>
           </div>
           <div class="table-wrap">
             <table>
@@ -235,17 +273,35 @@
           <div class="table-wrap">
             <table>
               <thead>
-                <tr><th>Transaction ID</th><th>Reason</th><th>Raised At</th></tr>
+                <tr><th>Transaction ID</th><th>Reason</th><th>Risk Level</th><th>Status</th><th>Raised At</th></tr>
               </thead>
               <tbody id="alertBody">
-                <tr><td colspan="3"><div class="empty-state"><p>Loading…</p></div></td></tr>
+                <tr><td colspan="5"><div class="empty-state"><p>Loading…</p></div></td></tr>
               </tbody>
               <tbody>
                 <tr id="alertNoResults" style="display:none">
-                  <td colspan="3"><div class="no-results">No alerts match your search.</div></td>
+                  <td colspan="5"><div class="no-results">No alerts match your search.</div></td>
                 </tr>
               </tbody>
             </table>
+          </div>
+        </div>
+        <div class="card" id="alertDetailCard" style="display:none; margin-top: 20px;">
+          <div class="card-header">
+            <h3>Alert Review</h3>
+          </div>
+          <div class="card-body">
+            <div class="alert-detail-grid">
+              <div><strong>Transaction ID</strong><div id="detailTxnId">—</div></div>
+              <div><strong>Merchant</strong><div id="detailMerchant">—</div></div>
+              <div><strong>Amount</strong><div id="detailAmount">—</div></div>
+              <div><strong>Risk Level</strong><div id="detailRiskLevel">—</div></div>
+              <div><strong>Status</strong><div id="detailAlertStatus">—</div></div>
+              <div><strong>Raised At</strong><div id="detailRaisedAt">—</div></div>
+              <div style="grid-column: span 3;"><strong>Triggered Rules</strong><div id="detailTriggeredRules">—</div></div>
+              <div style="grid-column: span 3;"><strong>Escalation Report</strong><div id="detailEscalationReport">—</div></div>
+            </div>
+            <div id="detailActions" style="margin-top:16px; display:flex; gap:12px;"></div>
           </div>
         </div>
       </div>
@@ -448,6 +504,31 @@ navItems.forEach((item) => {
   });
 });
 
+const dashboardCards = document.querySelectorAll(".stat-card[data-target], .stat-card[data-href]");
+dashboardCards.forEach((card) => {
+  card.classList.add("clickable");
+  card.addEventListener("click", () => {
+    const href = card.dataset.href;
+    if (href) {
+      window.location.href = href;
+      return;
+    }
+
+    const filter = card.dataset.filter;
+    if (card.dataset.target === "transactions") {
+      setTransactionFilter(filter || null);
+      const filterName = filter || "All";
+      const button = Array.from(document.querySelectorAll('.risk-filter-group .filter-chip')).find(b => b.textContent.trim() === filterName);
+      if (button) highlightTxnFilter(button);
+    }
+
+    const target = card.dataset.target;
+    if (!target) return;
+    const navItem = Array.from(navItems).find(n => n.dataset.section === target);
+    if (navItem) navItem.click();
+  });
+});
+
 // ── HELPERS ──
 function toggleInput(id) {
   const inp = document.getElementById(id);
@@ -457,6 +538,12 @@ function toggleInput(id) {
 function statusPill(s) {
   const labels = { normal: "Normal", review: "Review", suspicious: "Suspicious" };
   return `<span class="pill pill-${s}">${labels[s] || s}</span>`;
+}
+
+function riskPill(level) {
+  const safe = String(level || "Low").toLowerCase();
+  const labels = { low: "Low", medium: "Medium", high: "High" };
+  return `<span class="pill pill-${safe}">${labels[safe] || level}</span>`;
 }
 
 function formatDate(d) {
@@ -485,8 +572,11 @@ function riskBar(score) {
   </div>`;
 }
 
+let allTransactions = [];
+let currentTransactionFilter = null;
+
 function txnRow(t) {
-  const searchable = `${t.transaction_id} ${t.merchant_name||''} ${t.payment_method||''} ${t.country} ${t.status}`.toLowerCase();
+  const searchable = `${t.transaction_id} ${t.merchant_name||''} ${t.payment_method||''} ${t.country} ${t.status} ${t.risk_level}`.toLowerCase();
   return `<tr data-searchable="${searchable}">
     <td style="font-family:monospace;font-size:11.5px;color:var(--text-muted)">${t.transaction_id || "—"}</td>
     <td style="font-weight:600;max-width:160px">${t.merchant_name || t.user_id || "—"}</td>
@@ -497,6 +587,30 @@ function txnRow(t) {
     <td>${statusPill(t.status||"normal")}</td>
     <td style="color:var(--text-muted);font-size:12px">${formatDate(t.txn_time)}</td>
   </tr>`;
+}
+
+function renderTransactions() {
+  const data = currentTransactionFilter
+    ? allTransactions.filter(t => t.risk_level === currentTransactionFilter)
+    : allTransactions;
+  const body = document.getElementById("txnBody");
+  const empty = `<tr><td colspan="8"><div class="empty-state"><p>No transactions found</p></div></td></tr>`;
+  body.innerHTML = data.length ? data.map(txnRow).join("") : empty;
+  document.getElementById("txnFilterLabel").style.display = currentTransactionFilter ? "" : "none";
+  document.getElementById("txnFilterValue").textContent = currentTransactionFilter ? `${currentTransactionFilter} Risk` : "";
+}
+
+function setTransactionFilter(filter) {
+  currentTransactionFilter = filter || null;
+  renderTransactions();
+  filterTable('txnBody', 'txnSearch', 'txnNoResults');
+}
+
+function highlightTxnFilter(button) {
+  const group = button.closest('.risk-filter-group');
+  if (!group) return;
+  group.querySelectorAll('.filter-chip').forEach(el => el.classList.remove('active'));
+  button.classList.add('active');
 }
 
 function filterTable(bodyId, searchId, noResultsId) {
@@ -517,10 +631,27 @@ async function loadTransactions() {
   const res = await apiFetch("/api/transactions");
   if (!res) return;
   const data = await res.json();
-  const empty = `<tr><td colspan="8"><div class="empty-state"><p>No transactions found</p></div></td></tr>`;
-  document.getElementById("txnBody").innerHTML      = data.length ? data.map(txnRow).join("") : empty;
-  document.getElementById("overviewTxnBody").innerHTML = data.length ? data.slice(0,5).map(txnRow).join("") : empty;
+  const priority = { High: 3, Medium: 2, Low: 1 };
+  data.sort((a, b) => {
+    const scoreA = parseFloat(a.risk_score) || 0;
+    const scoreB = parseFloat(b.risk_score) || 0;
+    if (scoreA !== scoreB) return scoreB - scoreA;
+    const levelA = priority[a.risk_level] || 1;
+    const levelB = priority[b.risk_level] || 1;
+    if (levelA !== levelB) return levelB - levelA;
+    return new Date(b.txn_time || b.created_at) - new Date(a.txn_time || a.created_at);
+  });
+  allTransactions = data;
+  renderTransactions();
+  document.getElementById("overviewTxnBody").innerHTML = data.length ? data.slice(0,5).map(txnRow).join("") : `<tr><td colspan="8"><div class="empty-state"><p>No transactions found</p></div></td></tr>`;
+  const lowCount = data.filter(t => t.risk_level === "Low").length;
+  const mediumCount = data.filter(t => t.risk_level === "Medium").length;
+  const highCount = data.filter(t => t.risk_level === "High").length;
+
   document.getElementById("statTxnTotal").textContent   = data.length;
+  document.getElementById("statLow").textContent        = lowCount;
+  document.getElementById("statMedium").textContent     = mediumCount;
+  document.getElementById("statHigh").textContent       = highCount;
   document.getElementById("statSuspicious").textContent = data.filter(t => t.status === "suspicious").length;
 }
 
@@ -528,20 +659,91 @@ async function loadAlerts() {
   const res = await apiFetch("/api/alerts");
   if (!res) return;
   const data = await res.json();
+  const priority = { High: 3, Medium: 2, Low: 1 };
+  data.sort((a, b) => {
+    const scoreA = parseFloat(a.risk_score) || 0;
+    const scoreB = parseFloat(b.risk_score) || 0;
+    if (scoreA !== scoreB) return scoreB - scoreA;
+    const levelA = priority[a.risk_level] || 1;
+    const levelB = priority[b.risk_level] || 1;
+    if (levelA !== levelB) return levelB - levelA;
+    return new Date(b.created_at) - new Date(a.created_at);
+  });
   const body = document.getElementById("alertBody");
   body.innerHTML = data.length
-    ? data.map(a => `<tr data-searchable="${`${a.transaction_id} ${a.message}`.toLowerCase()}">
+    ? data.map(a => `<tr data-alert-id="${a.alert_id}" onclick="showAlertDetails('${a.alert_id}')" data-searchable="${`${a.transaction_id} ${a.message} ${a.risk_level} ${a.status}`.toLowerCase()}">
         <td style="font-family:monospace;font-size:12px">${a.transaction_id}</td>
         <td>${a.message}</td>
+        <td>${riskPill(a.risk_level)}</td>
+        <td>${a.status || "Pending"}</td>
         <td style="color:var(--text-muted);font-size:12px">${formatDate(a.created_at)}</td>
       </tr>`).join("")
-    : `<tr><td colspan="3"><div class="empty-state"><p>No alerts — all clear!</p></div></td></tr>`;
+    : `<tr><td colspan="5"><div class="empty-state"><p>No alerts — all clear!</p></div></td></tr>`;
   document.getElementById("statAlerts").textContent = data.length;
+  const badge = document.getElementById("alertCount");
   if (data.length > 0) {
-    const badge = document.getElementById("alertCount");
     badge.textContent = data.length;
     badge.style.display = "";
+  } else {
+    badge.style.display = "none";
   }
+}
+
+let currentAlertId = null;
+
+async function showAlertDetails(alertId) {
+  const res = await apiFetch(`/api/alerts/${alertId}`);
+  if (!res) return;
+  if (!res.ok) {
+    showToast("Alert Detail", "Unable to load alert details. Please try again.");
+    return;
+  }
+
+  const alert = await res.json();
+  currentAlertId = alert.alert_id;
+  document.getElementById("alertDetailCard").style.display = "";
+  document.getElementById("detailTxnId").textContent = alert.transaction_id || "—";
+  document.getElementById("detailMerchant").textContent = alert.merchant_name || "—";
+  document.getElementById("detailAmount").textContent = alert.amount ? `$${parseFloat(alert.amount).toLocaleString("en-SG", { minimumFractionDigits: 2 })}` : "—";
+  document.getElementById("detailRiskLevel").textContent = alert.risk_level || "—";
+  document.getElementById("detailAlertStatus").textContent = alert.status || "Pending";
+  document.getElementById("detailRaisedAt").textContent = formatDate(alert.created_at);
+
+  let triggered = alert.triggered_rules;
+  try { const parsed = JSON.parse(alert.triggered_rules); if (Array.isArray(parsed)) triggered = parsed.join("; "); } catch {}
+  document.getElementById("detailTriggeredRules").textContent = triggered || "—";
+  document.getElementById("detailEscalationReport").textContent = alert.escalation_report || "—";
+
+  const actions = document.getElementById("detailActions");
+  actions.innerHTML = "";
+  if (alert.status === "Pending") {
+    actions.innerHTML = `
+      <button class="btn btn-secondary" onclick="dismissCurrentAlert()">Dismiss</button>
+      <button class="btn btn-danger" onclick="escalateCurrentAlert()">Escalate</button>
+    `;
+  }
+}
+
+async function dismissCurrentAlert() {
+  if (!currentAlertId || !confirm("Dismiss this alert?")) return;
+  const res = await apiFetch(`/api/alerts/${currentAlertId}/dismiss`, { method: "POST" });
+  if (!res) return;
+  const data = await res.json();
+  if (!res.ok) { showToast("Dismiss Alert", data.message || "Failed to dismiss Alert."); return; }
+  showToast("Dismiss Alert", data.message || "Alert successfully dismissed.");
+  loadAlerts();
+  showAlertDetails(currentAlertId);
+}
+
+async function escalateCurrentAlert() {
+  if (!currentAlertId || !confirm("Escalate this alert?")) return;
+  const res = await apiFetch(`/api/alerts/${currentAlertId}/escalate`, { method: "POST" });
+  if (!res) return;
+  const data = await res.json();
+  if (!res.ok) { showToast("Escalate Alert", data.message || "Failed to escalate Alert."); return; }
+  showToast("Escalate Alert", data.message || "Alert successfully escalated.");
+  loadAlerts();
+  showAlertDetails(currentAlertId);
 }
 
 async function loadUsers() {

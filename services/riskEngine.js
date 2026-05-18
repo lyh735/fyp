@@ -72,8 +72,8 @@ function evaluateTransaction(txn, context = {}) {
     risk_level,
     status,
     triggered_rules,
-    alert_required: risk_level === "High",
-    alert_status: risk_level === "High" ? "Pending Review" : null,
+    alert_required: risk_level !== "Low",
+    alert_status: risk_level !== "Low" ? "Pending" : null,
   };
 }
 
