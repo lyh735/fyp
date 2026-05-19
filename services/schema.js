@@ -67,6 +67,7 @@ async function ensureComplianceSchema() {
     ["merchant_average_amount", "DECIMAL(10,2)"],
     ["risk_level", "VARCHAR(20)"],
     ["triggered_rules", "TEXT"],
+    ["processing_status", "VARCHAR(50)"],
     ["created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP"],
   ];
 
@@ -80,8 +81,11 @@ async function ensureComplianceSchema() {
     ["risk_score", "INT"],
     ["risk_level", "VARCHAR(20)"],
     ["triggered_rules", "TEXT"],
-    ["status", "VARCHAR(50) DEFAULT 'Pending Review'"],
+    ["status", "VARCHAR(50) DEFAULT 'Pending'"],
+    ["reviewed_by", "VARCHAR(100)"],
     ["reviewed_at", "DATETIME NULL"],
+    ["review_notes", "TEXT"],
+    ["escalation_report", "TEXT"],
   ];
 
   for (const [name, definition] of alertColumns) {
