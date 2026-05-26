@@ -173,6 +173,7 @@
         name="alert_id"
         value="<%= alert.id %>"
       >
+      <input type="hidden" name="action_type" id="actionType">
 
       <div class="mb-3">
 
@@ -202,9 +203,8 @@
         <div class="col-md-6 mb-3">
 
           <button
-            type="submit"
-            name="action_type"
-            value="dismiss"
+            type="button"
+            onclick="submitAction('dismiss')"
             class="btn btn-secondary w-100 p-3 fs-4"
           >
             ✖ Dismiss Alert
@@ -215,9 +215,8 @@
         <div class="col-md-6 mb-3">
 
           <button
-            type="submit"
-            name="action_type"
-            value="escalate"
+            type="button"
+            onclick="submitAction('escalate')"
             class="btn btn-danger w-100 p-3 fs-4"
           >
             ⬆ Escalate Alert
@@ -235,3 +234,14 @@
 
 </body>
 </html>
+<script>
+
+function submitAction(action){
+
+  document.getElementById("actionType").value = action;
+
+  document.forms[0].submit();
+
+}
+
+</script>
