@@ -16,9 +16,9 @@ exports.showAlertsPage = (req, res) => {
 exports.showAlertDetails = (req, res) => {
   const alertId = req.params.id;
 
-  const sql = "SELECT * FROM alerts WHERE id = ?";
+  const sql = "SELECT * FROM alerts WHERE id = ? OR alert_id = ? LIMIT 1";
 
-  db.query(sql, [alertId], (err, results) => {
+  db.query(sql, [alertId, alertId], (err, results) => {
     if (err) {
       console.error(err);
       return res.send("Database error");

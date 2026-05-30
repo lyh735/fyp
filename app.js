@@ -23,12 +23,15 @@ app.use(express.json());
 const transactionRoutes = require("./routes/transactionRoutes");
 const authRoutes = require("./routes/authRoutes");
 const { ensureComplianceSchema } = require("./services/schema");
+const { showTransactionDetailsPage } = require("./controllers/transactionController");
 
 app.use("/api", transactionRoutes);
 app.use("/api/auth", authRoutes);
 
 const officerRoutes = require("./routes/officerRoutes");
 app.use("/api/officer", officerRoutes);
+
+app.get("/transaction/:id", showTransactionDetailsPage);
 
 
 app.get("/", (req, res) => {

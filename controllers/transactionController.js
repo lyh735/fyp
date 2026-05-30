@@ -317,12 +317,45 @@ exports.getTransactions = (req, res) => {
   );
 };
 
+exports.showTransactionDetailsPage = async (req, res) => {
+  try {
+    const transactionId = req.params.id;
+    const transactions = await query(
+      "SELECT * FROM transactions WHERE transaction_id = ? LIMIT 1",
+      [transactionId]
+    );
+
+    if (!transactions.length) {
+      return res.send("Transaction not found");
+    }
+
+    const transaction = transactions[0];
+    const alerts = await query(
+      "SELECT * FROM alerts WHERE transaction_id = ? ORDER BY created_at DESC LIMIT 1",
+      [transactionId]
+    );
+    const alert = alerts[0] || null;
+
+    res.render("transactionDetails", { transaction, alert });
+  } catch (err) {
+    console.error(err);
+    res.send("Server error");
+  }
+};
+
 exports.getAlerts = async (req, res) => {
   const status = req.query.status || "Pending";
-  const orderByRisk = "FIELD(risk_level, 'High', 'Medium', 'Low'), created_at DESC";
+  const orderByRisk = "FIELD(a.risk_level, 'High', 'Medium', 'Low'), a.created_at DESC";
   const sql = status === "all"
-    ? `SELECT * FROM alerts ORDER BY ${orderByRisk} LIMIT 200`
-    : `SELECT * FROM alerts WHERE status = ? ORDER BY ${orderByRisk} LIMIT 200`;
+    ? `SELECT a.*, t.merchant_name, t.amount, t.currency, t.transaction_type, t.ip_address, t.country
+       FROM alerts a
+       LEFT JOIN transactions t ON a.transaction_id = t.transaction_id
+       ORDER BY ${orderByRisk} LIMIT 200`
+    : `SELECT a.*, t.merchant_name, t.amount, t.currency, t.transaction_type, t.ip_address, t.country
+       FROM alerts a
+       LEFT JOIN transactions t ON a.transaction_id = t.transaction_id
+       WHERE a.status = ?
+       ORDER BY ${orderByRisk} LIMIT 200`;
   const values = status === "all" ? [] : [status];
 
   try {
