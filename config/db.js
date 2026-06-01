@@ -4,7 +4,7 @@ const db = mysql.createConnection({
   host: "localhost",
   user: "root",
   password: "Republic_C207",
-  port: "3308",
+  port: "3306",
   database: "transaction_monitoring"
 });
 

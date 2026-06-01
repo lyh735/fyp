@@ -12,151 +12,152 @@
   />
 
   <style>
-
-    body{
-      background:#f4f6f9;
+    body {
+      background: #f4f6f9;
     }
 
-    .report-card{
-      background:white;
-      border-radius:12px;
-      padding:30px;
-      box-shadow:0 2px 10px rgba(0,0,0,0.08);
-      margin-bottom:25px;
+    .report-card {
+      background: white;
+      border-radius: 14px;
+      padding: 30px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      margin-bottom: 25px;
     }
 
-    .metric-box{
-      border-radius:12px;
-      padding:30px;
-      color:white;
-      text-align:center;
-      height:100%;
+    .metric-box {
+      border-radius: 14px;
+      padding: 30px;
+      color: white;
+      text-align: center;
+      height: 100%;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.12);
     }
 
-    .metric-number{
-      font-size:50px;
-      font-weight:bold;
+    .metric-number {
+      font-size: 48px;
+      font-weight: bold;
     }
 
-    .metric-title{
-      font-size:18px;
-      margin-top:10px;
+    .metric-title {
+      font-size: 17px;
+      margin-top: 10px;
     }
 
+    .page-header {
+      background: white;
+      border-radius: 14px;
+      padding: 25px 30px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      margin-bottom: 25px;
+    }
+
+    .back-btn {
+      border-radius: 10px;
+      font-weight: 600;
+    }
+
+    .insight-box {
+      background: #f8f9fa;
+      border-radius: 12px;
+      padding: 22px;
+      height: 100%;
+      border-left: 5px solid #0d6efd;
+    }
+
+    .conclusion-box {
+      background: #eef5ff;
+      border-left: 6px solid #0d6efd;
+      border-radius: 12px;
+      padding: 25px;
+    }
   </style>
-
 </head>
 
 <body>
 
-<div class="container mt-5">
+<div class="container mt-5 mb-5">
 
-  <div class="d-flex justify-content-between align-items-center mb-4">
+  <div class="mb-4 d-flex justify-content-between align-items-center">
+    <a href="/dashboard.html" class="btn btn-dark px-4 py-2 shadow-sm back-btn">
+      ← Back to Dashboard
+    </a>
 
+    <div class="text-muted">
+      Generated: <%= new Date().toLocaleString() %>
+    </div>
+  </div>
+
+  <div class="page-header d-flex justify-content-between align-items-center">
     <div>
-
-      <h1>Compliance Monitoring Reports</h1>
-
-      <p class="text-muted">
+      <h1 class="mb-2">Compliance Monitoring Reports</h1>
+      <p class="text-muted mb-0">
         AML/CFT alert investigation analytics dashboard
       </p>
-
     </div>
 
     <div>
-
-      <a href="/api/officer/alerts" class="btn btn-primary">
+      <a href="/api/officer/alerts" class="btn btn-primary me-2">
         Alerts
       </a>
 
-      <a href="/api/officer/audit-logs" class="btn btn-dark">
+      <a href="/api/officer/audit-logs" class="btn btn-outline-dark">
         Audit Logs
       </a>
-
     </div>
-
   </div>
-
-  <!-- Metrics -->
 
   <div class="row">
 
     <div class="col-md-3 mb-4">
-
       <div class="metric-box bg-primary">
-
         <div class="metric-number">
           <%= report.total_alerts || 0 %>
         </div>
-
         <div class="metric-title">
           Total Alerts
         </div>
-
       </div>
-
     </div>
 
     <div class="col-md-3 mb-4">
-
       <div class="metric-box bg-warning text-dark">
-
         <div class="metric-number">
           <%= report.pending_alerts || 0 %>
         </div>
-
         <div class="metric-title">
           Pending Review
         </div>
-
       </div>
-
     </div>
 
     <div class="col-md-3 mb-4">
-
       <div class="metric-box bg-danger">
-
         <div class="metric-number">
           <%= report.escalated_alerts || 0 %>
         </div>
-
         <div class="metric-title">
           Escalated Alerts
         </div>
-
       </div>
-
     </div>
 
     <div class="col-md-3 mb-4">
-
       <div class="metric-box bg-success">
-
         <div class="metric-number">
           <%= report.reviewed_alerts || 0 %>
         </div>
-
         <div class="metric-title">
           Reviewed Alerts
         </div>
-
       </div>
-
     </div>
 
   </div>
 
-  <!-- Summary -->
-
   <div class="report-card">
+    <h3 class="mb-4">Compliance Summary</h3>
 
-    <h3 class="mb-4">
-      Compliance Summary
-    </h3>
-
-    <table class="table table-bordered">
-
+    <table class="table table-bordered align-middle">
       <tr>
         <th>Total Alerts Generated</th>
         <td><%= report.total_alerts || 0 %></td>
@@ -181,9 +182,44 @@
         <th>Dismissed Alerts</th>
         <td><%= report.dismissed_alerts || 0 %></td>
       </tr>
-
     </table>
+  </div>
 
+
+
+  <div class="report-card">
+    <h3 class="mb-4">Risk Insights</h3>
+
+    <div class="row">
+
+      <div class="col-md-4 mb-3">
+        <div class="insight-box">
+          <h5 class="text-danger">High Risk Alerts</h5>
+          <p class="mb-0">
+            Escalated transactions may indicate suspicious activity and should be prioritised for investigation.
+          </p>
+        </div>
+      </div>
+
+      <div class="col-md-4 mb-3">
+        <div class="insight-box">
+          <h5 class="text-warning">Pending Reviews</h5>
+          <p class="mb-0">
+            Pending alerts are still awaiting officer review and should be monitored to avoid investigation delays.
+          </p>
+        </div>
+      </div>
+
+      <div class="col-md-4 mb-3">
+        <div class="insight-box">
+          <h5 class="text-success">Monitoring Efficiency</h5>
+          <p class="mb-0">
+            Reviewed and dismissed alerts help officers manage false positives and improve review accuracy.
+          </p>
+        </div>
+      </div>
+
+    </div>
   </div>
 
 </div>
