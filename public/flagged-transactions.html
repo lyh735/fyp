@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Flagged Transactions — Compliance Monitor</title>
   <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    .unread-row { background: rgba(254,243,199,0.7); }
+    .unread-badge { display: inline-block; margin-left: 0.5rem; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 11px; font-weight: 700; color: #92400e; background: #fef3c7; }
+  </style>
 </head>
 <body>
 <div class="app-layout">
@@ -92,14 +96,14 @@
           <table>
             <thead>
               <tr>
-                <th>Transaction ID</th><th>Merchant</th><th>Amount</th><th>Risk Level</th><th>Status</th><th>Review</th><th>Raised At</th>
+                <th>Transaction ID</th><th>Merchant</th><th>Amount</th><th>Risk Level</th><th>Status</th><th>Review</th><th>Read</th><th>Raised At</th>
               </tr>
             </thead>
             <tbody id="flaggedBody">
-              <tr><td colspan="6"><div class="empty-state"><p>Loading…</p></div></td></tr>
+              <tr><td colspan="8"><div class="empty-state"><p>Loading…</p></div></td></tr>
             </tbody>
             <tbody>
-              <tr id="flaggedNoResults" style="display:none"><td colspan="6"><div class="no-results">No flagged transactions match your search.</div></td></tr>
+              <tr id="flaggedNoResults" style="display:none"><td colspan="8"><div class="no-results">No flagged transactions match your search.</div></td></tr>
             </tbody>
           </table>
         </div>
@@ -197,28 +201,45 @@ function renderFlaggedTransactions() {
     : allFlaggedTransactions;
   const body = document.getElementById("flaggedBody");
   body.innerHTML = data.length
-    ? data.map(a => `<tr data-alert-id="${a.alert_id}" onclick="navigateToTransactionDetail('${encodeURIComponent(a.alert_id)}')" data-searchable="${`${a.transaction_id} ${a.message} ${a.risk_level} ${a.status}`.toLowerCase()}">
-        <td style="font-family:monospace;font-size:12px">${a.transaction_id}</td>
-        <td>${a.merchant_id || "—"}</td>
-        <td>${a.amount ? `$${parseFloat(a.amount).toFixed(2)}` : "—"}</td>
-        <td>${riskPill(a.risk_level)}</td>
-        <td>${a.status || "Pending"}</td>
-        <td>${reviewIndicator(a.status)}</td>
-        <td style="color:var(--text-muted);font-size:12px">${formatDate(a.created_at)}</td>
-      </tr>`).join("")
-    : `<tr><td colspan="6"><div class="empty-state"><p>No flagged transactions found</p></div></td></tr>`;
+    ? data.map(a => {
+        const unread = !a.read_at;
+        return `<tr class="${unread ? 'unread-row' : ''}" data-alert-id="${a.alert_id}" onclick="navigateToTransactionDetail('${encodeURIComponent(a.transaction_id)}')" data-searchable="${`${a.transaction_id} ${a.message} ${a.risk_level} ${a.status}`.toLowerCase()}">
+          <td style="font-family:monospace;font-size:12px">
+            ${a.transaction_id || "—"}
+            ${unread ? '<span class="unread-badge">Unread</span>' : ''}
+          </td>
+          <td>${a.merchant_id || "—"}</td>
+          <td>${a.amount ? `$${parseFloat(a.amount).toFixed(2)}` : "—"}</td>
+          <td>${riskPill(a.risk_level)}</td>
+          <td>${a.status || "Pending"}</td>
+          <td>${reviewIndicator(a.status)}</td>
+          <td>${a.read_at ? '<span class="pill pill-normal">Read</span>' : '<span class="pill pill-pending">Unread</span>'}</td>
+          <td style="color:var(--text-muted);font-size:12px">${formatDate(a.created_at)}</td>
+        </tr>`;
+      }).join("")
+    : `<tr><td colspan="8"><div class="empty-state"><p>No flagged transactions found</p></div></td></tr>`;
   document.getElementById("flaggedFilterLabel").style.display = currentFlaggedRiskFilter ? "" : "none";
   document.getElementById("flaggedFilterValue").textContent = currentFlaggedRiskFilter ? `${currentFlaggedRiskFilter} Risk` : "";
 }
 
-function navigateToTransactionDetail(alertId) {
-  window.location.href = `/api/officer/alerts/${alertId}`;
+function navigateToTransactionDetail(transactionId) {
+  if (!transactionId) return;
+  window.location.href = `/transaction/${transactionId}`;
 }
 
 function setFlaggedRiskFilter(filter) {
   currentFlaggedRiskFilter = filter || null;
   renderFlaggedTransactions();
   filterTable('flaggedBody', 'flaggedSearch', 'flaggedNoResults');
+}
+
+async function markAlertAsRead(alertId) {
+  if (!alertId) return;
+  const res = await apiFetch(`/api/alerts/${alertId}/read`, { method: "POST" });
+  if (!res) return;
+  const data = await res.json();
+  if (!res.ok) return;
+  return data.alert;
 }
 
 function highlightFlaggedFilter(button) {
@@ -234,12 +255,13 @@ async function loadFlaggedTransactions() {
   const data = await res.json();
   const priority = { High: 3, Medium: 2, Low: 1 };
   data.sort((a, b) => {
-    const scoreA = parseFloat(a.risk_score) || 0;
-    const scoreB = parseFloat(b.risk_score) || 0;
-    if (scoreA !== scoreB) return scoreB - scoreA;
+    if (!!a.read_at !== !!b.read_at) return a.read_at ? 1 : -1;
     const levelA = priority[a.risk_level] || 1;
     const levelB = priority[b.risk_level] || 1;
     if (levelA !== levelB) return levelB - levelA;
+    const scoreA = parseFloat(a.risk_score) || 0;
+    const scoreB = parseFloat(b.risk_score) || 0;
+    if (scoreA !== scoreB) return scoreB - scoreA;
     return new Date(b.created_at) - new Date(a.created_at);
   });
   allFlaggedTransactions = data;
@@ -256,6 +278,10 @@ async function showFlaggedDetails(alertId) {
 
   const alert = await res.json();
   currentAlertId = alert.alert_id;
+  if (!alert.read_at) {
+    await markAlertAsRead(alert.alert_id);
+    loadFlaggedTransactions();
+  }
   document.getElementById("flaggedDetailCard").style.display = "";
   document.getElementById("detailTxnId").textContent = alert.transaction_id || "—";
   document.getElementById("detailMerchant").textContent = alert.merchant_name || alert.merchant_id || "—";

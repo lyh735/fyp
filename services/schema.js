@@ -82,6 +82,7 @@ async function ensureComplianceSchema() {
     ["risk_level", "VARCHAR(20)"],
     ["triggered_rules", "TEXT"],
     ["status", "VARCHAR(50) DEFAULT 'Pending'"],
+    ["read_at", "DATETIME NULL"],
     ["reviewed_by", "VARCHAR(100)"],
     ["reviewed_at", "DATETIME NULL"],
     ["review_notes", "TEXT"],

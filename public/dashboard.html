@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dashboard — Compliance Monitoring System</title>
   <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    .unread-row { background: rgba(254,243,199,0.7); }
+  </style>
 </head>
 <body>
 
@@ -162,6 +165,18 @@
               <div class="value" id="statMedium">—</div>
             </div>
           </div>
+          <div class="stat-card" data-target="transactions" data-filter="attention">
+            <div class="stat-icon purple">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 19V5"/>
+                <path d="M5 12h14"/>
+              </svg>
+            </div>
+            <div class="stat-info">
+              <div class="label">Needs Review</div>
+              <div class="value" id="statAttention">—</div>
+            </div>
+          </div>
           <div class="stat-card" data-target="transactions" data-filter="Low">
             <div class="stat-icon green">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -173,7 +188,7 @@
               <div class="value" id="statLow">—</div>
             </div>
           </div>
-          <div class="stat-card" data-target="alerts">
+          <div class="stat-card" data-target="alerts" data-filter="unread">
             <div class="stat-icon yellow">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -181,7 +196,7 @@
               </svg>
             </div>
             <div class="stat-info">
-              <div class="label">Active Alerts</div>
+              <div class="label">Unread Alerts</div>
               <div class="value" id="statAlerts">—</div>
             </div>
           </div>
@@ -235,6 +250,7 @@
               <button type="button" class="filter-chip active" onclick="setTransactionFilter(null); highlightTxnFilter(this)">All</button>
               <button type="button" class="filter-chip" onclick="setTransactionFilter('High'); highlightTxnFilter(this)">High</button>
               <button type="button" class="filter-chip" onclick="setTransactionFilter('Medium'); highlightTxnFilter(this)">Medium</button>
+              <button type="button" class="filter-chip" onclick="setTransactionFilter('attention'); highlightTxnFilter(this)">Needs Action</button>
               <button type="button" class="filter-chip" onclick="setTransactionFilter('Low'); highlightTxnFilter(this)">Low</button>
             </div>
             <div id="txnFilterLabel" class="filter-label" style="display:none">Filter: <span id="txnFilterValue"></span></div>
@@ -272,18 +288,19 @@
               <input class="search-input" id="alertSearch" type="text"
                 placeholder="Search by transaction ID or reason…" oninput="filterTable('alertBody','alertSearch','alertNoResults')" />
             </div>
+            <div id="alertFilterLabel" style="margin-left:16px;color:var(--text-muted);font-size:13px;display:none"></div>
           </div>
           <div class="table-wrap">
             <table>
               <thead>
-                <tr><th>Transaction ID</th><th>Reason</th><th>Risk Level</th><th>Status</th><th>Raised At</th></tr>
+                <tr><th>Transaction ID</th><th>Reason</th><th>Risk Level</th><th>Status</th><th>Read</th><th>Raised At</th></tr>
               </thead>
               <tbody id="alertBody">
-                <tr><td colspan="5"><div class="empty-state"><p>Loading…</p></div></td></tr>
+                <tr><td colspan="6"><div class="empty-state"><p>Loading…</p></div></td></tr>
               </tbody>
               <tbody>
                 <tr id="alertNoResults" style="display:none">
-                  <td colspan="5"><div class="no-results">No alerts match your search.</div></td>
+                  <td colspan="6"><div class="no-results">No alerts match your search.</div></td>
                 </tr>
               </tbody>
             </table>
@@ -300,6 +317,8 @@
               <div><strong>Amount</strong><div id="detailAmount">—</div></div>
               <div><strong>Risk Level</strong><div id="detailRiskLevel">—</div></div>
               <div><strong>Status</strong><div id="detailAlertStatus">—</div></div>
+              <div><strong>Read Status</strong><div id="detailReadStatus">—</div></div>
+              <div><strong>Read At</strong><div id="detailReadAt">—</div></div>
               <div><strong>Raised At</strong><div id="detailRaisedAt">—</div></div>
               <div style="grid-column: span 3;"><strong>Triggered Rules</strong><div id="detailTriggeredRules">—</div></div>
               <div style="grid-column: span 3;"><strong>Escalation Report</strong><div id="detailEscalationReport">—</div></div>
@@ -493,6 +512,7 @@ const navItems = document.querySelectorAll(".nav-item[data-section]");
 const sections = document.querySelectorAll(".section");
 const titleEl  = document.getElementById("sectionTitle");
 const sectionLabels = { overview: "Overview", transactions: "Transactions", alerts: "Alerts", simulator: "Transaction Simulator", account: "My Account" };
+let currentAlertFilter = null;
 
 navItems.forEach((item) => {
   item.addEventListener("click", () => {
@@ -517,20 +537,45 @@ dashboardCards.forEach((card) => {
       return;
     }
 
-    const filter = card.dataset.filter;
-    if (card.dataset.target === "transactions") {
-      setTransactionFilter(filter || null);
-      const filterName = filter || "All";
-      const button = Array.from(document.querySelectorAll('.risk-filter-group .filter-chip')).find(b => b.textContent.trim() === filterName);
-      if (button) highlightTxnFilter(button);
-    }
-
     const target = card.dataset.target;
     if (!target) return;
+
+    // First navigate to the target section so its DOM is active,
+    // then apply any filters or highlights (helps with role-based views).
     const navItem = Array.from(navItems).find(n => n.dataset.section === target);
     if (navItem) navItem.click();
+
+    const cardFilter = card.dataset.filter;
+    if (target === "transactions") {
+      setTransactionFilter(cardFilter || null);
+      const filterLabelMap = { attention: "Needs Action" };
+      const filterName = cardFilter ? (filterLabelMap[cardFilter] || `${cardFilter}`) : "All";
+      // Delay slightly to ensure the transactions section is visible before querying
+      // filter chips (fixes cases where the UI wasn't ready for officers).
+      setTimeout(() => {
+        const button = Array.from(document.querySelectorAll('.risk-filter-group .filter-chip')).find(b => b.textContent.trim() === filterName);
+        if (button) highlightTxnFilter(button);
+      }, 50);
+    }
+
+    if (target === "alerts") setAlertFilter(cardFilter || null);
   });
 });
+
+function setAlertFilter(filter) {
+  currentAlertFilter = filter || null;
+  const label = document.getElementById("alertFilterLabel");
+  if (label) {
+    if (filter === "unread") {
+      label.textContent = "Showing unread alerts only";
+      label.style.display = "inline-block";
+    } else {
+      label.textContent = "";
+      label.style.display = "none";
+    }
+  }
+  loadAlerts();
+}
 
 // ── HELPERS ──
 function toggleInput(id) {
@@ -600,18 +645,31 @@ function navigateToTransactionDetail(transactionId) {
 
 function navigateToAlertDetails(alertId) {
   if (!alertId) return;
-  window.location.href = `/api/officer/alerts/${alertId}`;
+  showAlertDetails(alertId);
+}
+
+async function markAlertAsRead(alertId) {
+  if (!alertId) return;
+  const res = await apiFetch(`/api/alerts/${alertId}/read`, { method: "POST" });
+  if (!res) return;
+  await res.json();
 }
 
 function renderTransactions() {
-  const data = currentTransactionFilter
-    ? allTransactions.filter(t => t.risk_level === currentTransactionFilter)
-    : allTransactions;
+  const data = currentTransactionFilter === "attention"
+    ? allTransactions.filter(t => t.risk_level === "High" || t.risk_level === "Medium")
+    : currentTransactionFilter
+      ? allTransactions.filter(t => t.risk_level === currentTransactionFilter)
+      : allTransactions;
   const body = document.getElementById("txnBody");
   const empty = `<tr><td colspan="8"><div class="empty-state"><p>No transactions found</p></div></td></tr>`;
   body.innerHTML = data.length ? data.map(txnRow).join("") : empty;
   document.getElementById("txnFilterLabel").style.display = currentTransactionFilter ? "" : "none";
-  document.getElementById("txnFilterValue").textContent = currentTransactionFilter ? `${currentTransactionFilter} Risk` : "";
+  document.getElementById("txnFilterValue").textContent = currentTransactionFilter
+    ? currentTransactionFilter === "attention"
+      ? "Medium / High Risk"
+      : `${currentTransactionFilter} Risk`
+    : "";
 }
 
 function setTransactionFilter(filter) {
@@ -665,6 +723,7 @@ async function loadTransactions() {
   document.getElementById("statTxnTotal").textContent   = data.length;
   document.getElementById("statLow").textContent        = lowCount;
   document.getElementById("statMedium").textContent     = mediumCount;
+  document.getElementById("statAttention").textContent  = highCount + mediumCount;
   document.getElementById("statHigh").textContent       = highCount;
   document.getElementById("statSuspicious").textContent = data.filter(t => t.status === "suspicious").length;
 }
@@ -675,28 +734,36 @@ async function loadAlerts() {
   const data = await res.json();
   const priority = { High: 3, Medium: 2, Low: 1 };
   data.sort((a, b) => {
-    const scoreA = parseFloat(a.risk_score) || 0;
-    const scoreB = parseFloat(b.risk_score) || 0;
-    if (scoreA !== scoreB) return scoreB - scoreA;
+    if (!!a.read_at !== !!b.read_at) return a.read_at ? 1 : -1;
     const levelA = priority[a.risk_level] || 1;
     const levelB = priority[b.risk_level] || 1;
     if (levelA !== levelB) return levelB - levelA;
+    const scoreA = parseFloat(a.risk_score) || 0;
+    const scoreB = parseFloat(b.risk_score) || 0;
+    if (scoreA !== scoreB) return scoreB - scoreA;
     return new Date(b.created_at) - new Date(a.created_at);
   });
+  const filtered = currentAlertFilter === "unread" ? data.filter(a => !a.read_at) : data;
   const body = document.getElementById("alertBody");
-  body.innerHTML = data.length
-    ? data.map(a => `<tr data-alert-id="${a.alert_id}" onclick="navigateToAlertDetails('${a.alert_id}')" style="cursor:pointer" data-searchable="${`${a.transaction_id} ${a.message} ${a.risk_level} ${a.status}`.toLowerCase()}">
-        <td style="font-family:monospace;font-size:12px">${a.transaction_id}</td>
-        <td>${a.message}</td>
-        <td>${riskPill(a.risk_level)}</td>
-        <td>${a.status || "Pending"}</td>
-        <td style="color:var(--text-muted);font-size:12px">${formatDate(a.created_at)}</td>
-      </tr>`).join("")
-    : `<tr><td colspan="5"><div class="empty-state"><p>No alerts — all clear!</p></div></td></tr>`;
-  document.getElementById("statAlerts").textContent = data.length;
+  body.innerHTML = filtered.length
+    ? filtered.map(a => {
+        const unread = !a.read_at;
+        const txnId = encodeURIComponent(a.transaction_id || "");
+        return `<tr class="${unread ? 'unread-row' : ''}" data-alert-id="${a.alert_id}" onclick="navigateToTransactionDetail('${txnId}')" style="cursor:pointer" data-searchable="${`${a.transaction_id} ${a.message} ${a.risk_level} ${a.status}`.toLowerCase()}">
+          <td style="font-family:monospace;font-size:12px">${a.transaction_id}</td>
+          <td>${a.message}</td>
+          <td>${riskPill(a.risk_level)}</td>
+          <td>${a.status || "Pending"}</td>
+          <td>${a.read_at ? '<span class="pill pill-normal">Read</span>' : '<span class="pill pill-pending">Unread</span>'}</td>
+          <td style="color:var(--text-muted);font-size:12px">${formatDate(a.created_at)}</td>
+        </tr>`;
+      }).join("")
+    : `<tr><td colspan="6"><div class="empty-state"><p>No alerts — all clear!</p></div></td></tr>`;
+  const unreadCount = data.filter(a => !a.read_at).length;
+  document.getElementById("statAlerts").textContent = unreadCount;
   const badge = document.getElementById("alertCount");
-  if (data.length > 0) {
-    badge.textContent = data.length;
+  if (unreadCount > 0) {
+    badge.textContent = unreadCount;
     badge.style.display = "";
   } else {
     badge.style.display = "none";
@@ -713,7 +780,16 @@ async function showAlertDetails(alertId) {
     return;
   }
 
-  const alert = await res.json();
+  let alert = await res.json();
+  if (!alert.read_at) {
+    await markAlertAsRead(alert.alert_id);
+    await loadAlerts();
+    const res2 = await apiFetch(`/api/alerts/${alertId}`);
+    if (res2 && res2.ok) {
+      alert = await res2.json();
+    }
+  }
+
   currentAlertId = alert.alert_id;
   document.getElementById("alertDetailCard").style.display = "";
   document.getElementById("detailTxnId").textContent = alert.transaction_id || "—";
@@ -721,6 +797,8 @@ async function showAlertDetails(alertId) {
   document.getElementById("detailAmount").textContent = alert.amount ? `$${parseFloat(alert.amount).toLocaleString("en-SG", { minimumFractionDigits: 2 })}` : "—";
   document.getElementById("detailRiskLevel").textContent = alert.risk_level || "—";
   document.getElementById("detailAlertStatus").textContent = alert.status || "Pending";
+  document.getElementById("detailReadStatus").textContent = alert.read_at ? "Read" : "Unread";
+  document.getElementById("detailReadAt").textContent = alert.read_at ? formatDate(alert.read_at) : "—";
   document.getElementById("detailRaisedAt").textContent = formatDate(alert.created_at);
 
   let triggered = alert.triggered_rules;
@@ -871,6 +949,7 @@ loadUsers();
 // ══════════════════════════════════════════
 let simInterval  = null;
 let simCounts    = { total: 0, normal: 0, review: 0, suspicious: 0 };
+let lastSimTxnId = null;
 const MAX_FEED   = 20;
 
 function toggleSimulator() {
@@ -917,9 +996,10 @@ async function runOneTxn() {
   if (!data.transaction) return;
 
   const t = data.transaction;
+  lastSimTxnId = t.transaction_id || null;
   simCounts.total++;
-  if (t.status === "suspicious") simCounts.suspicious++;
-  else if (t.status === "review") simCounts.review++;
+  if (t.risk_level === "High") simCounts.suspicious++;
+  else if (t.risk_level === "Medium") simCounts.review++;
   else simCounts.normal++;
 
   updateSimStats();
@@ -968,9 +1048,31 @@ document.getElementById("simSpeed")?.addEventListener("change", () => {
 const socket = io();
 socket.on("newAlert", (alert) => {
   showToast("Suspicious Transaction", `ID: ${alert.transaction_id} — Risk: ${alert.risk_score}`);
+  updateSimCountsFromAlert(alert);
   loadTransactions();
   loadAlerts();
 });
+
+function updateSimCountsFromAlert(alert) {
+  if (!alert) return;
+  if (alert.transaction_id && alert.transaction_id === lastSimTxnId) {
+    lastSimTxnId = null;
+    return;
+  }
+
+  const alertRiskLevel = String(alert.risk_level || alert.status || "").toLowerCase();
+  if (alertRiskLevel === "high") {
+    simCounts.total++;
+    simCounts.suspicious++;
+  } else if (alertRiskLevel === "medium") {
+    simCounts.total++;
+    simCounts.review++;
+  } else {
+    return;
+  }
+
+  updateSimStats();
+}
 
 function showToast(title, body) {
   const container = document.getElementById("toastContainer");

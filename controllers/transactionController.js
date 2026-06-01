@@ -336,6 +336,11 @@ exports.showTransactionDetailsPage = async (req, res) => {
     );
     const alert = alerts[0] || null;
 
+    if (alert && !alert.read_at) {
+      await query("UPDATE alerts SET read_at = NOW() WHERE alert_id = ?", [alert.alert_id]);
+      alert.read_at = new Date();
+    }
+
     res.render("transactionDetails", { transaction, alert });
   } catch (err) {
     console.error(err);
@@ -345,7 +350,7 @@ exports.showTransactionDetailsPage = async (req, res) => {
 
 exports.getAlerts = async (req, res) => {
   const status = req.query.status || "Pending";
-  const orderByRisk = "FIELD(a.risk_level, 'High', 'Medium', 'Low'), a.created_at DESC";
+  const orderByRisk = "a.read_at IS NOT NULL, FIELD(a.risk_level, 'High', 'Medium', 'Low'), a.created_at DESC";
   const sql = status === "all"
     ? `SELECT a.*, t.merchant_name, t.amount, t.currency, t.transaction_type, t.ip_address, t.country
        FROM alerts a
@@ -371,6 +376,23 @@ exports.getAlert = async (req, res) => {
     const alert = await getAlertById(req.params.id);
     if (!alert) return res.status(404).json({ message: "Alert not found" });
     res.json(alert);
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.markAlertRead = async (req, res) => {
+  try {
+    const alert = await getAlertById(req.params.id);
+    if (!alert) return res.status(404).json({ message: "Alert not found" });
+    if (!alert.read_at) {
+      await query(
+        `UPDATE alerts SET read_at = NOW() WHERE alert_id = ?`,
+        [req.params.id]
+      );
+    }
+    const updated = await getAlertById(req.params.id);
+    res.json({ message: "Alert marked as read", alert: updated });
   } catch (err) {
     res.status(500).json({ message: "Server error" });
   }

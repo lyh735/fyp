@@ -86,6 +86,16 @@
         <div class="col-md-6">
           <div class="label-title">Alert Status</div>
           <h4><%= alert.status || 'Pending' %></h4>
+      </div>
+      </div>
+      <div class="row mb-3">
+        <div class="col-md-6">
+          <div class="label-title">Read Status</div>
+          <h4><%= alert.read_at ? 'Read' : 'Unread' %></h4>
+        </div>
+        <div class="col-md-6">
+          <div class="label-title">Read At</div>
+          <h4><%= alert.read_at ? new Date(alert.read_at).toLocaleString('en-SG', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—' %></h4>
         </div>
       </div>
       <div class="mb-3">
@@ -96,8 +106,40 @@
         <div class="label-title">Escalation Report</div>
         <p><%= alert.escalation_report || '—' %></p>
       </div>
+      <div class="row mb-3">
+        <div class="col-md-6">
+          <div class="label-title">Reviewed By</div>
+          <h4><%= alert.officer_name || '—' %></h4>
+        </div>
+        <div class="col-md-6">
+          <div class="label-title">Reviewed At</div>
+          <h4><%= alert.reviewed_at ? new Date(alert.reviewed_at).toLocaleString('en-SG', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—' %></h4>
+        </div>
+      </div>
       <div class="d-flex gap-2">
-        <a class="btn btn-primary" href="/api/officer/alerts/<%= encodeURIComponent(alert.alert_id) %>">View Alert Details</a>
+        <% if (alert.status === 'Pending') { %>
+          <div class="w-100">
+            <form id="alertActionForm">
+              <div class="mb-3">
+                <label for="officerName" class="form-label">Officer Name</label>
+                <input id="officerName" class="form-control" type="text" required />
+              </div>
+              <div class="mb-3">
+                <label for="officerNotes" class="form-label">Officer Notes</label>
+                <textarea id="officerNotes" class="form-control" rows="4" required></textarea>
+              </div>
+              <div class="d-flex gap-2">
+                <button type="button" id="dismissBtn" class="btn btn-secondary" onclick="submitAlertAction('dismiss')">Dismiss</button>
+                <button type="button" id="escalateBtn" class="btn btn-danger" onclick="submitAlertAction('escalate')">Escalate</button>
+              </div>
+            </form>
+          </div>
+        <% } else { %>
+          <div class="w-100">
+            <div class="label-title">Review Notes</div>
+            <p><%= alert.officer_notes || '—' %></p>
+          </div>
+        <% } %>
       </div>
     </div>
   <% } else { %>
@@ -107,5 +149,43 @@
     </div>
   <% } %>
 </div>
+<% if (alert) { %>
+<script>
+  async function submitAlertAction(action) {
+    const name = document.getElementById('officerName')?.value.trim();
+    const notes = document.getElementById('officerNotes')?.value.trim();
+    if (!name || !notes) {
+      alert('Officer name and notes are required.');
+      return;
+    }
+
+    const alertId = '<%= alert.alert_id %>';
+    const btn = document.getElementById(action === 'dismiss' ? 'dismissBtn' : 'escalateBtn');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = action === 'dismiss' ? 'Dismissing…' : 'Escalating…';
+    }
+
+    try {
+      const res = await fetch(`/api/alerts/${encodeURIComponent(alertId)}/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ officer_name: name, officer_notes: notes }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Unable to complete action.');
+      alert(data.message || 'Action completed successfully.');
+      window.location.reload();
+    } catch (err) {
+      alert(err.message || 'Unable to complete action. Please try again.');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = action === 'dismiss' ? 'Dismiss' : 'Escalate';
+      }
+    }
+  }
+</script>
+<% } %>
 </body>
 </html>

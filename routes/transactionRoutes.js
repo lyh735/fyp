@@ -6,6 +6,7 @@ const {
   getTransactions,
   getAlerts,
   getAlert,
+  markAlertRead,
   dismissAlert,
   escalateAlert,
 } = require("../controllers/transactionController");
@@ -15,6 +16,7 @@ router.post("/transactions",       authenticate, createTransaction);
 router.get ("/transactions",       authenticate, getTransactions);
 router.get ("/alerts",             authenticate, getAlerts);
 router.get ("/alerts/:id",         authenticate, getAlert);
+router.post("/alerts/:id/read",    authenticate, markAlertRead);
 router.post("/alerts/:id/dismiss", authenticate, dismissAlert);
 router.post("/alerts/:id/escalate",authenticate, escalateAlert);
 router.post("/simulate",           authenticate, requireAdmin, simulate);
