@@ -625,7 +625,8 @@ let currentTransactionFilter = null;
 
 function txnRow(t) {
   const searchable = `${t.transaction_id} ${t.merchant_name||''} ${t.payment_method||''} ${t.country} ${t.status} ${t.risk_level}`.toLowerCase();
-  return `<tr data-searchable="${searchable}">
+  const txnId = encodeURIComponent(t.transaction_id || "");
+  return `<tr data-searchable="${searchable}" onclick="navigateToTransactionDetail('${txnId}')" style="cursor:pointer">
     <td style="font-family:monospace;font-size:11.5px;color:var(--text-muted)">${t.transaction_id || "—"}</td>
     <td style="font-weight:600;max-width:160px">${t.merchant_name || t.user_id || "—"}</td>
     <td>${pmBadge(t.payment_method)}</td>
@@ -635,6 +636,16 @@ function txnRow(t) {
     <td>${statusPill(t.status||"normal")}</td>
     <td style="color:var(--text-muted);font-size:12px">${formatDate(t.txn_time)}</td>
   </tr>`;
+}
+
+function navigateToTransactionDetail(transactionId) {
+  if (!transactionId) return;
+  window.location.href = `/transaction/${transactionId}`;
+}
+
+function navigateToAlertDetails(alertId) {
+  if (!alertId) return;
+  window.location.href = `/api/officer/alerts/${alertId}`;
 }
 
 function renderTransactions() {
@@ -719,7 +730,7 @@ async function loadAlerts() {
   });
   const body = document.getElementById("alertBody");
   body.innerHTML = data.length
-    ? data.map(a => `<tr data-alert-id="${a.alert_id}" onclick="showAlertDetails('${a.alert_id}')" data-searchable="${`${a.transaction_id} ${a.message} ${a.risk_level} ${a.status}`.toLowerCase()}">
+    ? data.map(a => `<tr data-alert-id="${a.alert_id}" onclick="navigateToAlertDetails('${a.alert_id}')" style="cursor:pointer" data-searchable="${`${a.transaction_id} ${a.message} ${a.risk_level} ${a.status}`.toLowerCase()}">
         <td style="font-family:monospace;font-size:12px">${a.transaction_id}</td>
         <td>${a.message}</td>
         <td>${riskPill(a.risk_level)}</td>

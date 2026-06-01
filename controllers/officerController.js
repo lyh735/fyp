@@ -24,12 +24,10 @@ exports.showAlertDetails = (req, res) => {
 
   const alertId = req.params.id;
 
-  const sql = `
-    SELECT * FROM alerts
-    WHERE id = ?
-  `;
 
-  db.query(sql, [alertId], (err, results) => {
+  const sql = "SELECT * FROM alerts WHERE id = ? OR alert_id = ? LIMIT 1";
+
+  db.query(sql, [alertId, alertId], (err, results) => {
 
     if (err) {
       console.error(err);

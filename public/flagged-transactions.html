@@ -92,7 +92,7 @@
           <table>
             <thead>
               <tr>
-                <th>Transaction ID</th><th>Merchant</th><th>Amount</th><th>Risk Level</th><th>Status</th><th>Raised At</th>
+                <th>Transaction ID</th><th>Merchant</th><th>Amount</th><th>Risk Level</th><th>Status</th><th>Review</th><th>Raised At</th>
               </tr>
             </thead>
             <tbody id="flaggedBody">
@@ -114,6 +114,7 @@
             <div><strong>Amount</strong><div id="detailAmount">—</div></div>
             <div><strong>Risk Level</strong><div id="detailRiskLevel">—</div></div>
             <div><strong>Status</strong><div id="detailAlertStatus">—</div></div>
+            <div><strong>Review Status</strong><div id="detailReviewStatus">—</div></div>
             <div><strong>Raised At</strong><div id="detailRaisedAt">—</div></div>
             <div style="grid-column: span 3;"><strong>Triggered Rules</strong><div id="detailTriggeredRules">—</div></div>
             <div style="grid-column: span 3;"><strong>Escalation Report</strong><div id="detailEscalationReport">—</div></div>
@@ -148,6 +149,11 @@ function riskPill(level) {
   const safe = String(level || "Low").toLowerCase();
   const labels = { low: "Low", medium: "Medium", high: "High" };
   return `<span class="pill pill-${safe}">${labels[safe] || level}</span>`;
+}
+
+function reviewIndicator(status) {
+  const reviewed = status && status !== "Pending";
+  return `<span class="pill pill-${reviewed ? 'green' : 'yellow'}">${reviewed ? 'Reviewed' : 'Not reviewed'}</span>`;
 }
 
 function showToast(title, body) {
@@ -191,17 +197,22 @@ function renderFlaggedTransactions() {
     : allFlaggedTransactions;
   const body = document.getElementById("flaggedBody");
   body.innerHTML = data.length
-    ? data.map(a => `<tr data-alert-id="${a.alert_id}" onclick="showFlaggedDetails('${a.alert_id}')" data-searchable="${`${a.transaction_id} ${a.message} ${a.risk_level} ${a.status}`.toLowerCase()}">
+    ? data.map(a => `<tr data-alert-id="${a.alert_id}" onclick="navigateToTransactionDetail('${encodeURIComponent(a.alert_id)}')" data-searchable="${`${a.transaction_id} ${a.message} ${a.risk_level} ${a.status}`.toLowerCase()}">
         <td style="font-family:monospace;font-size:12px">${a.transaction_id}</td>
         <td>${a.merchant_id || "—"}</td>
         <td>${a.amount ? `$${parseFloat(a.amount).toFixed(2)}` : "—"}</td>
         <td>${riskPill(a.risk_level)}</td>
         <td>${a.status || "Pending"}</td>
+        <td>${reviewIndicator(a.status)}</td>
         <td style="color:var(--text-muted);font-size:12px">${formatDate(a.created_at)}</td>
       </tr>`).join("")
     : `<tr><td colspan="6"><div class="empty-state"><p>No flagged transactions found</p></div></td></tr>`;
   document.getElementById("flaggedFilterLabel").style.display = currentFlaggedRiskFilter ? "" : "none";
   document.getElementById("flaggedFilterValue").textContent = currentFlaggedRiskFilter ? `${currentFlaggedRiskFilter} Risk` : "";
+}
+
+function navigateToTransactionDetail(alertId) {
+  window.location.href = `/api/officer/alerts/${alertId}`;
 }
 
 function setFlaggedRiskFilter(filter) {
@@ -251,6 +262,7 @@ async function showFlaggedDetails(alertId) {
   document.getElementById("detailAmount").textContent = alert.amount ? `$${parseFloat(alert.amount).toLocaleString("en-SG", { minimumFractionDigits: 2 })}` : "—";
   document.getElementById("detailRiskLevel").innerHTML = riskPill(alert.risk_level);
   document.getElementById("detailAlertStatus").textContent = alert.status || "Pending";
+  document.getElementById("detailReviewStatus").innerHTML = reviewIndicator(alert.status);
   document.getElementById("detailRaisedAt").textContent = formatDate(alert.created_at);
   let triggered = alert.triggered_rules;
   try { const parsed = JSON.parse(alert.triggered_rules); if (Array.isArray(parsed)) triggered = parsed.join("; "); } catch {}
