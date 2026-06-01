@@ -118,27 +118,7 @@
       </div>
       <div class="d-flex gap-2">
         <% if (alert.status === 'Pending') { %>
-          <div class="w-100">
-            <form id="alertActionForm">
-              <div class="mb-3">
-                <label for="officerName" class="form-label">Officer Name</label>
-                <input id="officerName" class="form-control" type="text" required />
-              </div>
-              <div class="mb-3">
-                <label for="officerNotes" class="form-label">Officer Notes</label>
-                <textarea id="officerNotes" class="form-control" rows="4" required></textarea>
-              </div>
-              <div class="d-flex gap-2">
-                <button type="button" id="dismissBtn" class="btn btn-secondary" onclick="submitAlertAction('dismiss')">Dismiss</button>
-                <button type="button" id="escalateBtn" class="btn btn-danger" onclick="submitAlertAction('escalate')">Escalate</button>
-              </div>
-            </form>
-          </div>
-        <% } else { %>
-          <div class="w-100">
-            <div class="label-title">Review Notes</div>
-            <p><%= alert.officer_notes || '—' %></p>
-          </div>
+          <button type="button" class="btn btn-danger" onclick="goToAlertAction(<%= alert.id %>)">Take Action</button>
         <% } %>
       </div>
     </div>
@@ -149,43 +129,10 @@
     </div>
   <% } %>
 </div>
-<% if (alert) { %>
 <script>
-  async function submitAlertAction(action) {
-    const name = document.getElementById('officerName')?.value.trim();
-    const notes = document.getElementById('officerNotes')?.value.trim();
-    if (!name || !notes) {
-      alert('Officer name and notes are required.');
-      return;
-    }
-
-    const alertId = '<%= alert.alert_id %>';
-    const btn = document.getElementById(action === 'dismiss' ? 'dismissBtn' : 'escalateBtn');
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = action === 'dismiss' ? 'Dismissing…' : 'Escalating…';
-    }
-
-    try {
-      const res = await fetch(`/api/alerts/${encodeURIComponent(alertId)}/${action}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ officer_name: name, officer_notes: notes }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Unable to complete action.');
-      alert(data.message || 'Action completed successfully.');
-      window.location.reload();
-    } catch (err) {
-      alert(err.message || 'Unable to complete action. Please try again.');
-    } finally {
-      if (btn) {
-        btn.disabled = false;
-        btn.textContent = action === 'dismiss' ? 'Dismiss' : 'Escalate';
-      }
-    }
+  function goToAlertAction(alertId) {
+    window.location.href = `/api/officer/alerts/${alertId}/action`;
   }
 </script>
-<% } %>
 </body>
 </html>

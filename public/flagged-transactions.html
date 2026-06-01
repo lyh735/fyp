@@ -324,10 +324,13 @@ async function showFlaggedDetails(alertId) {
   actions.innerHTML = "";
   if (alert.status === "Pending") {
     actions.innerHTML = `
-      <button class="btn btn-secondary" onclick="dismissCurrentAlert()">Dismiss</button>
-      <button class="btn btn-danger" onclick="escalateCurrentAlert()">Escalate</button>
+      <button class="btn btn-danger" onclick="goToAlertAction(${alert.id})">Take Action</button>
     `;
   }
+}
+
+function goToAlertAction(alertId) {
+  window.location.href = `/api/officer/alerts/${alertId}/action`;
 }
 
 async function dismissCurrentAlert() {

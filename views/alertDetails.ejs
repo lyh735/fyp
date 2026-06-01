@@ -168,67 +168,11 @@
 
     <h3 class="mb-4">Officer Review</h3>
 
-    <form action="/api/officer/action" method="POST">
-
-      <input
-        type="hidden"
-        name="alert_id"
-        value="<%= alert.id %>"
-      >
-      <input type="hidden" name="action_type" id="actionType">
-
-      <div class="mb-3">
-
-        <input
-          type="text"
-          class="form-control"
-          name="officer_name"
-          placeholder="Officer Name"
-          required
-        >
-
-      </div>
-
-      <div class="mb-4">
-
-        <textarea
-          class="form-control"
-          rows="6"
-          name="remarks"
-          placeholder="Add notes about this alert..."
-        ></textarea>
-
-      </div>
-
-      <div class="row">
-
-        <div class="col-md-6 mb-3">
-
-          <button
-            type="button"
-            onclick="submitAction('dismiss')"
-            class="btn btn-secondary w-100 p-3 fs-4"
-          >
-            ✖ Dismiss Alert
-          </button>
-
-        </div>
-
-        <div class="col-md-6 mb-3">
-
-          <button
-            type="button"
-            onclick="submitAction('escalate')"
-            class="btn btn-danger w-100 p-3 fs-4"
-          >
-            ⬆ Escalate Alert
-          </button>
-
-        </div>
-
-      </div>
-
-    </form>
+    <% if(alert.status === 'Pending') { %>
+      <button type="button" class="btn btn-danger" onclick="goToAlertAction(<%= alert.id %>)">Take Action</button>
+    <% } else { %>
+      <p class="text-muted">This alert has already been reviewed and cannot be modified.</p>
+    <% } %>
 
   </div>
 
@@ -238,12 +182,8 @@
 </html>
 <script>
 
-function submitAction(action){
-
-  document.getElementById("actionType").value = action;
-
-  document.forms[0].submit();
-
+function goToAlertAction(alertId) {
+  window.location.href = `/api/officer/alerts/${alertId}/action`;
 }
 
 </script>

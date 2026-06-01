@@ -46,6 +46,31 @@ exports.showAlertDetails = (req, res) => {
 
 };
 
+exports.showAlertActionPage = (req, res) => {
+
+  const alertId = req.params.id;
+
+  const sql = "SELECT * FROM alerts WHERE id = ? OR alert_id = ? LIMIT 1";
+
+  db.query(sql, [alertId, alertId], (err, results) => {
+
+    if (err) {
+      console.error(err);
+      return res.send("Database error");
+    }
+
+    if (results.length === 0) {
+      return res.send("Alert not found");
+    }
+
+    res.render("alertAction", {
+      alert: results[0]
+    });
+
+  });
+
+};
+
 exports.takeActionPage = (req, res) => {
 
   const {
@@ -55,115 +80,131 @@ exports.takeActionPage = (req, res) => {
     remarks
   } = req.body;
 
-  let newStatus = "Pending Review";
-
-  if (action_type === "review") {
-    newStatus = "Reviewed";
-  }
-
-  if (action_type === "dismiss") {
-    newStatus = "Dismissed";
-  }
-
-  if (action_type === "escalate") {
-    newStatus = "Escalated";
-  }
-
-  const updateAlertSql = `
-    UPDATE alerts
-    SET status = ?, reviewed_at = NOW()
-    WHERE id = ?
-  `;
-
-  const insertActionSql = `
-    INSERT INTO officer_actions
-    (
-      alert_id,
-      officer_name,
-      action_type,
-      remarks
-    )
-    VALUES (?, ?, ?, ?)
-  `;
-
-  const insertAuditSql = `
-    INSERT INTO audit_logs
-    (
-      event_type,
-      transaction_id,
-      merchant_id,
-      message,
-      officer_name,
-      action,
-      details
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `;
-
-  db.query(updateAlertSql, [newStatus, alert_id], (err) => {
-
+  // First, fetch the alert details
+  const selectAlertSql = "SELECT * FROM alerts WHERE id = ? LIMIT 1";
+  
+  db.query(selectAlertSql, [alert_id], (err, alerts) => {
     if (err) {
       console.error(err);
-      return res.send("Error updating alert");
+      return res.status(500).send("Error fetching alert");
     }
 
-    db.query(
-      insertActionSql,
-      [
+    if (alerts.length === 0) {
+      return res.status(404).send("Alert not found");
+    }
+
+    const alert = alerts[0];
+    let newStatus = "Pending Review";
+
+    if (action_type === "review") {
+      newStatus = "Reviewed";
+    }
+
+    if (action_type === "dismiss") {
+      newStatus = "Dismissed";
+    }
+
+    if (action_type === "escalate") {
+      newStatus = "Escalated";
+    }
+
+    const updateAlertSql = `
+      UPDATE alerts
+      SET status = ?, reviewed_at = NOW()
+      WHERE id = ?
+    `;
+
+    const insertActionSql = `
+      INSERT INTO officer_actions
+      (
         alert_id,
         officer_name,
         action_type,
         remarks
-      ],
-      (err) => {
+      )
+      VALUES (?, ?, ?, ?)
+    `;
 
-        if (err) {
-          console.error(err);
-          return res.send("Error saving officer action");
-        }
+    const insertAuditSql = `
+      INSERT INTO audit_logs
+      (
+        event_type,
+        transaction_id,
+        merchant_id,
+        message,
+        officer_name,
+        action,
+        details
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `;
 
-        const details = `
+    db.query(updateAlertSql, [newStatus, alert_id], (err) => {
+
+      if (err) {
+        console.error(err);
+        return res.status(500).send("Error updating alert");
+      }
+
+      db.query(
+        insertActionSql,
+        [
+          alert_id,
+          officer_name,
+          action_type,
+          remarks
+        ],
+        (err) => {
+
+          if (err) {
+            console.error(err);
+            return res.status(500).send("Error saving officer action");
+          }
+
+          const details = `
 Officer ${officer_name} performed ${action_type}
 on alert database ID ${alert_id}.
 Remarks: ${remarks || "None"}
 `;
 
-        const eventType =
-          action_type === "escalate"
-            ? "Compliance Escalation"
-            : action_type === "dismiss"
-            ? "Alert Dismissal"
-            : "Alert Review";
+          const eventType =
+            action_type === "escalate"
+              ? "Compliance Escalation"
+              : action_type === "dismiss"
+              ? "Alert Dismissal"
+              : "Alert Review";
 
-        const message = details;
+          const message = details;
 
-        db.query(
-          insertAuditSql,
-          [
-            eventType,
-            alert_id,
-            null,
-            message,
-            officer_name,
-            action_type,
-            details
-          ],
-          (err) => {
+          db.query(
+            insertAuditSql,
+            [
+              eventType,
+              alert.transaction_id,
+              alert.merchant_id,
+              message,
+              officer_name,
+              action_type,
+              details
+            ],
+            (err) => {
 
-            if (err) {
-              console.error(err);
-              return res.send("Error saving audit log");
+              if (err) {
+                console.error(err);
+                return res.status(500).send("Error saving audit log");
+              }
+
+              res.redirect(
+                `/api/officer/action-success/${alert_id}?action=${action_type}`
+              );
+
             }
+          );
 
-            res.redirect(
-              `/api/officer/action-success/${alert_id}?action=${action_type}`
-            );
+        }
+      );
 
-          }
-        );
-
-      }
-    );
+    });
 
   });
 

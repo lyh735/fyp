@@ -5,6 +5,7 @@ const officerController = require("../controllers/officerController");
 
 router.get("/alerts", officerController.showAlertsPage);
 router.get("/alerts/:id", officerController.showAlertDetails);
+router.get("/alerts/:id/action", officerController.showAlertActionPage);
 
 router.post("/action", officerController.takeActionPage);
 

@@ -735,13 +735,14 @@ async function loadAlerts() {
     if (scoreA !== scoreB) return scoreB - scoreA;
     return new Date(b.created_at) - new Date(a.created_at);
   });
-  const filtered = currentAlertFilter === "unread" ? data.filter(a => !a.read_at) : data;
+  // Only show pending alerts (exclude dismissed/escalated)
+  const pendingAlerts = data.filter(a => a.status === "Pending");
+  const filtered = currentAlertFilter === "unread" ? pendingAlerts.filter(a => !a.read_at) : pendingAlerts;
   const body = document.getElementById("alertBody");
   body.innerHTML = filtered.length
     ? filtered.map(a => {
         const unread = !a.read_at;
-        const txnId = encodeURIComponent(a.transaction_id || "");
-        return `<tr class="${unread ? 'unread-row' : ''}" data-alert-id="${a.alert_id}" onclick="navigateToTransactionDetail('${txnId}')" style="cursor:pointer" data-searchable="${`${a.transaction_id} ${a.message} ${a.risk_level} ${a.status}`.toLowerCase()}">
+        return `<tr class="${unread ? 'unread-row' : ''}" data-alert-id="${a.alert_id}" onclick="showAlertDetails(${a.id})" style="cursor:pointer" data-searchable="${`${a.transaction_id} ${a.message} ${a.risk_level} ${a.status}`.toLowerCase()}">
           <td style="font-family:monospace;font-size:12px">${a.transaction_id}</td>
           <td>${a.message}</td>
           <td>${riskPill(a.risk_level)}</td>
@@ -751,7 +752,7 @@ async function loadAlerts() {
         </tr>`;
       }).join("")
     : `<tr><td colspan="6"><div class="empty-state"><p>No alerts — all clear!</p></div></td></tr>`;
-  const unreadCount = data.filter(a => !a.read_at).length;
+  const unreadCount = pendingAlerts.filter(a => !a.read_at).length;
   document.getElementById("statAlerts").textContent = unreadCount;
   const badge = document.getElementById("alertCount");
   if (unreadCount > 0) {
@@ -802,10 +803,13 @@ async function showAlertDetails(alertId) {
   actions.innerHTML = "";
   if (alert.status === "Pending") {
     actions.innerHTML = `
-      <button class="btn btn-secondary" onclick="dismissCurrentAlert()">Dismiss</button>
-      <button class="btn btn-danger" onclick="escalateCurrentAlert()">Escalate</button>
+      <button class="btn btn-danger" onclick="goToAlertAction(${alert.id})">Take Action</button>
     `;
   }
+}
+
+function goToAlertAction(alertId) {
+  window.location.href = `/api/officer/alerts/${alertId}/action`;
 }
 
 async function dismissCurrentAlert() {
