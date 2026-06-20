@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Overview - Compliance Monitoring System</title>
+  <title>Alerts - Compliance Monitoring System</title>
   <link rel="stylesheet" href="/css/style.css" />
   <style>
     .unread-row { background: rgba(254,243,199,0.7); }
   </style>
 </head>
-<body data-page="overview">
+<body data-page="alerts">
 
 <div class="app-layout">
   <!-- Sidebar -->
@@ -28,7 +28,7 @@
 
     <nav class="sidebar-nav">
       <div class="nav-section-label">Main</div>
-      <div class="nav-item active" onclick="window.location.href='/dashboard.html'">
+      <div class="nav-item" onclick="window.location.href='/dashboard.html'">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
           <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
@@ -42,7 +42,7 @@
         </svg>
         Transactions
       </div>
-      <div class="nav-item" onclick="window.location.href='/alerts.html'">
+      <div class="nav-item active" onclick="window.location.href='/alerts.html'">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
           <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
@@ -111,7 +111,7 @@
   <!-- Main -->
   <div class="main-content">
     <div class="topbar">
-      <h2 id="sectionTitle">Overview</h2>
+      <h2 id="sectionTitle">Alerts</h2>
       <div class="topbar-right">
         <div class="topbar-user">
           <span id="topbarRole" class="badge"></span>
@@ -122,111 +122,54 @@
 
     <div class="content-area">
 
-      <!-- OVERVIEW SECTION -->
-      <div class="section active" id="section-overview">
-
-        <div class="stats-grid">
-          <div class="stat-card" data-target="transactions">
-            <div class="stat-icon blue">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="12" y1="1" x2="12" y2="23"/>
-                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-              </svg>
-            </div>
-            <div class="stat-info">
-              <div class="label">Total Transactions</div>
-              <div class="value" id="statTxnTotal">—</div>
-            </div>
-          </div>
-          <div class="stat-card" data-target="transactions" data-filter="High">
-            <div class="stat-icon red">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-              </svg>
-            </div>
-            <div class="stat-info">
-              <div class="label">High Risk</div>
-              <div class="value" id="statHigh">—</div>
-            </div>
-          </div>
-          <div class="stat-card" data-target="transactions" data-filter="Medium">
-            <div class="stat-icon orange">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 2a10 10 0 0 0-3.22 19.48"/>
-                <path d="M12 2a10 10 0 0 1 3.22 19.48"/>
-              </svg>
-            </div>
-            <div class="stat-info">
-              <div class="label">Medium Risk</div>
-              <div class="value" id="statMedium">—</div>
-            </div>
-          </div>
-          <div class="stat-card" data-target="transactions" data-filter="attention">
-            <div class="stat-icon purple">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 19V5"/>
-                <path d="M5 12h14"/>
-              </svg>
-            </div>
-            <div class="stat-info">
-              <div class="label">Needs Action</div>
-              <div class="value" id="statAttention">—</div>
-            </div>
-          </div>
-          <div class="stat-card" data-target="transactions" data-filter="Low">
-            <div class="stat-icon green">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M20 6L9 17l-5-5"/>
-              </svg>
-            </div>
-            <div class="stat-info">
-              <div class="label">Low Risk</div>
-              <div class="value" id="statLow">—</div>
-            </div>
-          </div>
-          <div class="stat-card" data-target="alerts" data-filter="unread">
-            <div class="stat-icon yellow">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-              </svg>
-            </div>
-            <div class="stat-info">
-              <div class="label">Unread Alerts</div>
-              <div class="value" id="statAlerts">—</div>
-            </div>
-          </div>
-          <div class="stat-card" id="statUsersCard" data-href="/create-user.html" style="display:none">
-            <div class="stat-icon green">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                <circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-              </svg>
-            </div>
-            <div class="stat-info">
-              <div class="label">Total Users</div>
-              <div class="value" id="statUsers">—</div>
-            </div>
-          </div>
-        </div>
-
+      <!-- ALERTS SECTION -->
+      <div class="section active" id="section-alerts">
         <div class="card">
-          <div class="card-header"><h3>Recent Transactions</h3></div>
+          <div class="card-header">
+            <h3><span class="alert-dot"></span>Compliance Alerts</h3>
+            <div class="search-wrap">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input class="search-input" id="alertSearch" type="text"
+                placeholder="Search by transaction ID or reason…" oninput="filterTable('alertBody','alertSearch','alertNoResults')" />
+            </div>
+            <div id="alertFilterLabel" style="margin-left:16px;color:var(--text-muted);font-size:13px;display:none"></div>
+          </div>
           <div class="table-wrap">
             <table>
               <thead>
-                <tr>
-                  <th>Transaction ID</th><th>Merchant</th><th>Payment</th><th>Amount</th>
-                  <th>Country</th><th>Risk Score</th><th>Status</th><th>Date / Time</th>
-                </tr>
+                <tr><th>Transaction ID</th><th>Reason</th><th>Risk Level</th><th>Status</th><th>Read</th><th>Raised At</th></tr>
               </thead>
-              <tbody id="overviewTxnBody">
-                <tr><td colspan="8"><div class="empty-state"><p>Loading…</p></div></td></tr>
+              <tbody id="alertBody">
+                <tr><td colspan="6"><div class="empty-state"><p>Loading…</p></div></td></tr>
+              </tbody>
+              <tbody>
+                <tr id="alertNoResults" style="display:none">
+                  <td colspan="6"><div class="no-results">No alerts match your search.</div></td>
+                </tr>
               </tbody>
             </table>
+          </div>
+        </div>
+        <div class="card" id="alertDetailCard" style="display:none; margin-top: 20px;">
+          <div class="card-header">
+            <h3>Alert Review</h3>
+          </div>
+          <div class="card-body">
+            <div class="alert-detail-grid">
+              <div><strong>Transaction ID</strong><div id="detailTxnId">—</div></div>
+              <div><strong>Merchant</strong><div id="detailMerchant">—</div></div>
+              <div><strong>Amount</strong><div id="detailAmount">—</div></div>
+              <div><strong>Risk Level</strong><div id="detailRiskLevel">—</div></div>
+              <div><strong>Status</strong><div id="detailAlertStatus">—</div></div>
+              <div><strong>Read Status</strong><div id="detailReadStatus">—</div></div>
+              <div><strong>Read At</strong><div id="detailReadAt">—</div></div>
+              <div><strong>Raised At</strong><div id="detailRaisedAt">—</div></div>
+              <div style="grid-column: span 3;"><strong>Triggered Rules</strong><div id="detailTriggeredRules">—</div></div>
+              <div style="grid-column: span 3;"><strong>Escalation Report</strong><div id="detailEscalationReport">—</div></div>
+            </div>
+            <div id="detailActions" style="margin-top:16px; display:flex; gap:12px;"></div>
           </div>
         </div>
       </div>

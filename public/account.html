@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Overview - Compliance Monitoring System</title>
+  <title>My Account - Compliance Monitoring System</title>
   <link rel="stylesheet" href="/css/style.css" />
   <style>
     .unread-row { background: rgba(254,243,199,0.7); }
   </style>
 </head>
-<body data-page="overview">
+<body data-page="account">
 
 <div class="app-layout">
   <!-- Sidebar -->
@@ -28,7 +28,7 @@
 
     <nav class="sidebar-nav">
       <div class="nav-section-label">Main</div>
-      <div class="nav-item active" onclick="window.location.href='/dashboard.html'">
+      <div class="nav-item" onclick="window.location.href='/dashboard.html'">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
           <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
@@ -80,7 +80,7 @@
       </div>
 
       <div class="nav-section-label">Account</div>
-      <div class="nav-item" onclick="window.location.href='/account.html'">
+      <div class="nav-item active" onclick="window.location.href='/account.html'">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
           <circle cx="12" cy="7" r="4"/>
@@ -111,7 +111,7 @@
   <!-- Main -->
   <div class="main-content">
     <div class="topbar">
-      <h2 id="sectionTitle">Overview</h2>
+      <h2 id="sectionTitle">My Account</h2>
       <div class="topbar-right">
         <div class="topbar-user">
           <span id="topbarRole" class="badge"></span>
@@ -122,116 +122,111 @@
 
     <div class="content-area">
 
-      <!-- OVERVIEW SECTION -->
-      <div class="section active" id="section-overview">
+      <!-- MY ACCOUNT SECTION -->
+      <div class="section active" id="section-account">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
 
-        <div class="stats-grid">
-          <div class="stat-card" data-target="transactions">
-            <div class="stat-icon blue">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="12" y1="1" x2="12" y2="23"/>
-                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-              </svg>
-            </div>
-            <div class="stat-info">
-              <div class="label">Total Transactions</div>
-              <div class="value" id="statTxnTotal">—</div>
-            </div>
-          </div>
-          <div class="stat-card" data-target="transactions" data-filter="High">
-            <div class="stat-icon red">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-              </svg>
-            </div>
-            <div class="stat-info">
-              <div class="label">High Risk</div>
-              <div class="value" id="statHigh">—</div>
-            </div>
-          </div>
-          <div class="stat-card" data-target="transactions" data-filter="Medium">
-            <div class="stat-icon orange">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 2a10 10 0 0 0-3.22 19.48"/>
-                <path d="M12 2a10 10 0 0 1 3.22 19.48"/>
-              </svg>
-            </div>
-            <div class="stat-info">
-              <div class="label">Medium Risk</div>
-              <div class="value" id="statMedium">—</div>
-            </div>
-          </div>
-          <div class="stat-card" data-target="transactions" data-filter="attention">
-            <div class="stat-icon purple">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 19V5"/>
-                <path d="M5 12h14"/>
-              </svg>
-            </div>
-            <div class="stat-info">
-              <div class="label">Needs Action</div>
-              <div class="value" id="statAttention">—</div>
-            </div>
-          </div>
-          <div class="stat-card" data-target="transactions" data-filter="Low">
-            <div class="stat-icon green">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M20 6L9 17l-5-5"/>
-              </svg>
-            </div>
-            <div class="stat-info">
-              <div class="label">Low Risk</div>
-              <div class="value" id="statLow">—</div>
+          <!-- Profile Details -->
+          <div class="card">
+            <div class="card-header"><h3>My Profile</h3></div>
+            <div class="card-body">
+              <div id="profileMsg" class="message"></div>
+              <!-- Read-only view (all users) -->
+              <div id="profileView">
+                <div style="margin-bottom:14px">
+                  <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:3px">Full Name</div>
+                  <div id="viewName" style="font-size:14px;color:var(--text)">—</div>
+                </div>
+                <div style="margin-bottom:14px">
+                  <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:3px">Date of Birth</div>
+                  <div id="viewDob" style="font-size:14px;color:var(--text)">—</div>
+                </div>
+                <div style="margin-bottom:14px">
+                  <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:3px">Email Address</div>
+                  <div id="viewEmail" style="font-size:14px;color:var(--text)">—</div>
+                </div>
+                <div>
+                  <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:3px">Role</div>
+                  <div id="viewRole" style="font-size:14px;color:var(--text)">—</div>
+                </div>
+              </div>
+              <!-- Editable form (admin only) -->
+              <form id="profileForm" novalidate style="display:none">
+                <div class="form-group">
+                  <label for="profName">Full Name</label>
+                  <input type="text" id="profName" placeholder="Full name" required />
+                </div>
+                <div class="form-group">
+                  <label for="profDob">Date of Birth</label>
+                  <input type="date" id="profDob" />
+                </div>
+                <div class="form-group">
+                  <label for="profEmail">Email Address</label>
+                  <input type="email" id="profEmail" placeholder="Email" required />
+                </div>
+                <div class="form-group" style="margin-bottom:0">
+                  <label>Role</label>
+                  <input type="text" id="profRole" disabled style="background:#f1f5f9;color:var(--text-muted)" />
+                </div>
+                <div style="margin-top:20px">
+                  <button type="submit" class="btn btn-primary" id="profileBtn" style="width:auto;padding:10px 24px">
+                    Save Changes
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
-          <div class="stat-card" data-target="alerts" data-filter="unread">
-            <div class="stat-icon yellow">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-              </svg>
-            </div>
-            <div class="stat-info">
-              <div class="label">Unread Alerts</div>
-              <div class="value" id="statAlerts">—</div>
-            </div>
-          </div>
-          <div class="stat-card" id="statUsersCard" data-href="/create-user.html" style="display:none">
-            <div class="stat-icon green">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                <circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-              </svg>
-            </div>
-            <div class="stat-info">
-              <div class="label">Total Users</div>
-              <div class="value" id="statUsers">—</div>
-            </div>
-          </div>
-        </div>
 
-        <div class="card">
-          <div class="card-header"><h3>Recent Transactions</h3></div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Transaction ID</th><th>Merchant</th><th>Payment</th><th>Amount</th>
-                  <th>Country</th><th>Risk Score</th><th>Status</th><th>Date / Time</th>
-                </tr>
-              </thead>
-              <tbody id="overviewTxnBody">
-                <tr><td colspan="8"><div class="empty-state"><p>Loading…</p></div></td></tr>
-              </tbody>
-            </table>
+          <!-- Change Password -->
+          <div class="card">
+            <div class="card-header"><h3>Change Password</h3></div>
+            <div class="card-body">
+              <div id="pwMsg" class="message"></div>
+              <form id="pwForm" novalidate>
+                <div class="form-group">
+                  <label for="currentPw">Current Password</label>
+                  <div class="input-wrap">
+                    <input type="password" id="currentPw" placeholder="Enter current password" />
+                    <button type="button" class="toggle-pw" onclick="toggleInput('currentPw')">
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="newPw">New Password</label>
+                  <div class="input-wrap">
+                    <input type="password" id="newPw" placeholder="At least 8 characters" />
+                    <button type="button" class="toggle-pw" onclick="toggleInput('newPw')">
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="confirmPw">Confirm New Password</label>
+                  <div class="input-wrap">
+                    <input type="password" id="confirmPw" placeholder="Re-enter new password" />
+                    <button type="button" class="toggle-pw" onclick="toggleInput('confirmPw')">
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <button type="submit" class="btn btn-primary" id="pwBtn" style="width:auto;padding:10px 24px">
+                  Update Password
+                </button>
+              </form>
+            </div>
           </div>
+
         </div>
       </div>
 
-      </div><!-- /content-area -->
+    </div><!-- /content-area -->
   </div><!-- /main-content -->
 </div>
 
@@ -650,7 +645,7 @@ if (profileForm) profileForm.addEventListener("submit", async (e) => {
   const dob   = document.getElementById("profDob").value;
   const email = document.getElementById("profEmail").value.trim();
 
-  if (!name || !dob || !email) { showMessage("profileMsg", "All fields are required.", "error"); return; }
+  if (!name || !email) { showMessage("profileMsg", "Name and email are required.", "error"); return; }
 
   const btn = document.getElementById("profileBtn");
   btn.disabled = true; btn.textContent = "Saving…";

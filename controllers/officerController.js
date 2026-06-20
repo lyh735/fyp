@@ -3,8 +3,12 @@ const db = require("../config/db");
 exports.showAlertsPage = (req, res) => {
 
   const sql = `
-    SELECT * FROM alerts
-    ORDER BY created_at DESC
+    SELECT a.*, a.alert_id AS id, COALESCE(a.message, a.triggered_rules) AS reason,
+           m.merchant_name, t.amount, t.currency, t.ip_address, t.country
+    FROM alerts a
+    LEFT JOIN transactions t ON a.transaction_id = t.transaction_id
+    LEFT JOIN merchants m ON a.merchant_id = m.merchant_id
+    ORDER BY a.created_at DESC
   `;
 
   db.query(sql, (err, alerts) => {
@@ -25,9 +29,19 @@ exports.showAlertDetails = (req, res) => {
   const alertId = req.params.id;
 
 
-  const sql = "SELECT * FROM alerts WHERE id = ? OR alert_id = ? LIMIT 1";
+  const sql = `
+    SELECT a.*, a.alert_id AS id, COALESCE(a.message, a.triggered_rules) AS reason,
+           m.merchant_name, t.amount, t.currency, t.ip_address, t.country,
+           u.name AS officer_name
+    FROM alerts a
+    LEFT JOIN transactions t ON a.transaction_id = t.transaction_id
+    LEFT JOIN merchants m ON a.merchant_id = m.merchant_id
+    LEFT JOIN users u ON a.reviewed_by = u.user_id
+    WHERE a.alert_id = ?
+    LIMIT 1
+  `;
 
-  db.query(sql, [alertId, alertId], (err, results) => {
+  db.query(sql, [alertId], (err, results) => {
 
     if (err) {
       console.error(err);
@@ -50,9 +64,16 @@ exports.showAlertActionPage = (req, res) => {
 
   const alertId = req.params.id;
 
-  const sql = "SELECT * FROM alerts WHERE id = ? OR alert_id = ? LIMIT 1";
+  const sql = `
+    SELECT a.*, a.alert_id AS id, m.merchant_name, t.amount, t.currency
+    FROM alerts a
+    LEFT JOIN transactions t ON a.transaction_id = t.transaction_id
+    LEFT JOIN merchants m ON a.merchant_id = m.merchant_id
+    WHERE a.alert_id = ?
+    LIMIT 1
+  `;
 
-  db.query(sql, [alertId, alertId], (err, results) => {
+  db.query(sql, [alertId], (err, results) => {
 
     if (err) {
       console.error(err);
@@ -81,7 +102,7 @@ exports.takeActionPage = (req, res) => {
   } = req.body;
 
   // First, fetch the alert details
-  const selectAlertSql = "SELECT * FROM alerts WHERE id = ? LIMIT 1";
+  const selectAlertSql = "SELECT * FROM alerts WHERE alert_id = ? LIMIT 1";
   
   db.query(selectAlertSql, [alert_id], (err, alerts) => {
     if (err) {
@@ -108,17 +129,18 @@ exports.takeActionPage = (req, res) => {
       newStatus = "Escalated";
     }
 
+    const findOfficerSql = "SELECT user_id FROM users WHERE name = ? LIMIT 1";
     const updateAlertSql = `
       UPDATE alerts
-      SET status = ?, reviewed_at = NOW()
-      WHERE id = ?
+      SET status = ?, reviewed_by = ?, reviewed_at = NOW()
+      WHERE alert_id = ?
     `;
 
     const insertActionSql = `
       INSERT INTO officer_actions
       (
         alert_id,
-        officer_name,
+        officer_id,
         action_type,
         remarks
       )
@@ -128,29 +150,41 @@ exports.takeActionPage = (req, res) => {
     const insertAuditSql = `
       INSERT INTO audit_logs
       (
+        user_id,
         event_type,
-        transaction_id,
-        merchant_id,
+        table_name,
+        record_id,
         message,
-        officer_name,
-        action,
-        details
+        new_value
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?)
     `;
 
-    db.query(updateAlertSql, [newStatus, alert_id], (err) => {
+    db.query(findOfficerSql, [officer_name], (err, officers) => {
 
       if (err) {
         console.error(err);
-        return res.status(500).send("Error updating alert");
+        return res.status(500).send("Error finding officer");
       }
+
+      if (officers.length === 0) {
+        return res.status(400).send("Officer name must match an existing user account");
+      }
+
+      const officerId = officers[0].user_id;
+
+      db.query(updateAlertSql, [newStatus, officerId, alert_id], (err) => {
+
+        if (err) {
+          console.error(err);
+          return res.status(500).send("Error updating alert");
+        }
 
       db.query(
         insertActionSql,
         [
           alert_id,
-          officer_name,
+          officerId,
           action_type,
           remarks
         ],
@@ -179,13 +213,12 @@ Remarks: ${remarks || "None"}
           db.query(
             insertAuditSql,
             [
+              officerId,
               eventType,
-              alert.transaction_id,
-              alert.merchant_id,
+              "alerts",
+              String(alert_id),
               message,
-              officer_name,
-              action_type,
-              details
+              action_type
             ],
             (err) => {
 
@@ -204,6 +237,7 @@ Remarks: ${remarks || "None"}
         }
       );
 
+      });
     });
 
   });
@@ -213,8 +247,11 @@ Remarks: ${remarks || "None"}
 exports.showAuditLogsPage = (req, res) => {
 
   const sql = `
-    SELECT * FROM audit_logs
-    ORDER BY created_at DESC
+    SELECT al.audit_id AS log_id, al.*, u.name AS officer_name,
+           al.new_value AS action, al.message AS details
+    FROM audit_logs al
+    LEFT JOIN users u ON al.user_id = u.user_id
+    ORDER BY al.created_at DESC
   `;
 
   db.query(sql, (err, logs) => {
@@ -236,7 +273,7 @@ exports.showReportPage = (req, res) => {
     SELECT
       COUNT(*) AS total_alerts,
 
-      SUM(status = 'Pending Review')
+      SUM(status = 'Pending' OR status = 'Pending Review' OR status = 'open')
       AS pending_alerts,
 
       SUM(status = 'Reviewed')

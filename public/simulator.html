@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Overview - Compliance Monitoring System</title>
+  <title>Transaction Simulator - Compliance Monitoring System</title>
   <link rel="stylesheet" href="/css/style.css" />
   <style>
     .unread-row { background: rgba(254,243,199,0.7); }
   </style>
 </head>
-<body data-page="overview">
+<body data-page="simulator">
 
 <div class="app-layout">
   <!-- Sidebar -->
@@ -28,7 +28,7 @@
 
     <nav class="sidebar-nav">
       <div class="nav-section-label">Main</div>
-      <div class="nav-item active" onclick="window.location.href='/dashboard.html'">
+      <div class="nav-item" onclick="window.location.href='/dashboard.html'">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
           <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
@@ -61,7 +61,7 @@
 
       <div id="adminNav" style="display:none">
         <div class="nav-section-label">Administration</div>
-        <div class="nav-item" onclick="window.location.href='/simulator.html'">
+        <div class="nav-item active" onclick="window.location.href='/simulator.html'">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polygon points="5 3 19 12 5 21 5 3"/>
           </svg>
@@ -111,7 +111,7 @@
   <!-- Main -->
   <div class="main-content">
     <div class="topbar">
-      <h2 id="sectionTitle">Overview</h2>
+      <h2 id="sectionTitle">Transaction Simulator</h2>
       <div class="topbar-right">
         <div class="topbar-user">
           <span id="topbarRole" class="badge"></span>
@@ -122,111 +122,49 @@
 
     <div class="content-area">
 
-      <!-- OVERVIEW SECTION -->
-      <div class="section active" id="section-overview">
+      <!-- SIMULATOR SECTION (admin only) -->
+      <div class="section active" id="section-simulator">
 
-        <div class="stats-grid">
-          <div class="stat-card" data-target="transactions">
-            <div class="stat-icon blue">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="12" y1="1" x2="12" y2="23"/>
-                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-              </svg>
-            </div>
-            <div class="stat-info">
-              <div class="label">Total Transactions</div>
-              <div class="value" id="statTxnTotal">—</div>
-            </div>
+        <!-- Banner / Controls -->
+        <div class="sim-banner">
+          <div class="sim-banner-text">
+            <h2>Transaction Simulator</h2>
+            <p>Generates realistic UniwebPay transactions across AliPay, WechatPay, UnionQR Pay and GrabPay for SingEat and YiDian merchant partners. Suspicious transactions trigger live compliance alerts.</p>
           </div>
-          <div class="stat-card" data-target="transactions" data-filter="High">
-            <div class="stat-icon red">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-              </svg>
+          <div class="sim-controls-row">
+            <div class="sim-status-pill">
+              <span class="sim-dot" id="simDot"></span>
+              <span id="simStatusText">Stopped</span>
             </div>
-            <div class="stat-info">
-              <div class="label">High Risk</div>
-              <div class="value" id="statHigh">—</div>
-            </div>
-          </div>
-          <div class="stat-card" data-target="transactions" data-filter="Medium">
-            <div class="stat-icon orange">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 2a10 10 0 0 0-3.22 19.48"/>
-                <path d="M12 2a10 10 0 0 1 3.22 19.48"/>
-              </svg>
-            </div>
-            <div class="stat-info">
-              <div class="label">Medium Risk</div>
-              <div class="value" id="statMedium">—</div>
-            </div>
-          </div>
-          <div class="stat-card" data-target="transactions" data-filter="attention">
-            <div class="stat-icon purple">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 19V5"/>
-                <path d="M5 12h14"/>
-              </svg>
-            </div>
-            <div class="stat-info">
-              <div class="label">Needs Action</div>
-              <div class="value" id="statAttention">—</div>
-            </div>
-          </div>
-          <div class="stat-card" data-target="transactions" data-filter="Low">
-            <div class="stat-icon green">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M20 6L9 17l-5-5"/>
-              </svg>
-            </div>
-            <div class="stat-info">
-              <div class="label">Low Risk</div>
-              <div class="value" id="statLow">—</div>
-            </div>
-          </div>
-          <div class="stat-card" data-target="alerts" data-filter="unread">
-            <div class="stat-icon yellow">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-              </svg>
-            </div>
-            <div class="stat-info">
-              <div class="label">Unread Alerts</div>
-              <div class="value" id="statAlerts">—</div>
-            </div>
-          </div>
-          <div class="stat-card" id="statUsersCard" data-href="/create-user.html" style="display:none">
-            <div class="stat-icon green">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                <circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-              </svg>
-            </div>
-            <div class="stat-info">
-              <div class="label">Total Users</div>
-              <div class="value" id="statUsers">—</div>
-            </div>
+            <select class="sim-speed-select" id="simSpeed">
+              <option value="3000">Slow — 1 / 3s</option>
+              <option value="1500" selected>Medium — 1 / 1.5s</option>
+              <option value="750">Fast — 1 / 0.75s</option>
+              <option value="300">Turbo — 1 / 0.3s</option>
+            </select>
+            <button class="btn-sim-start" id="simToggleBtn" onclick="toggleSimulator()">▶ Start</button>
+            <button class="btn-sim-reset" onclick="resetSimulator()">Reset</button>
           </div>
         </div>
 
+        <!-- Session stats -->
+        <div class="sim-stats-row">
+          <div class="sim-stat"><div class="s-val" id="simTotal">0</div><div class="s-lbl">Generated</div></div>
+          <div class="sim-stat"><div class="s-val" id="simNormal" style="color:#16a34a">0</div><div class="s-lbl">Normal</div></div>
+          <div class="sim-stat"><div class="s-val" id="simReview" style="color:#b45309">0</div><div class="s-lbl">For Review</div></div>
+          <div class="sim-stat"><div class="s-val" id="simSusp" style="color:#b91c1c">0</div><div class="s-lbl">Suspicious</div></div>
+        </div>
+
+        <!-- Live feed -->
         <div class="card">
-          <div class="card-header"><h3>Recent Transactions</h3></div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Transaction ID</th><th>Merchant</th><th>Payment</th><th>Amount</th>
-                  <th>Country</th><th>Risk Score</th><th>Status</th><th>Date / Time</th>
-                </tr>
-              </thead>
-              <tbody id="overviewTxnBody">
-                <tr><td colspan="8"><div class="empty-state"><p>Loading…</p></div></td></tr>
-              </tbody>
-            </table>
+          <div class="card-header">
+            <h3><span class="alert-dot" id="feedDot" style="display:none"></span>Live Transaction Feed</h3>
+            <span style="font-size:12px;color:var(--text-muted)">Last 20 transactions</span>
+          </div>
+          <div id="liveFeed">
+            <div style="padding:40px;text-align:center;color:var(--text-muted);font-size:13px">
+              Start the simulator to see live transactions.
+            </div>
           </div>
         </div>
       </div>

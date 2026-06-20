@@ -21,12 +21,14 @@ async function withRetries(operation, attempts = 3) {
 
 async function logAudit(eventType, txn, message) {
   try {
+    const tableName = txn?.alert_id ? "alerts" : "transactions";
+    const recordId = txn?.alert_id || txn?.transaction_id || null;
     await withRetries(() => query(
       `
-        INSERT INTO audit_logs (event_type, transaction_id, merchant_id, message)
+        INSERT INTO audit_logs (event_type, table_name, record_id, message)
         VALUES (?, ?, ?, ?)
       `,
-      [eventType, txn?.transaction_id || null, txn?.merchant_id || null, message]
+      [eventType, tableName, recordId, message]
     ));
   } catch (err) {
     console.error("CRITICAL: Failed to write audit log:", err.message || err);
@@ -36,10 +38,6 @@ async function logAudit(eventType, txn, message) {
 async function logCritical(txn, message) {
   console.error("CRITICAL:", message);
   await logAudit("critical_error", txn, message);
-}
-
-function createAlertId(transactionId) {
-  return `ALT-${transactionId}-${Date.now()}`;
 }
 
 async function getPersistedTransactionRisk(transactionId, txn) {
@@ -61,19 +59,47 @@ async function getPersistedTransactionRisk(transactionId, txn) {
   return rows[0];
 }
 
+async function ensureMerchantRecord(txn, payload = {}) {
+  const merchantName = payload.merchant_name || txn.merchant_name || txn.merchant_id;
+  await query(
+    `
+      INSERT INTO merchants
+        (
+          merchant_id, merchant_name, business_category, merchant_average_amount,
+          risk_level, country, status
+        )
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        merchant_name = VALUES(merchant_name),
+        merchant_average_amount = COALESCE(VALUES(merchant_average_amount), merchant_average_amount),
+        risk_level = COALESCE(VALUES(risk_level), risk_level),
+        country = COALESCE(VALUES(country), country),
+        status = VALUES(status),
+        updated_at = NOW()
+    `,
+    [
+      txn.merchant_id,
+      merchantName,
+      payload.business_category || null,
+      txn.merchant_average_amount || payload.merchant_average_amount || null,
+      txn.customer_risk_profile || null,
+      txn.country || "Singapore",
+      "active",
+    ]
+  );
+}
+
 async function createAlertRecord(txn, result) {
-  const alertId = createAlertId(txn.transaction_id);
-  await withRetries(() => query(
+  const insertResult = await withRetries(() => query(
     `
       INSERT INTO alerts
         (
-          alert_id, transaction_id, merchant_id, risk_score, risk_level,
+          transaction_id, merchant_id, risk_score, risk_level,
           triggered_rules, status, message
         )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `,
     [
-      alertId,
       txn.transaction_id,
       txn.merchant_id,
       result.risk_score,
@@ -84,17 +110,21 @@ async function createAlertRecord(txn, result) {
     ]
   ));
 
-  return alertId;
+  return insertResult.insertId;
 }
 
 async function getAlertById(alertId) {
   const rows = await query(
     `
-      SELECT a.*, t.merchant_name, t.payment_method, t.amount, t.currency,
-             t.transaction_type, t.ip_address, t.country, t.customer_risk_profile,
-             t.merchant_average_amount, t.txn_time AS transaction_time
+      SELECT a.*, a.alert_id AS id, m.merchant_name, t.masked_wallet_ref AS user_id,
+             t.payment_method, t.amount, t.currency,
+             t.transaction_type, t.ip_address, t.country, NULL AS customer_risk_profile,
+             m.merchant_average_amount, t.txn_time AS transaction_time,
+             u.name AS officer_name, NULL AS escalation_report
       FROM alerts a
       LEFT JOIN transactions t ON a.transaction_id = t.transaction_id
+      LEFT JOIN merchants m ON a.merchant_id = m.merchant_id
+      LEFT JOIN users u ON a.reviewed_by = u.user_id
       WHERE a.alert_id = ?
       LIMIT 1
     `,
@@ -104,22 +134,18 @@ async function getAlertById(alertId) {
 }
 
 async function updateAlertStatus(alertId, status, userId, report = null) {
-  const updates = ["status = ?", "reviewed_by = ?", "reviewed_at = NOW()"];
-  const values = [status, userId];
-  if (report !== null) {
-    updates.push("escalation_report = ?");
-    values.push(report);
-  }
-  values.push(alertId);
-
   await query(
     `
       UPDATE alerts
-      SET ${updates.join(", ")}
+      SET status = ?, reviewed_by = ?, reviewed_at = NOW()
       WHERE alert_id = ?
     `,
-    values
+    [status, userId, alertId]
   );
+
+  if (report) {
+    await logAudit("escalation_report", { alert_id: alertId }, report);
+  }
 }
 
 async function getRecentMerchantTransactionCount(merchantId, timestamp) {
@@ -128,8 +154,8 @@ async function getRecentMerchantTransactionCount(merchantId, timestamp) {
       SELECT COUNT(*) AS count
       FROM transactions
       WHERE merchant_id = ?
-        AND COALESCE(\`timestamp\`, txn_time) >= DATE_SUB(?, INTERVAL 10 MINUTE)
-        AND COALESCE(\`timestamp\`, txn_time) <= ?
+        AND txn_time >= DATE_SUB(?, INTERVAL 10 MINUTE)
+        AND txn_time <= ?
     `,
     [merchantId, timestamp, timestamp]
   );
@@ -175,34 +201,32 @@ async function processTransaction(payload, req) {
     `Risk score calculated: ${result.risk_score} (${result.risk_level})`
   );
 
+  await ensureMerchantRecord(txn, payload);
+
   await query(
     `
       INSERT INTO transactions
         (
-          transaction_id, user_id, merchant_name, payment_method,
-          merchant_id, amount, currency, transaction_type, ip_address, country,
-          txn_time, \`timestamp\`, status, customer_risk_profile,
-          merchant_average_amount, risk_score, risk_level, triggered_rules,
-          processing_status
+          transaction_id, merchant_id, masked_wallet_ref, masked_payment_ref,
+          payment_method, transaction_type, amount, currency, ip_address,
+          country, txn_time, transaction_status, risk_score, risk_level,
+          triggered_rules, processing_status
         )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       txn.transaction_id,
-      payload.user_id || null,
-      payload.merchant_name || txn.merchant_id,
-      payload.payment_method || null,
       txn.merchant_id,
+      payload.masked_wallet_ref || payload.user_id || null,
+      payload.masked_payment_ref || null,
+      payload.payment_method || null,
+      txn.transaction_type,
       txn.amount,
       txn.currency,
-      txn.transaction_type,
       txn.ip_address,
       txn.country,
       txn.timestamp,
-      txn.timestamp,
       result.status,
-      txn.customer_risk_profile,
-      txn.merchant_average_amount,
       result.risk_score,
       result.risk_level,
       JSON.stringify(result.triggered_rules),
@@ -309,7 +333,14 @@ exports.simulate = async (req, res) => {
 
 exports.getTransactions = (req, res) => {
   db.query(
-    "SELECT * FROM transactions ORDER BY COALESCE(`timestamp`, txn_time, created_at) DESC LIMIT 500",
+    `
+      SELECT t.*, t.masked_wallet_ref AS user_id, t.transaction_status AS status,
+             m.merchant_name, m.merchant_average_amount
+      FROM transactions t
+      LEFT JOIN merchants m ON t.merchant_id = m.merchant_id
+      ORDER BY COALESCE(t.txn_time, t.created_at) DESC
+      LIMIT 500
+    `,
     (err, results) => {
       if (err) return res.status(500).json({ message: "Server error" });
       res.json(results);
@@ -321,7 +352,14 @@ exports.showTransactionDetailsPage = async (req, res) => {
   try {
     const transactionId = req.params.id;
     const transactions = await query(
-      "SELECT * FROM transactions WHERE transaction_id = ? LIMIT 1",
+      `
+        SELECT t.*, t.masked_wallet_ref AS user_id, t.transaction_status AS status,
+               m.merchant_name, m.merchant_average_amount
+        FROM transactions t
+        LEFT JOIN merchants m ON t.merchant_id = m.merchant_id
+        WHERE t.transaction_id = ?
+        LIMIT 1
+      `,
       [transactionId]
     );
 
@@ -331,7 +369,14 @@ exports.showTransactionDetailsPage = async (req, res) => {
 
     const transaction = transactions[0];
     const alerts = await query(
-      "SELECT * FROM alerts WHERE transaction_id = ? ORDER BY created_at DESC LIMIT 1",
+      `
+        SELECT a.*, a.alert_id AS id, u.name AS officer_name, NULL AS escalation_report
+        FROM alerts a
+        LEFT JOIN users u ON a.reviewed_by = u.user_id
+        WHERE a.transaction_id = ?
+        ORDER BY a.created_at DESC
+        LIMIT 1
+      `,
       [transactionId]
     );
     const alert = alerts[0] || null;
@@ -352,13 +397,15 @@ exports.getAlerts = async (req, res) => {
   const status = req.query.status || "Pending";
   const orderByRisk = "a.read_at IS NOT NULL, FIELD(a.risk_level, 'High', 'Medium', 'Low'), a.created_at DESC";
   const sql = status === "all"
-    ? `SELECT a.*, t.merchant_name, t.amount, t.currency, t.transaction_type, t.ip_address, t.country
+    ? `SELECT a.*, a.alert_id AS id, m.merchant_name, t.amount, t.currency, t.transaction_type, t.ip_address, t.country
        FROM alerts a
        LEFT JOIN transactions t ON a.transaction_id = t.transaction_id
+       LEFT JOIN merchants m ON a.merchant_id = m.merchant_id
        ORDER BY ${orderByRisk} LIMIT 200`
-    : `SELECT a.*, t.merchant_name, t.amount, t.currency, t.transaction_type, t.ip_address, t.country
+    : `SELECT a.*, a.alert_id AS id, m.merchant_name, t.amount, t.currency, t.transaction_type, t.ip_address, t.country
        FROM alerts a
        LEFT JOIN transactions t ON a.transaction_id = t.transaction_id
+       LEFT JOIN merchants m ON a.merchant_id = m.merchant_id
        WHERE a.status = ?
        ORDER BY ${orderByRisk} LIMIT 200`;
   const values = status === "all" ? [] : [status];

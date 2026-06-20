@@ -16,13 +16,13 @@ exports.login = (req, res) => {
     }
 
     const user = results[0];
-    const match = await bcrypt.compare(password, user.password);
+    const match = await bcrypt.compare(password, user.password_hash);
     if (!match) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role, name: user.name },
+      { id: user.user_id, email: user.email, role: user.role, name: user.name },
       JWT_SECRET,
       { expiresIn: "8h" }
     );
@@ -30,7 +30,7 @@ exports.login = (req, res) => {
     res.json({
       token,
       user: {
-        id: user.id,
+        id: user.user_id,
         name: user.name,
         email: user.email,
         role: user.role,
@@ -42,15 +42,15 @@ exports.login = (req, res) => {
 
 exports.createUser = async (req, res) => {
   const { name, dob, email, password } = req.body;
-  if (!name || !dob || !email || !password) {
+  if (!name || !email || !password) {
     return res.status(400).json({ message: "All fields are required" });
   }
 
   try {
     const hashed = await bcrypt.hash(password, 10);
     db.query(
-      "INSERT INTO users (name, dob, email, password, role, first_login) VALUES (?, ?, ?, ?, 'user', TRUE)",
-      [name, dob, email, hashed],
+      "INSERT INTO users (name, email, password_hash, role, first_login) VALUES (?, ?, ?, 'user', TRUE)",
+      [name, email, hashed],
       (err) => {
         if (err) {
           if (err.code === "ER_DUP_ENTRY") {
@@ -77,7 +77,7 @@ exports.changePassword = async (req, res) => {
   try {
     const hashed = await bcrypt.hash(newPassword, 10);
     db.query(
-      "UPDATE users SET password = ?, first_login = FALSE WHERE id = ?",
+      "UPDATE users SET password_hash = ?, first_login = FALSE, updated_at = NOW() WHERE user_id = ?",
       [hashed, userId],
       (err) => {
         if (err) return res.status(500).json({ message: "Server error" });
@@ -93,12 +93,12 @@ exports.updateProfile = (req, res) => {
   const { name, dob, email } = req.body;
   const userId = req.user.id;
 
-  if (!name || !dob || !email) {
-    return res.status(400).json({ message: "Name, date of birth and email are required" });
+  if (!name || !email) {
+    return res.status(400).json({ message: "Name and email are required" });
   }
 
   db.query(
-    "SELECT id FROM users WHERE email = ? AND id != ?",
+    "SELECT user_id FROM users WHERE email = ? AND user_id != ?",
     [email, userId],
     (err, rows) => {
       if (err) return res.status(500).json({ message: "Server error" });
@@ -107,8 +107,8 @@ exports.updateProfile = (req, res) => {
       }
 
       db.query(
-        "UPDATE users SET name = ?, dob = ?, email = ? WHERE id = ?",
-        [name, dob, email, userId],
+        "UPDATE users SET name = ?, email = ?, updated_at = NOW() WHERE user_id = ?",
+        [name, email, userId],
         (err2) => {
           if (err2) return res.status(500).json({ message: "Server error" });
           res.json({ message: "Profile updated successfully", name, email });
@@ -120,7 +120,7 @@ exports.updateProfile = (req, res) => {
 
 exports.getProfile = (req, res) => {
   db.query(
-    "SELECT id, name, dob, email, role, first_login, created_at FROM users WHERE id = ?",
+    "SELECT user_id AS id, name, NULL AS dob, email, role, first_login, created_at FROM users WHERE user_id = ?",
     [req.user.id],
     (err, results) => {
       if (err) return res.status(500).json({ message: "Server error" });
@@ -132,7 +132,7 @@ exports.getProfile = (req, res) => {
 
 exports.getUsers = (req, res) => {
   db.query(
-    "SELECT id, name, dob, email, role, first_login, created_at FROM users WHERE id != ? ORDER BY created_at DESC",
+    "SELECT user_id AS id, name, NULL AS dob, email, role, first_login, created_at FROM users WHERE user_id != ? ORDER BY created_at DESC",
     [req.user.id],
     (err, results) => {
       if (err) return res.status(500).json({ message: "Server error" });
@@ -143,7 +143,7 @@ exports.getUsers = (req, res) => {
 
 exports.getUserById = (req, res) => {
   db.query(
-    "SELECT id, name, dob, email, role, first_login, created_at FROM users WHERE id = ?",
+    "SELECT user_id AS id, name, NULL AS dob, email, role, first_login, created_at FROM users WHERE user_id = ?",
     [req.params.id],
     (err, results) => {
       if (err) return res.status(500).json({ message: "Server error" });
@@ -164,7 +164,7 @@ exports.resetUserPassword = async (req, res) => {
   try {
     const hashed = await bcrypt.hash(newPassword, 10);
     db.query(
-      "UPDATE users SET password = ?, first_login = TRUE WHERE id = ?",
+      "UPDATE users SET password_hash = ?, first_login = TRUE, updated_at = NOW() WHERE user_id = ?",
       [hashed, targetId],
       (err, result) => {
         if (err) return res.status(500).json({ message: "Server error" });
@@ -184,7 +184,7 @@ exports.deleteUser = (req, res) => {
     return res.status(400).json({ message: "You cannot delete your own account" });
   }
 
-  db.query("DELETE FROM users WHERE id = ?", [targetId], (err, result) => {
+  db.query("DELETE FROM users WHERE user_id = ?", [targetId], (err, result) => {
     if (err) return res.status(500).json({ message: "Server error" });
     if (result.affectedRows === 0) return res.status(404).json({ message: "User not found" });
     res.json({ message: "User account deleted successfully" });
@@ -195,7 +195,7 @@ exports.upgradeUser = (req, res) => {
   const targetId = req.params.id;
 
   db.query(
-    "UPDATE users SET role = 'admin' WHERE id = ? AND role = 'user'",
+    "UPDATE users SET role = 'admin', updated_at = NOW() WHERE user_id = ? AND role = 'user'",
     [targetId],
     (err, result) => {
       if (err) return res.status(500).json({ message: "Server error" });
