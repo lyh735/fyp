@@ -1,7 +1,7 @@
-CREATE DATABASE IF NOT EXISTS rt_cms;
+CREATE DATABASE rt_cms;
 USE rt_cms;
 
-CREATE TABLE IF NOT EXISTS merchants (
+CREATE TABLE merchants (
     merchant_id VARCHAR(50) PRIMARY KEY,
     merchant_name VARCHAR(100) NOT NULL,
     business_category VARCHAR(100),
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS merchants (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE users (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     email VARCHAR(100) NOT NULL UNIQUE,
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS compliance_rules (
+CREATE TABLE compliance_rules (
     rule_id INT AUTO_INCREMENT PRIMARY KEY,
     rule_name VARCHAR(100) NOT NULL,
     rule_type VARCHAR(50),
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS compliance_rules (
     FOREIGN KEY (updated_by) REFERENCES users(user_id)
 );
 
-CREATE TABLE IF NOT EXISTS transactions (
+CREATE TABLE transactions (
     transaction_id VARCHAR(50) PRIMARY KEY,
     merchant_id VARCHAR(50) NOT NULL,
     masked_wallet_ref VARCHAR(100),
@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     FOREIGN KEY (merchant_id) REFERENCES merchants(merchant_id)
 );
 
-CREATE TABLE IF NOT EXISTS alerts (
+CREATE TABLE alerts (
     alert_id INT AUTO_INCREMENT PRIMARY KEY,
     transaction_id VARCHAR(50) NOT NULL,
     merchant_id VARCHAR(50) NOT NULL,
@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS alerts (
     FOREIGN KEY (reviewed_by) REFERENCES users(user_id)
 );
 
-CREATE TABLE IF NOT EXISTS officer_actions (
+CREATE TABLE officer_actions (
     action_id INT AUTO_INCREMENT PRIMARY KEY,
     alert_id INT NOT NULL,
     officer_id INT NOT NULL,
@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS officer_actions (
     FOREIGN KEY (officer_id) REFERENCES users(user_id)
 );
 
-CREATE TABLE IF NOT EXISTS audit_logs (
+CREATE TABLE audit_logs (
     audit_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
     event_type VARCHAR(100),

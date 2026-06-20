@@ -418,6 +418,23 @@ exports.getAlerts = async (req, res) => {
   }
 };
 
+exports.getComplianceRules = async (req, res) => {
+  try {
+    const rules = await query(
+      `
+        SELECT rule_id, rule_name, rule_type, description, threshold_value,
+               threshold_count, time_window_minutes, points, is_active,
+               created_at, updated_at
+        FROM compliance_rules
+        ORDER BY is_active DESC, rule_type ASC, rule_name ASC
+      `
+    );
+    res.json(rules);
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 exports.getAlert = async (req, res) => {
   try {
     const alert = await getAlertById(req.params.id);

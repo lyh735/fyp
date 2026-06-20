@@ -122,6 +122,98 @@ async function ensureComplianceSchema() {
       FOREIGN KEY (user_id) REFERENCES users(user_id)
     )
   `);
+
+  const rules = await query("SELECT COUNT(*) AS count FROM compliance_rules");
+  if (rules[0].count === 0) {
+    await query(`
+      INSERT INTO compliance_rules
+        (
+          rule_name, rule_type, description, threshold_value, threshold_count,
+          time_window_minutes, points, is_active
+        )
+      VALUES
+        (
+          'Significant amount compared to merchant average',
+          'amount_multiplier',
+          'Flags transactions greater than three times the merchant average amount.',
+          3.00,
+          NULL,
+          NULL,
+          30,
+          1
+        ),
+        (
+          'Repeated transactions within short period',
+          'velocity',
+          'Flags merchants with five or more transactions within ten minutes.',
+          NULL,
+          5,
+          10,
+          25,
+          1
+        ),
+        (
+          'Transaction outside operating hours',
+          'time',
+          'Flags transactions made from 11 PM to before 6 AM.',
+          NULL,
+          NULL,
+          NULL,
+          15,
+          1
+        ),
+        (
+          'High-risk customer profile',
+          'customer_risk',
+          'Adds risk points when the customer profile is marked high risk.',
+          NULL,
+          NULL,
+          NULL,
+          25,
+          1
+        ),
+        (
+          'High-risk country/jurisdiction',
+          'jurisdiction',
+          'Flags transactions from configured high-risk countries or jurisdictions.',
+          NULL,
+          NULL,
+          NULL,
+          30,
+          1
+        ),
+        (
+          'Missing or insufficient information',
+          'data_quality',
+          'Flags transactions where important information such as country was missing or defaulted.',
+          NULL,
+          NULL,
+          NULL,
+          20,
+          1
+        ),
+        (
+          'Online transaction with missing/invalid IP',
+          'ip_validation',
+          'Flags online transactions without a valid IP address.',
+          NULL,
+          NULL,
+          NULL,
+          20,
+          1
+        ),
+        (
+          'Large cross-border transfer amount if country is not Singapore',
+          'cross_border',
+          'Flags SGD transactions above 1500 when the transaction country is not Singapore.',
+          1500.00,
+          NULL,
+          NULL,
+          25,
+          1
+        )
+    `);
+  }
 }
 
 module.exports = { ensureComplianceSchema };
