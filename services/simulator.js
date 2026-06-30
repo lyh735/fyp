@@ -1,7 +1,10 @@
 // Realistic transaction data for UniwebPay / SingEat / YiDian network
 
-const PAYMENT_METHODS = ["AliPay", "WechatPay", "UnionQR Pay", "GrabPay"];
-const PAYMENT_WEIGHTS  = [0.35, 0.30, 0.20, 0.15];
+const PAYMENT_METHODS = [
+  "Visa", "Mastercard", "Alipay", "WeChat Pay",
+  "GrabPay", "ShopeePay", "PayNow", "SGQR",
+];
+const PAYMENT_WEIGHTS = [0.18, 0.15, 0.18, 0.14, 0.12, 0.08, 0.10, 0.05];
 
 const MERCHANTS = [
   // Fine Dining — SingEat partners

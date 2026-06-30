@@ -1,5 +1,15 @@
 const VALID_RISK_PROFILES = ["low", "medium", "high"];
 const VALID_TRANSACTION_TYPES = ["online", "face_to_face"];
+const VALID_PAYMENT_METHODS = [
+  "Visa",
+  "Mastercard",
+  "Alipay",
+  "WeChat Pay",
+  "GrabPay",
+  "ShopeePay",
+  "PayNow",
+  "SGQR",
+];
 
 function toMysqlDateTime(value) {
   const textValue = String(value || "").trim();
@@ -29,6 +39,13 @@ function normalizeText(value) {
   return typeof value === "string" ? value.trim() : value;
 }
 
+function normalizeBoolean(value, fallback) {
+  if (value === undefined || value === null || value === "") return fallback;
+  if (value === true || value === 1 || value === "1" || value === "true") return true;
+  if (value === false || value === 0 || value === "0" || value === "false") return false;
+  return fallback;
+}
+
 function validateTransaction(payload) {
   const errors = [];
   const countryWasDefaulted = !payload.country;
@@ -54,7 +71,9 @@ function validateTransaction(payload) {
   const merchantAverageAmount = Number(payload.merchant_average_amount);
   const transactionType = normalizeText(payload.transaction_type);
   const customerRiskProfile = normalizeText(payload.customer_risk_profile)?.toLowerCase();
+  const paymentMethod = normalizeText(payload.payment_method);
   const timestamp = toMysqlDateTime(payload.timestamp);
+  const merchantRiskScore = Number(payload.merchant_risk_score ?? 0);
 
   if (!Number.isFinite(amount) || amount <= 0) {
     errors.push("amount must be greater than 0");
@@ -76,8 +95,16 @@ function validateTransaction(payload) {
     errors.push("ip_address is required for online transactions");
   }
 
+  if (paymentMethod && !VALID_PAYMENT_METHODS.includes(paymentMethod)) {
+    errors.push(`payment_method must be one of: ${VALID_PAYMENT_METHODS.join(", ")}`);
+  }
+
   if (!timestamp) {
     errors.push("timestamp must be valid");
+  }
+
+  if (!Number.isInteger(merchantRiskScore)) {
+    errors.push("merchant_risk_score must be an integer");
   }
 
   if (errors.length) {
@@ -97,6 +124,9 @@ function validateTransaction(payload) {
       timestamp,
       customer_risk_profile: customerRiskProfile,
       merchant_average_amount: merchantAverageAmount,
+      merchant_risk_score: merchantRiskScore,
+      has_physical_store: normalizeBoolean(payload.has_physical_store, true),
+      source_type: normalizeText(payload.source_type) || "api",
     },
     metadata: { countryWasDefaulted },
   };

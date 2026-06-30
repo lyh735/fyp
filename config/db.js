@@ -5,7 +5,7 @@ const db = mysql.createConnection({
   user: "root",
   password: "Republic_C207",
   port: "3308",
-  database: "rt_cms"
+  database: "transaction_monitoring"
 });
 
 db.connect((err) => {

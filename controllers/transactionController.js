@@ -3,6 +3,7 @@ const { query } = require("../services/dbQuery");
 const { evaluateTransaction } = require("../services/riskEngine");
 const { generateTransaction } = require("../services/simulator");
 const { validateTransaction } = require("../services/validation");
+const { ensureDefaultRules } = require("../services/schema");
 
 async function withRetries(operation, attempts = 3) {
   let lastError;
@@ -59,32 +60,46 @@ async function getPersistedTransactionRisk(transactionId, txn) {
   return rows[0];
 }
 
-async function ensureMerchantRecord(txn, payload = {}) {
+async function ensureMerchantRecord(txn, payload = {}, userId) {
   const merchantName = payload.merchant_name || txn.merchant_name || txn.merchant_id;
   await query(
     `
       INSERT INTO merchants
         (
-          merchant_id, merchant_name, business_category, merchant_average_amount,
-          risk_level, country, status
+          merchant_id, merchant_name, business_category, mcc_code,
+          merchant_average_amount, operating_hours_start, operating_hours_end,
+          risk_level, merchant_risk_score, country, has_physical_store,
+          status, updated_by
         )
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         merchant_name = VALUES(merchant_name),
+        business_category = COALESCE(VALUES(business_category), business_category),
+        mcc_code = COALESCE(VALUES(mcc_code), mcc_code),
         merchant_average_amount = COALESCE(VALUES(merchant_average_amount), merchant_average_amount),
+        operating_hours_start = COALESCE(VALUES(operating_hours_start), operating_hours_start),
+        operating_hours_end = COALESCE(VALUES(operating_hours_end), operating_hours_end),
         risk_level = COALESCE(VALUES(risk_level), risk_level),
+        merchant_risk_score = VALUES(merchant_risk_score),
         country = COALESCE(VALUES(country), country),
+        has_physical_store = VALUES(has_physical_store),
         status = VALUES(status),
-        updated_at = NOW()
+        updated_by = VALUES(updated_by)
     `,
     [
       txn.merchant_id,
       merchantName,
       payload.business_category || null,
+      payload.mcc_code || null,
       txn.merchant_average_amount || payload.merchant_average_amount || null,
-      txn.customer_risk_profile || null,
-      txn.country || "Singapore",
+      payload.operating_hours_start || null,
+      payload.operating_hours_end || null,
+      payload.merchant_risk_level || txn.customer_risk_profile || null,
+      txn.merchant_risk_score,
+      payload.merchant_country || txn.country || "Singapore",
+      txn.has_physical_store,
       "active",
+      userId,
     ]
   );
 }
@@ -119,7 +134,9 @@ async function getAlertById(alertId) {
       SELECT a.*, a.alert_id AS id, m.merchant_name, t.masked_wallet_ref AS user_id,
              t.payment_method, t.amount, t.currency,
              t.transaction_type, t.ip_address, t.country, NULL AS customer_risk_profile,
-             m.merchant_average_amount, t.txn_time AS transaction_time,
+             m.merchant_average_amount, m.risk_level AS merchant_risk_level,
+             m.merchant_risk_score, m.has_physical_store,
+             t.source_type, t.txn_time AS transaction_time,
              u.name AS officer_name, NULL AS escalation_report
       FROM alerts a
       LEFT JOIN transactions t ON a.transaction_id = t.transaction_id
@@ -201,7 +218,7 @@ async function processTransaction(payload, req) {
     `Risk score calculated: ${result.risk_score} (${result.risk_level})`
   );
 
-  await ensureMerchantRecord(txn, payload);
+  await ensureMerchantRecord(txn, payload, req.user.id);
 
   await query(
     `
@@ -210,9 +227,9 @@ async function processTransaction(payload, req) {
           transaction_id, merchant_id, masked_wallet_ref, masked_payment_ref,
           payment_method, transaction_type, amount, currency, ip_address,
           country, txn_time, transaction_status, risk_score, risk_level,
-          triggered_rules, processing_status
+          triggered_rules, processing_status, source_type
         )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       txn.transaction_id,
@@ -231,6 +248,7 @@ async function processTransaction(payload, req) {
       result.risk_level,
       JSON.stringify(result.triggered_rules),
       "Processing",
+      txn.source_type,
     ]
   );
 
@@ -271,6 +289,7 @@ async function processTransaction(payload, req) {
   );
 
   result.processing_status = "Complete";
+  result.alert_id = alertId;
   return { txn, result, validation };
 }
 
@@ -284,6 +303,8 @@ function buildApiResponse(txn, result) {
     alert_required: result.alert_required,
     alert_status: result.alert_status,
     processing_status: result.processing_status,
+    source_type: txn.source_type,
+    alert_id: result.alert_id,
   };
 }
 
@@ -315,6 +336,7 @@ exports.simulate = async (req, res) => {
       timestamp: generated.txn_time,
       customer_risk_profile: generated.amount > 3000 ? "high" : "low",
       merchant_average_amount: generated.amount > 3000 ? 800 : Math.max(generated.amount, 25),
+      source_type: "simulator",
     };
 
     const processed = await processTransaction(txn, req);
@@ -335,7 +357,9 @@ exports.getTransactions = (req, res) => {
   db.query(
     `
       SELECT t.*, t.masked_wallet_ref AS user_id, t.transaction_status AS status,
-             m.merchant_name, m.merchant_average_amount
+             m.merchant_name, m.merchant_average_amount,
+             m.risk_level AS merchant_risk_level, m.merchant_risk_score,
+             m.has_physical_store
       FROM transactions t
       LEFT JOIN merchants m ON t.merchant_id = m.merchant_id
       ORDER BY COALESCE(t.txn_time, t.created_at) DESC
@@ -354,7 +378,9 @@ exports.showTransactionDetailsPage = async (req, res) => {
     const transactions = await query(
       `
         SELECT t.*, t.masked_wallet_ref AS user_id, t.transaction_status AS status,
-               m.merchant_name, m.merchant_average_amount
+               m.merchant_name, m.merchant_average_amount,
+               m.risk_level AS merchant_risk_level, m.merchant_risk_score,
+               m.has_physical_store
         FROM transactions t
         LEFT JOIN merchants m ON t.merchant_id = m.merchant_id
         WHERE t.transaction_id = ?
@@ -418,8 +444,108 @@ exports.getAlerts = async (req, res) => {
   }
 };
 
+function normalizeImportRow(row) {
+  return Object.entries(row || {}).reduce((normalized, [key, value]) => {
+    const normalizedKey = String(key)
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+    if (normalizedKey) normalized[normalizedKey] = value;
+    return normalized;
+  }, {});
+}
+
+function formatImportError(err) {
+  if (err?.code === "ER_DUP_ENTRY") return "transaction_id already exists";
+  return err?.message || "Unable to process transaction";
+}
+
+exports.uploadTransactions = async (req, res) => {
+  const rows = req.body?.transactions;
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return res.status(400).json({ message: "The upload contains no transaction rows" });
+  }
+  if (rows.length > 500) {
+    return res.status(400).json({ message: "A maximum of 500 transactions is allowed per upload" });
+  }
+
+  const merchantAverageCache = new Map();
+  const results = [];
+
+  for (let index = 0; index < rows.length; index++) {
+    const row = normalizeImportRow(rows[index]);
+    const transactionId = row.transaction_id || null;
+
+    try {
+      if (!row.merchant_average_amount && row.merchant_id) {
+        if (!merchantAverageCache.has(row.merchant_id)) {
+          const merchants = await query(
+            "SELECT merchant_average_amount FROM merchants WHERE merchant_id = ? LIMIT 1",
+            [row.merchant_id]
+          );
+          merchantAverageCache.set(
+            row.merchant_id,
+            merchants[0]?.merchant_average_amount || 1000
+          );
+        }
+        row.merchant_average_amount = merchantAverageCache.get(row.merchant_id);
+      }
+
+      const payload = {
+        ...row,
+        timestamp: row.timestamp || row.txn_time || row.transaction_time,
+        currency: row.currency || "SGD",
+        transaction_type: row.transaction_type || (row.ip_address ? "online" : "face_to_face"),
+        customer_risk_profile: row.customer_risk_profile || "low",
+        merchant_average_amount: row.merchant_average_amount || 1000,
+        merchant_name: row.merchant_name || row.merchant_id,
+        source_type: "file_upload",
+      };
+
+      const processed = await processTransaction(payload, req);
+      if (!processed.validation.isValid) {
+        results.push({
+          row: index + 2,
+          transaction_id: transactionId,
+          status: "failed",
+          errors: processed.validation.errors,
+        });
+        continue;
+      }
+
+      results.push({
+        row: index + 2,
+        status: "processed",
+        ...buildApiResponse(processed.txn, processed.result),
+      });
+    } catch (err) {
+      results.push({
+        row: index + 2,
+        transaction_id: transactionId,
+        status: "failed",
+        errors: [formatImportError(err)],
+      });
+    }
+  }
+
+  const succeeded = results.filter((result) => result.status === "processed").length;
+  const alertsCreated = results.filter((result) => result.alert_id).length;
+  res.status(succeeded > 0 ? 200 : 422).json({
+    message: `Processed ${succeeded} of ${rows.length} transactions`,
+    summary: {
+      total: rows.length,
+      succeeded,
+      failed: rows.length - succeeded,
+      alerts_created: alertsCreated,
+    },
+    results,
+  });
+};
+
 exports.getComplianceRules = async (req, res) => {
   try {
+    await ensureDefaultRules(req.user.id);
     const rules = await query(
       `
         SELECT rule_id, rule_name, rule_type, description, threshold_value,

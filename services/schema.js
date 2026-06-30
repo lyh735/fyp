@@ -2,23 +2,6 @@ const { query } = require("./dbQuery");
 
 async function ensureComplianceSchema() {
   await query(`
-    CREATE TABLE IF NOT EXISTS merchants (
-      merchant_id VARCHAR(50) PRIMARY KEY,
-      merchant_name VARCHAR(100) NOT NULL,
-      business_category VARCHAR(100),
-      mcc_code VARCHAR(20),
-      merchant_average_amount DECIMAL(12,2),
-      operating_hours_start TIME,
-      operating_hours_end TIME,
-      risk_level VARCHAR(20),
-      country VARCHAR(50) DEFAULT 'Singapore',
-      status VARCHAR(30),
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-
-  await query(`
     CREATE TABLE IF NOT EXISTS users (
       user_id INT AUTO_INCREMENT PRIMARY KEY,
       name VARCHAR(100) NOT NULL,
@@ -28,7 +11,28 @@ async function ensureComplianceSchema() {
       first_login TINYINT DEFAULT 1,
       status VARCHAR(30) DEFAULT 'active',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS merchants (
+      merchant_id VARCHAR(50) PRIMARY KEY,
+      merchant_name VARCHAR(100) NOT NULL,
+      business_category VARCHAR(100),
+      mcc_code VARCHAR(20),
+      merchant_average_amount DECIMAL(12,2),
+      operating_hours_start TIME,
+      operating_hours_end TIME,
+      risk_level VARCHAR(20),
+      merchant_risk_score INT DEFAULT 0,
+      country VARCHAR(50) DEFAULT 'Singapore',
+      has_physical_store TINYINT(1) DEFAULT 1,
+      status VARCHAR(30),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      updated_by INT,
+      FOREIGN KEY (updated_by) REFERENCES users(user_id)
     )
   `);
 
@@ -43,10 +47,10 @@ async function ensureComplianceSchema() {
       time_window_minutes INT,
       points INT DEFAULT 0,
       is_active TINYINT DEFAULT 1,
-      created_by INT,
+      created_by INT NOT NULL,
       updated_by INT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       FOREIGN KEY (created_by) REFERENCES users(user_id),
       FOREIGN KEY (updated_by) REFERENCES users(user_id)
     )
@@ -70,6 +74,7 @@ async function ensureComplianceSchema() {
       risk_level VARCHAR(20),
       triggered_rules TEXT,
       processing_status VARCHAR(50),
+      source_type VARCHAR(30),
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (merchant_id) REFERENCES merchants(merchant_id)
     )
@@ -83,7 +88,7 @@ async function ensureComplianceSchema() {
       risk_score INT,
       risk_level VARCHAR(20),
       triggered_rules TEXT,
-      status VARCHAR(30) DEFAULT 'open',
+      status VARCHAR(30) DEFAULT 'Pending',
       message TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       reviewed_at DATETIME,
@@ -123,13 +128,27 @@ async function ensureComplianceSchema() {
     )
   `);
 
+  await ensureDefaultRules();
+}
+
+async function ensureDefaultRules(createdBy = null) {
   const rules = await query("SELECT COUNT(*) AS count FROM compliance_rules");
-  if (rules[0].count === 0) {
-    await query(`
+  if (rules[0].count > 0) return;
+
+  let authorId = createdBy;
+  if (!authorId) {
+    const authors = await query(
+      "SELECT user_id FROM users ORDER BY user_id ASC LIMIT 1"
+    );
+    if (authors.length === 0) return;
+    authorId = authors[0].user_id;
+  }
+
+  await query(`
       INSERT INTO compliance_rules
         (
           rule_name, rule_type, description, threshold_value, threshold_count,
-          time_window_minutes, points, is_active
+          time_window_minutes, points, is_active, created_by
         )
       VALUES
         (
@@ -140,7 +159,8 @@ async function ensureComplianceSchema() {
           NULL,
           NULL,
           30,
-          1
+          1,
+          ?
         ),
         (
           'Repeated transactions within short period',
@@ -150,7 +170,8 @@ async function ensureComplianceSchema() {
           5,
           10,
           25,
-          1
+          1,
+          ?
         ),
         (
           'Transaction outside operating hours',
@@ -160,7 +181,8 @@ async function ensureComplianceSchema() {
           NULL,
           NULL,
           15,
-          1
+          1,
+          ?
         ),
         (
           'High-risk customer profile',
@@ -170,7 +192,8 @@ async function ensureComplianceSchema() {
           NULL,
           NULL,
           25,
-          1
+          1,
+          ?
         ),
         (
           'High-risk country/jurisdiction',
@@ -180,7 +203,8 @@ async function ensureComplianceSchema() {
           NULL,
           NULL,
           30,
-          1
+          1,
+          ?
         ),
         (
           'Missing or insufficient information',
@@ -190,7 +214,8 @@ async function ensureComplianceSchema() {
           NULL,
           NULL,
           20,
-          1
+          1,
+          ?
         ),
         (
           'Online transaction with missing/invalid IP',
@@ -200,7 +225,8 @@ async function ensureComplianceSchema() {
           NULL,
           NULL,
           20,
-          1
+          1,
+          ?
         ),
         (
           'Large cross-border transfer amount if country is not Singapore',
@@ -210,10 +236,10 @@ async function ensureComplianceSchema() {
           NULL,
           NULL,
           25,
-          1
+          1,
+          ?
         )
-    `);
-  }
+  `, Array(8).fill(authorId));
 }
 
-module.exports = { ensureComplianceSchema };
+module.exports = { ensureComplianceSchema, ensureDefaultRules };

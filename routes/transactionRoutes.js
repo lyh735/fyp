@@ -2,6 +2,7 @@ const express = require("express");
 const router  = express.Router();
 const {
   createTransaction,
+  uploadTransactions,
   simulate,
   getTransactions,
   getAlerts,
@@ -14,6 +15,7 @@ const {
 const { authenticate, requireAdmin } = require("../middleware/authMiddleware");
 
 router.post("/transactions",       authenticate, createTransaction);
+router.post("/transactions/upload", authenticate, uploadTransactions);
 router.get ("/transactions",       authenticate, getTransactions);
 router.get ("/alerts",             authenticate, getAlerts);
 router.get ("/alerts/:id",         authenticate, getAlert);

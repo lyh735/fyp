@@ -136,7 +136,7 @@
         <div class="sim-banner">
           <div class="sim-banner-text">
             <h2>Transaction Simulator</h2>
-            <p>Generates realistic UniwebPay transactions across AliPay, WechatPay, UnionQR Pay and GrabPay for SingEat and YiDian merchant partners. Suspicious transactions trigger live compliance alerts.</p>
+            <p>Generates realistic transactions across cards, digital wallets, and bank/QR payment methods. Suspicious transactions trigger live compliance alerts.</p>
           </div>
           <div class="sim-controls-row">
             <div class="sim-status-pill">
@@ -290,10 +290,14 @@ function formatDate(d) {
 function pmBadge(method) {
   if (!method) return "—";
   const map = {
-    "AliPay":      "pm-badge pm-alipay",
-    "WechatPay":   "pm-badge pm-wechat",
-    "UnionQR Pay": "pm-badge pm-unionqr",
-    "GrabPay":     "pm-badge pm-grabpay",
+    "Visa":       "pm-badge pm-card",
+    "Mastercard": "pm-badge pm-card",
+    "Alipay":     "pm-badge pm-wallet",
+    "WeChat Pay": "pm-badge pm-wallet",
+    "GrabPay":    "pm-badge pm-wallet",
+    "ShopeePay":  "pm-badge pm-wallet",
+    "PayNow":     "pm-badge pm-bankqr",
+    "SGQR":       "pm-badge pm-bankqr",
   };
   return `<span class="${map[method] || 'pm-badge'}">${method}</span>`;
 }
@@ -761,7 +765,11 @@ function prependFeedItem(t) {
   const feed = document.getElementById("liveFeed");
   if (feed.querySelector("[data-placeholder]")) feed.innerHTML = "";
 
-  const pmCls = { "AliPay":"pm-alipay","WechatPay":"pm-wechat","UnionQR Pay":"pm-unionqr","GrabPay":"pm-grabpay" };
+  const pmCls = {
+    Visa:"pm-card", Mastercard:"pm-card", Alipay:"pm-wallet",
+    "WeChat Pay":"pm-wallet", GrabPay:"pm-wallet", ShopeePay:"pm-wallet",
+    PayNow:"pm-bankqr", SGQR:"pm-bankqr"
+  };
   const item = document.createElement("div");
   item.className = "live-feed-item";
   item.innerHTML = `

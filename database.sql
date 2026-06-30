@@ -1,20 +1,5 @@
-CREATE DATABASE rt_cms;
-USE rt_cms;
-
-CREATE TABLE merchants (
-    merchant_id VARCHAR(50) PRIMARY KEY,
-    merchant_name VARCHAR(100) NOT NULL,
-    business_category VARCHAR(100),
-    mcc_code VARCHAR(20),
-    merchant_average_amount DECIMAL(12,2),
-    operating_hours_start TIME,
-    operating_hours_end TIME,
-    risk_level VARCHAR(20),
-    country VARCHAR(50) DEFAULT 'Singapore',
-    status VARCHAR(30),
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
+CREATE DATABASE transaction_monitoring;
+USE transaction_monitoring;
 
 CREATE TABLE users (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -25,7 +10,26 @@ CREATE TABLE users (
     first_login TINYINT DEFAULT 1,
     status VARCHAR(30) DEFAULT 'active',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE merchants (
+    merchant_id VARCHAR(50) PRIMARY KEY,
+    merchant_name VARCHAR(100) NOT NULL,
+    business_category VARCHAR(100),
+    mcc_code VARCHAR(20),
+    merchant_average_amount DECIMAL(12,2),
+    operating_hours_start TIME,
+    operating_hours_end TIME,
+    risk_level VARCHAR(20),
+    merchant_risk_score INT DEFAULT 0,
+    country VARCHAR(50) DEFAULT 'Singapore',
+    has_physical_store TINYINT(1) DEFAULT 1,
+    status VARCHAR(30),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by INT,
+    FOREIGN KEY (updated_by) REFERENCES users(user_id)
 );
 
 CREATE TABLE compliance_rules (
@@ -38,11 +42,10 @@ CREATE TABLE compliance_rules (
     time_window_minutes INT,
     points INT DEFAULT 0,
     is_active TINYINT DEFAULT 1,
-    created_by INT,
+    created_by INT NOT NULL,
     updated_by INT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (created_by) REFERENCES users(user_id),
     FOREIGN KEY (updated_by) REFERENCES users(user_id)
 );
@@ -64,8 +67,8 @@ CREATE TABLE transactions (
     risk_level VARCHAR(20),
     triggered_rules TEXT,
     processing_status VARCHAR(50),
+    source_type VARCHAR(30),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-
     FOREIGN KEY (merchant_id) REFERENCES merchants(merchant_id)
 );
 
@@ -76,13 +79,12 @@ CREATE TABLE alerts (
     risk_score INT,
     risk_level VARCHAR(20),
     triggered_rules TEXT,
-    status VARCHAR(30) DEFAULT 'open',
+    status VARCHAR(30) DEFAULT 'Pending',
     message TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     reviewed_at DATETIME,
     reviewed_by INT,
     read_at DATETIME,
-
     FOREIGN KEY (transaction_id) REFERENCES transactions(transaction_id),
     FOREIGN KEY (merchant_id) REFERENCES merchants(merchant_id),
     FOREIGN KEY (reviewed_by) REFERENCES users(user_id)
@@ -95,7 +97,6 @@ CREATE TABLE officer_actions (
     action_type VARCHAR(50),
     remarks TEXT,
     action_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-
     FOREIGN KEY (alert_id) REFERENCES alerts(alert_id),
     FOREIGN KEY (officer_id) REFERENCES users(user_id)
 );
@@ -110,6 +111,5 @@ CREATE TABLE audit_logs (
     new_value TEXT,
     message TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-
     FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
