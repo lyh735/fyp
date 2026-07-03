@@ -153,6 +153,10 @@ async function ensureComplianceSchema() {
       additional_remarks TEXT,
       request_message TEXT,
       response_message TEXT,
+      response_file_name VARCHAR(255),
+      response_stored_name VARCHAR(255),
+      response_mime_type VARCHAR(100),
+      response_file_size INT,
       status VARCHAR(40) DEFAULT 'Draft',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -239,6 +243,12 @@ async function ensureRfiSchemaCompatibility() {
   await addColumnIfMissing("rfi_requests", "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
   await addColumnIfMissing("rfi_requests", "reminder_count", "INT DEFAULT 0");
   await addColumnIfMissing("rfi_requests", "last_reminder_at", "DATETIME NULL");
+  await addColumnIfMissing("rfi_requests", "response_message", "TEXT NULL");
+  await addColumnIfMissing("rfi_requests", "responded_at", "DATETIME NULL");
+  await addColumnIfMissing("rfi_requests", "response_file_name", "VARCHAR(255) NULL");
+  await addColumnIfMissing("rfi_requests", "response_stored_name", "VARCHAR(255) NULL");
+  await addColumnIfMissing("rfi_requests", "response_mime_type", "VARCHAR(100) NULL");
+  await addColumnIfMissing("rfi_requests", "response_file_size", "INT NULL");
 
   await query(`
     UPDATE rfi_requests

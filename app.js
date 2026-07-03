@@ -21,16 +21,21 @@ app.use(express.urlencoded({ extended: true }));
 
 const transactionRoutes = require("./routes/transactionRoutes");
 const authRoutes = require("./routes/authRoutes");
+const stroRoutes = require("./routes/stroRoutes");
+const rfiRoutes = require("./routes/rfiRoutes");
 const { ensureComplianceSchema } = require("./services/schema");
 const { showTransactionDetailsPage } = require("./controllers/transactionController");
 
 app.use("/api", transactionRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/stro", stroRoutes);
+app.use("/api/rfis", rfiRoutes);
 
 const officerRoutes = require("./routes/officerRoutes");
 app.use("/api/officer", officerRoutes);
 
 app.get("/transaction/:id", showTransactionDetailsPage);
+app.get("/stro", (req, res) => res.redirect("/stro-alerts.html"));
 
 
 app.get("/", (req, res) => {

@@ -75,6 +75,9 @@
 
 <body>
 
+<script src="/js/auth.js"></script>
+<script>if (!requireAuth()) throw new Error("Authentication required");</script>
+
 <div class="container mt-5 mb-5">
 
   <div class="mb-4 d-flex justify-content-between align-items-center">
@@ -102,6 +105,10 @@
 
       <a href="/api/officer/audit-logs" class="btn btn-outline-dark">
         Audit Logs
+      </a>
+
+      <a href="/stro-alerts.html" class="btn btn-outline-primary ms-2">
+        STRO Alerts
       </a>
     </div>
   </div>

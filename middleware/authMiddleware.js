@@ -19,3 +19,25 @@ exports.requireAdmin = (req, res, next) => {
   }
   next();
 };
+
+exports.requireStro = (req, res, next) => {
+  if (String(req.user.role || "").trim().toLowerCase() !== "stro") {
+    return res.status(403).json({ message: "STRO access required" });
+  }
+  next();
+};
+
+exports.requireAnalyst = (req, res, next) => {
+  if (String(req.user.role || "").trim().toLowerCase() !== "analyst") {
+    return res.status(403).json({ message: "Analyst access required" });
+  }
+  next();
+};
+
+exports.requireAlertOfficer = (req, res, next) => {
+  const role = String(req.user.role || "").trim().toLowerCase();
+  if (!["admin", "compliance_manager", "analyst"].includes(role)) {
+    return res.status(403).json({ message: "Compliance officer access required" });
+  }
+  next();
+};

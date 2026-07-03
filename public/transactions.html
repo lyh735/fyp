@@ -92,6 +92,13 @@
         </div>
       </div>
 
+      <div id="stroNav" style="display:none">
+        <div class="nav-section-label">STRO Review</div>
+        <div class="nav-item" onclick="window.location.href='/stro-alerts.html'">Escalated Alerts</div>
+        <div class="nav-item" onclick="window.location.href='/api/officer/report'">Reports</div>
+        <div class="nav-item" onclick="window.location.href='/api/officer/audit-logs'">Audit Trail</div>
+      </div>
+
       <div class="nav-section-label">Account</div>
       <div class="nav-item" onclick="window.location.href='/account.html'">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -210,6 +217,9 @@ if (["admin", "compliance_manager"].includes(user.role)) {
   const statUsersCard = document.getElementById("statUsersCard");
   if (adminNav) adminNav.style.display = "block";
   if (statUsersCard) statUsersCard.style.display = "";
+}
+if (String(user.role).trim().toLowerCase() === "stro") {
+  document.getElementById("stroNav").style.display = "block";
 }
 
 // ── SECTION NAVIGATION ──
@@ -525,7 +535,7 @@ async function showAlertDetails(alertId) {
 
   const actions = document.getElementById("detailActions");
   actions.innerHTML = "";
-  if (alert.status === "Pending") {
+  if (alert.status === "Pending" && String(user.role).trim().toLowerCase() !== "stro") {
     actions.innerHTML = `
       <button class="btn btn-danger" onclick="goToAlertAction(${alert.id})">Take Action</button>
     `;

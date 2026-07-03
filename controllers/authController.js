@@ -17,6 +17,7 @@ exports.login = (req, res) => {
     }
 
     const user = results[0];
+    const role = String(user.role || "").trim().toLowerCase();
     if (user.status !== "active") {
       return res.status(403).json({ message: "Account is not active" });
     }
@@ -26,7 +27,7 @@ exports.login = (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: user.user_id, email: user.email, role: user.role, name: user.name },
+      { id: user.user_id, email: user.email, role, name: user.name },
       JWT_SECRET,
       { expiresIn: "8h" }
     );
@@ -37,7 +38,7 @@ exports.login = (req, res) => {
         id: user.user_id,
         name: user.name,
         email: user.email,
-        role: user.role,
+        role,
         first_login: !!user.first_login
       }
     });

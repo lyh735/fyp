@@ -39,6 +39,16 @@ function requireAdminRole() {
   return user;
 }
 
+function requireStroRole() {
+  const user = requireAuth();
+  if (!user) return null;
+  if (String(user.role || "").trim().toLowerCase() !== "stro") {
+    window.location.href = "/dashboard.html";
+    return null;
+  }
+  return user;
+}
+
 async function apiFetch(url, options = {}) {
   const token = getToken();
   const headers = {

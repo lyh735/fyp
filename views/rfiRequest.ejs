@@ -42,6 +42,12 @@
     .meta { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:18px; }
     .meta div { background:#f8fafc; border-radius:8px; padding:11px; font-size:13px; }
     .meta strong { display:block; color:var(--muted); font-size:11px; margin-bottom:4px; text-transform:uppercase; }
+    .full-card { margin-top:22px; }
+    .response-file { padding:12px; border:1px solid var(--border); border-radius:8px; background:#f8fafc; }
+    .history { list-style:none; padding:0; margin:0; }
+    .history li { padding:14px 0; border-bottom:1px solid var(--border); }
+    .history li:last-child { border-bottom:0; }
+    .history small { display:block; color:var(--muted); margin-top:4px; }
     dialog { width:min(760px,90vw); border:0; border-radius:12px; padding:0; box-shadow:0 24px 60px rgba(0,0,0,.25); }
     dialog::backdrop { background:rgba(15,23,42,.55); }
     dialog .preview-actions { padding:14px 20px; text-align:right; border-top:1px solid var(--border); }
@@ -97,22 +103,62 @@
             </div>
             <div class="field"><label for="additional_remarks">Additional remarks (optional)</label><textarea id="additional_remarks" name="additional_remarks" <%= rfi && rfi.status !== 'Draft' ? 'readonly' : '' %>><%= rfi ? (rfi.additional_remarks || '') : '' %></textarea></div>
             <div class="actions">
-              <% if (!rfi || rfi.status === 'Draft') { %><button class="primary" type="submit">Save Draft</button><% } %>
+              <% if (!rfi || rfi.status === 'Draft') { %>
+                <button class="primary" type="submit" name="intent" value="save">Save Draft</button>
+                <button class="secondary" type="submit" name="intent" value="export">Save &amp; Export PDF</button>
+                <button class="success" type="submit" name="intent" value="mark_sent" onclick="return confirm('Confirm that the PDF has been sent to the merchant?')">Save &amp; Mark as Sent</button>
+              <% } else { %>
+                <a class="button secondary" href="/api/officer/rfi/<%= rfi.rfi_id %>/pdf">Export PDF</a>
+              <% } %>
               <button class="secondary" type="button" id="previewButton">Preview</button>
-              <a class="button secondary <%= !rfi ? 'disabled' : '' %>" href="<%= rfi ? '/api/officer/rfi/' + rfi.rfi_id + '/pdf' : '#' %>">Export PDF</a>
             </div>
           </form>
 
-          <% if (rfi && rfi.status === 'Draft') { %>
-            <form method="POST" action="/api/officer/rfi/<%= rfi.rfi_id %>/mark-sent" style="margin-top:12px;" onsubmit="return confirm('Confirm that the PDF has been sent to the merchant?')"><button class="success" type="submit">Mark as Sent</button></form>
-          <% } %>
           <% if (rfi && rfi.sent_at) { %>
             <div class="meta" style="margin-top:20px;"><div><strong>RFI Sent</strong>Yes</div><div><strong>Sent Date</strong><%= new Date(rfi.sent_at).toLocaleDateString('en-SG') %></div><div><strong>Due Date</strong><%= dueDate %></div><div><strong>Reminders</strong><%= rfi.reminder_count || 0 %></div></div>
           <% } %>
-          <% if (isOverdue) { %><form method="POST" action="/api/officer/rfi/<%= rfi.rfi_id %>/reminder"><button class="warning" type="submit">Send Reminder</button></form><% } %>
+          <% if (isOverdue) { %>
+            <form method="POST" action="/api/officer/rfi/<%= rfi.rfi_id %>/reminder"><button class="warning" type="submit">Send Reminder</button></form>
+          <% } else if (rfi && rfi.status === 'Pending Merchant Response') { %>
+            <button class="secondary disabled" type="button" disabled title="Available after <%= dueDate %>">Reminder available after due date</button>
+          <% } %>
         </div>
       </aside>
     </div>
+
+    <% if (rfi && rfi.status === 'Pending Merchant Response') { %>
+      <section class="card full-card">
+        <div class="card-header"><h2>Record Merchant Response</h2></div>
+        <div class="card-body">
+          <form method="POST" enctype="multipart/form-data" action="/api/officer/rfi/<%= rfi.rfi_id %>/response">
+            <div class="field"><label for="response_message">Merchant response message</label><textarea id="response_message" name="response_message" placeholder="Record the merchant's explanation or response details"></textarea></div>
+            <div class="field"><label for="response_file">Response attachment (optional, maximum 10 MB)</label><input id="response_file" name="response_file" type="file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip" /></div>
+            <button class="success" type="submit" onclick="return confirm('Record this response and mark the RFI as responded?')">Save Response &amp; Mark Responded</button>
+          </form>
+        </div>
+      </section>
+    <% } else if (rfi && rfi.status === 'Responded') { %>
+      <section class="card full-card">
+        <div class="card-header"><h2>Merchant Response</h2></div>
+        <div class="card-body">
+          <div class="meta"><div><strong>Responded At</strong><%= rfi.responded_at ? new Date(rfi.responded_at).toLocaleString('en-SG') : 'Not recorded' %></div><div><strong>Status</strong><%= rfi.status %></div></div>
+          <div class="field"><label>Response message</label><div class="response-file"><%= rfi.response_message || 'No message provided.' %></div></div>
+          <% if (rfi.response_stored_name) { %><a class="button secondary" href="/api/officer/rfi/<%= rfi.rfi_id %>/response-file">Download <%= rfi.response_file_name %></a><% } %>
+        </div>
+      </section>
+    <% } %>
+
+    <section class="card full-card">
+      <div class="card-header"><h2>Case History</h2></div>
+      <div class="card-body">
+        <% if (!caseHistory.length) { %><p>No case activity recorded.</p><% } %>
+        <ul class="history">
+          <% caseHistory.forEach(function(item) { %>
+            <li><strong><%= String(item.action_type || '').replaceAll('_', ' ') %></strong> &mdash; <%= item.status_after_action || 'No status change' %><% if (item.remarks) { %><div><%= item.remarks %></div><% } %><small><%= item.actor_name || 'System' %> &middot; <%= new Date(item.created_at).toLocaleString('en-SG') %></small></li>
+          <% }) %>
+        </ul>
+      </div>
+    </section>
   </main>
 
   <dialog id="previewDialog"><div id="dialogDocument"></div><div class="preview-actions"><button class="secondary" type="button" id="closePreview">Close Preview</button></div></dialog>
@@ -127,6 +173,12 @@
       document.getElementById('previewRemarks').innerHTML = remarks ? `<p><strong>Additional remarks:</strong><br>${remarks.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])).replace(/\n/g,'<br>')}</p>` : '';
     }
     [dueInput, remarksInput, ...checkboxes].forEach(el => el.addEventListener('input', updatePreview));
+    document.getElementById('rfiForm').addEventListener('submit', (event) => {
+      if (!checkboxes.some(checkbox => checkbox.checked)) {
+        event.preventDefault();
+        window.alert('Select at least one requested document.');
+      }
+    });
     document.getElementById('previewButton').addEventListener('click', () => {
       updatePreview();
       document.getElementById('dialogDocument').innerHTML = document.getElementById('rfiDocument').outerHTML;

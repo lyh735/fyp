@@ -65,7 +65,9 @@
     const token = getToken();
     const user = getUser();
     if (token && user) {
-      window.location.href = user.first_login ? "/change-password.html" : "/dashboard.html";
+      window.location.href = user.first_login
+        ? "/change-password.html"
+        : "/dashboard.html";
     }
   })();
 

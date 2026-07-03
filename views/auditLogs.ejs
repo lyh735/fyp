@@ -47,6 +47,9 @@
 
 <body>
 
+<script src="/js/auth.js"></script>
+<script>if (!requireAuth()) throw new Error("Authentication required");</script>
+
 <div class="mb-4">
 
   <a href="/dashboard.html" class="btn btn-outline-secondary">
@@ -73,6 +76,10 @@
 
       <a href="/api/officer/report" class="btn btn-dark">
         Reports
+      </a>
+
+      <a href="/stro-alerts.html" class="btn btn-outline-primary">
+        STRO Alerts
       </a>
     </div>
 

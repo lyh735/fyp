@@ -381,7 +381,6 @@ exports.getTransactions = (req, res) => {
       FROM transactions t
       LEFT JOIN merchants m ON t.merchant_id = m.merchant_id
       ORDER BY COALESCE(t.txn_time, t.created_at) DESC
-      LIMIT 500
     `,
     (err, results) => {
       if (err) return res.status(500).json({ message: "Server error" });

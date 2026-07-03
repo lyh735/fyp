@@ -12,7 +12,7 @@ const {
   dismissAlert,
   escalateAlert,
 } = require("../controllers/transactionController");
-const { authenticate, requireAdmin } = require("../middleware/authMiddleware");
+const { authenticate, requireAdmin, requireAlertOfficer } = require("../middleware/authMiddleware");
 
 router.post("/transactions",       authenticate, createTransaction);
 router.post("/transactions/upload", authenticate, uploadTransactions);
@@ -21,8 +21,8 @@ router.get ("/alerts",             authenticate, getAlerts);
 router.get ("/alerts/:id",         authenticate, getAlert);
 router.get ("/rules",              authenticate, getComplianceRules);
 router.post("/alerts/:id/read",    authenticate, markAlertRead);
-router.post("/alerts/:id/dismiss", authenticate, dismissAlert);
-router.post("/alerts/:id/escalate",authenticate, escalateAlert);
+router.post("/alerts/:id/dismiss", authenticate, requireAlertOfficer, dismissAlert);
+router.post("/alerts/:id/escalate",authenticate, requireAlertOfficer, escalateAlert);
 router.post("/simulate",           authenticate, requireAdmin, simulate);
 
 module.exports = router;

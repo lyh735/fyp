@@ -50,6 +50,12 @@
         Alerts
         <span id="alertCount" class="badge badge-admin" style="margin-left:auto;display:none"></span>
       </div>
+      <div class="nav-item" id="analystRfiHistoryNav" style="display:none" onclick="window.location.href='/analyst-rfi-history.html'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/>
+        </svg>
+        My RFI History
+      </div>
       <div class="nav-item" onclick="window.location.href='/rules.html'">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M9 3h6l1 2h4v16H4V5h4l1-2z"/>
@@ -84,6 +90,13 @@
           </svg>
           Manage Users
         </div>
+      </div>
+
+      <div id="stroNav" style="display:none">
+        <div class="nav-section-label">STRO Review</div>
+        <div class="nav-item" onclick="window.location.href='/stro-alerts.html'">Escalated Alerts</div>
+        <div class="nav-item" onclick="window.location.href='/api/officer/report'">Reports</div>
+        <div class="nav-item" onclick="window.location.href='/api/officer/audit-logs'">Audit Trail</div>
       </div>
 
       <div class="nav-section-label">Account</div>
@@ -271,6 +284,12 @@ if (["admin", "compliance_manager"].includes(user.role)) {
   const statUsersCard = document.getElementById("statUsersCard");
   if (adminNav) adminNav.style.display = "block";
   if (statUsersCard) statUsersCard.style.display = "";
+}
+if (String(user.role).trim().toLowerCase() === "stro") {
+  document.getElementById("stroNav").style.display = "block";
+}
+if (String(user.role).trim().toLowerCase() === "analyst") {
+  document.getElementById("analystRfiHistoryNav").style.display = "flex";
 }
 
 // ── SECTION NAVIGATION ──
@@ -586,7 +605,7 @@ async function showAlertDetails(alertId) {
 
   const actions = document.getElementById("detailActions");
   actions.innerHTML = "";
-  if (alert.status === "Pending") {
+  if (alert.status === "Pending" && String(user.role).trim().toLowerCase() !== "stro") {
     actions.innerHTML = `
       <button class="btn btn-danger" onclick="goToAlertAction(${alert.id})">Take Action</button>
     `;
