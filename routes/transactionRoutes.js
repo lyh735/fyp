@@ -8,6 +8,9 @@ const {
   getAlerts,
   getAlert,
   getComplianceRules,
+  createComplianceRule,
+  updateComplianceRule,
+  deleteComplianceRule,
   markAlertRead,
   dismissAlert,
   escalateAlert,
@@ -20,6 +23,9 @@ router.get ("/transactions",       authenticate, getTransactions);
 router.get ("/alerts",             authenticate, getAlerts);
 router.get ("/alerts/:id",         authenticate, getAlert);
 router.get ("/rules",              authenticate, getComplianceRules);
+router.post("/rules",              authenticate, requireAdmin, createComplianceRule);
+router.put ("/rules/:id",          authenticate, requireAdmin, updateComplianceRule);
+router.delete("/rules/:id",        authenticate, requireAdmin, deleteComplianceRule);
 router.post("/alerts/:id/read",    authenticate, markAlertRead);
 router.post("/alerts/:id/dismiss", authenticate, requireAlertOfficer, dismissAlert);
 router.post("/alerts/:id/escalate",authenticate, requireAlertOfficer, escalateAlert);

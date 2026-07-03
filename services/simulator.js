@@ -55,12 +55,12 @@ const MERCHANT_AVERAGES = {
 };
 
 const COUNTRIES = [
-  { name: "Singapore", weight: 0.74 },
-  { name: "China",     weight: 0.18 },
+  { name: "Singapore", weight: 0.82 },
+  { name: "China",     weight: 0.08 },
   { name: "Malaysia",  weight: 0.04 },
-  { name: "Indonesia", weight: 0.02 },
-  { name: "Hong Kong", weight: 0.015 },
-  { name: "Taiwan",    weight: 0.005 },
+  { name: "Indonesia", weight: 0.025 },
+  { name: "Hong Kong", weight: 0.02 },
+  { name: "Taiwan",    weight: 0.015 },
 ];
 
 function weightedPick(items, weights) {

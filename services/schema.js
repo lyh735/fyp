@@ -240,10 +240,8 @@ async function ensureCurrentSchemaCompatibility() {
 }
 
 async function ensureDefaultRules(createdBy = null) {
-  const rules = await query("SELECT COUNT(*) AS count FROM compliance_rules");
-  if (rules[0].count > 0) return;
-
   let authorId = createdBy;
+
   if (!authorId) {
     const authors = await query(
       "SELECT user_id FROM users ORDER BY user_id ASC LIMIT 1"
@@ -253,101 +251,158 @@ async function ensureDefaultRules(createdBy = null) {
   }
 
   await query(`
-      INSERT INTO compliance_rules
-        (
-          rule_name, rule_type, description, threshold_value, threshold_count,
-          time_window_minutes, points, is_active, created_by
-        )
-      VALUES
-        (
-          'Significant amount compared to merchant average',
-          'amount_multiplier',
-          'Flags transactions greater than three times the merchant average amount.',
-          3.00,
-          NULL,
-          NULL,
-          30,
-          1,
-          ?
-        ),
-        (
-          'Repeated transactions within short period',
-          'velocity',
-          'Flags merchants with five or more transactions within ten minutes.',
-          NULL,
-          5,
-          10,
-          25,
-          1,
-          ?
-        ),
-        (
-          'Transaction outside operating hours',
-          'time',
-          'Flags transactions made from 11 PM to before 6 AM.',
-          NULL,
-          NULL,
-          NULL,
-          15,
-          1,
-          ?
-        ),
-        (
-          'High-risk customer profile',
-          'customer_risk',
-          'Adds risk points when the customer profile is marked high risk.',
-          NULL,
-          NULL,
-          NULL,
-          25,
-          1,
-          ?
-        ),
-        (
-          'High-risk country/jurisdiction',
-          'jurisdiction',
-          'Flags transactions from configured high-risk countries or jurisdictions.',
-          NULL,
-          NULL,
-          NULL,
-          30,
-          1,
-          ?
-        ),
-        (
-          'Missing or insufficient information',
-          'data_quality',
-          'Flags transactions where important information such as country was missing or defaulted.',
-          NULL,
-          NULL,
-          NULL,
-          20,
-          1,
-          ?
-        ),
-        (
-          'Online transaction with missing/invalid IP',
-          'ip_validation',
-          'Flags online transactions without a valid IP address.',
-          NULL,
-          NULL,
-          NULL,
-          20,
-          1,
-          ?
-        ),
-        (
-          'Large cross-border transfer amount if country is not Singapore',
-          'cross_border',
-          'Flags SGD transactions above 1500 when the transaction country is not Singapore.',
-          1500.00,
-          NULL,
-          NULL,
-          25,
-          1,
-          ?
-        )
-  `, Array(8).fill(authorId));
+    UPDATE compliance_rules
+    SET is_active = 0, updated_at = NOW()
+    WHERE LOWER(rule_name) LIKE '%high-risk country%'
+       OR LOWER(rule_name) LIKE '%high risk country%'
+       OR LOWER(rule_name) LIKE '%jurisdiction%'
+       OR LOWER(rule_name) LIKE '%cross-border%'
+       OR LOWER(rule_name) LIKE '%cross border%'
+       OR rule_type IN ('country', 'country_risk', 'jurisdiction', 'cross_border')
+  `);
+
+  const currentRules = [
+    {
+      rule_name: "Merchant MCC/base industry risk score",
+      rule_type: "merchant_profile",
+      description: "Adds base risk using merchant MCC or business category: F&B +5, retail +10, electronics +15, travel/tourism/hotel +20, money service/remittance/financial/gambling +30.",
+      threshold_value: null,
+      threshold_count: null,
+      time_window_minutes: null,
+      points: 30,
+    },
+    {
+      rule_name: "Significant amount compared to merchant average",
+      rule_type: "amount_multiplier",
+      description: "Flags transactions greater than three times the merchant average amount.",
+      threshold_value: 3.00,
+      threshold_count: null,
+      time_window_minutes: null,
+      points: 30,
+    },
+    {
+      rule_name: "High transaction velocity",
+      rule_type: "velocity",
+      description: "High transaction velocity detected: 10 transactions within 30 seconds.",
+      threshold_value: null,
+      threshold_count: 10,
+      time_window_minutes: 0,
+      points: 35,
+    },
+    {
+      rule_name: "Repeated small transactions",
+      rule_type: "velocity_small_amount",
+      description: "Repeated small transactions detected: 5 transactions below SGD 10 within 5 minutes.",
+      threshold_value: 10.00,
+      threshold_count: 5,
+      time_window_minutes: 5,
+      points: 25,
+    },
+    {
+      rule_name: "Frequent large amount transactions",
+      rule_type: "large_amount_frequency",
+      description: "Frequent large amount transactions detected within 30 minutes.",
+      threshold_value: 3.00,
+      threshold_count: 3,
+      time_window_minutes: 30,
+      points: 35,
+    },
+    {
+      rule_name: "Repeated cancelled or failed transactions",
+      rule_type: "cancellation_velocity",
+      description: "Repeated cancelled or failed transactions detected within 10 minutes.",
+      threshold_value: null,
+      threshold_count: 3,
+      time_window_minutes: 10,
+      points: 25,
+    },
+    {
+      rule_name: "Transaction outside merchant operating hours",
+      rule_type: "time",
+      description: "Flags transactions made outside the merchant operating_hours_start and operating_hours_end values. The rule is skipped when operating hours are missing.",
+      threshold_value: null,
+      threshold_count: null,
+      time_window_minutes: null,
+      points: 15,
+    },
+    {
+      rule_name: "High-risk customer profile",
+      rule_type: "customer_risk",
+      description: "Adds risk points when the customer profile is marked high risk.",
+      threshold_value: null,
+      threshold_count: null,
+      time_window_minutes: null,
+      points: 25,
+    },
+    {
+      rule_name: "Missing or insufficient transaction information",
+      rule_type: "data_quality",
+      description: "Flags transactions missing useful identifying references such as masked card, masked payment reference, terminal ID, or gateway reference.",
+      threshold_value: null,
+      threshold_count: null,
+      time_window_minutes: null,
+      points: 20,
+    },
+    {
+      rule_name: "Online transaction with missing/invalid IP",
+      rule_type: "ip_validation",
+      description: "Flags online transactions where IP address is missing or invalid.",
+      threshold_value: null,
+      threshold_count: null,
+      time_window_minutes: null,
+      points: 20,
+    },
+  ];
+
+  for (const rule of currentRules) {
+    const existing = await query(
+      "SELECT rule_id FROM compliance_rules WHERE rule_type = ? OR rule_name = ? ORDER BY rule_id ASC LIMIT 1",
+      [rule.rule_type, rule.rule_name]
+    );
+
+    if (existing.length) {
+      await query(
+        `
+          UPDATE compliance_rules
+          SET rule_name = ?, description = ?, threshold_value = ?,
+              threshold_count = ?, time_window_minutes = ?, points = ?,
+              is_active = 1, updated_by = ?, updated_at = NOW()
+          WHERE rule_id = ?
+        `,
+        [
+          rule.rule_name,
+          rule.description,
+          rule.threshold_value,
+          rule.threshold_count,
+          rule.time_window_minutes,
+          rule.points,
+          authorId,
+          existing[0].rule_id,
+        ]
+      );
+    } else {
+      await query(
+        `
+          INSERT INTO compliance_rules
+            (
+              rule_name, rule_type, description, threshold_value, threshold_count,
+              time_window_minutes, points, is_active, created_by
+            )
+          VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+        `,
+        [
+          rule.rule_name,
+          rule.rule_type,
+          rule.description,
+          rule.threshold_value,
+          rule.threshold_count,
+          rule.time_window_minutes,
+          rule.points,
+          authorId,
+        ]
+      );
+    }
+  }
 }
 
 module.exports = { ensureComplianceSchema, ensureDefaultRules };

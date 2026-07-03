@@ -58,6 +58,7 @@
       <a href="/dashboard.html">Overview</a>
       <a href="/transactions.html">Past Transactions</a>
       <a class="active" href="/stro-alerts.html">Escalated Alerts</a>
+      <a href="/str-draft.html">STR Drafting</a>
       <a href="/api/officer/report">Reports</a>
       <a href="/api/officer/audit-logs">Audit Trail</a>
     </nav>
@@ -83,8 +84,8 @@
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Alert</th><th>Transaction</th><th>Merchant</th><th>Amount</th><th>Risk</th><th>Escalated At</th><th>Status</th></tr></thead>
-          <tbody id="alertRows"><tr><td colspan="7"><div class="empty">Loading escalated alerts...</div></td></tr></tbody>
+          <thead><tr><th>Alert</th><th>Transaction</th><th>Merchant</th><th>Amount</th><th>Risk</th><th>Escalated At</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody id="alertRows"><tr><td colspan="8"><div class="empty">Loading escalated alerts...</div></td></tr></tbody>
         </table>
       </div>
     </section>
@@ -113,7 +114,7 @@
 
   function renderAlerts(items) {
     if (!items.length) {
-      rows.innerHTML = '<tr><td colspan="7"><div class="empty">No escalated alerts found.</div></td></tr>';
+      rows.innerHTML = '<tr><td colspan="8"><div class="empty">No escalated alerts found.</div></td></tr>';
       return;
     }
     rows.innerHTML = items.map(a => `
@@ -125,10 +126,17 @@
         <td><span class="risk risk-${String(a.risk_level || "low").toLowerCase()}">${escapeHtml(a.risk_level)}</span></td>
         <td>${escapeHtml(formatDate(a.escalated_at))}</td>
         <td><span class="status-escalated">${escapeHtml(a.status)}</span></td>
+        <td><button class="btn btn-secondary draft-link" type="button" data-id="${a.id}">Draft STR</button></td>
       </tr>`).join("");
     document.querySelectorAll(".alert-row").forEach(row => {
       row.addEventListener("click", () => showDetail(row.dataset.id));
       row.addEventListener("keydown", e => { if (e.key === "Enter") showDetail(row.dataset.id); });
+    });
+    document.querySelectorAll(".draft-link").forEach(btn => {
+      btn.addEventListener("click", e => {
+        e.stopPropagation();
+        window.location.href = `/str-draft.html?alert_id=${encodeURIComponent(btn.dataset.id)}`;
+      });
     });
   }
 
@@ -164,6 +172,7 @@
       ? `<ul class="case-history">${a.case_history.map(item => `<li><strong>${escapeHtml(String(item.action_type || "").replaceAll("_", " "))}</strong> - ${escapeHtml(item.status_after_action || "No status change")}<div>${escapeHtml(item.remarks || "")}</div><small>${escapeHtml(item.actor_name || "System")} · ${escapeHtml(formatDate(item.created_at))}</small></li>`).join("")}</ul>`
       : "No case activity recorded.";
     document.getElementById("detailGrid").innerHTML = fields.map(([label, value]) => `<div class="detail-field"><label>${escapeHtml(label)}</label><div>${escapeHtml(value)}</div></div>`).join("") +
+      `<div class="detail-field detail-wide"><label>STR Drafting</label><div><a class="btn btn-primary" href="/str-draft.html?alert_id=${encodeURIComponent(a.alert_id)}">Open STR Draft</a></div></div>` +
       `<div class="detail-field detail-wide"><label>Triggered rules</label><div>${escapeHtml(rulesText(a.triggered_rules))}</div></div>` +
       `<div class="detail-field detail-wide"><label>Escalation report / officer remarks</label><div class="detail-report">${escapeHtml(a.escalation_report || a.message || "No escalation remarks were provided.")}</div></div>` + rfiSection +
       `<div class="detail-field detail-wide"><label>Case history</label>${history}</div>`;
@@ -201,7 +210,7 @@
       alerts = data;
       document.getElementById("alertCount").textContent = alerts.length;
       renderAlerts(alerts);
-    } catch (err) { rows.innerHTML = '<tr><td colspan="7"><div class="empty">Alerts could not be loaded.</div></td></tr>'; showError(err.message); }
+    } catch (err) { rows.innerHTML = '<tr><td colspan="8"><div class="empty">Alerts could not be loaded.</div></td></tr>'; showError(err.message); }
   })();
 </script>
 </body>

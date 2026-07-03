@@ -95,6 +95,7 @@
       <div id="stroNav" style="display:none">
         <div class="nav-section-label">STRO Review</div>
         <div class="nav-item" onclick="window.location.href='/stro-alerts.html'">Escalated Alerts</div>
+        <div class="nav-item" onclick="window.location.href='/str-draft.html'">STR Drafting</div>
         <div class="nav-item" onclick="window.location.href='/api/officer/report'">Reports</div>
         <div class="nav-item" onclick="window.location.href='/api/officer/audit-logs'">Audit Trail</div>
       </div>
@@ -283,19 +284,51 @@ function toggleInput(id) {
 }
 
 function statusPill(s) {
-  const labels = { normal: "Normal", review: "Review", suspicious: "Suspicious" };
-  return `<span class="pill pill-${s}">${labels[s] || s}</span>`;
+  const safe = String(s || "normal").toLowerCase();
+  const labels = { normal: "Normal", review: "Review", suspicious: "Suspicious", rejected: "Rejected" };
+  return `<span class="pill pill-${safe}">${labels[safe] || s}</span>`;
 }
 
 function riskPill(level) {
   const safe = String(level || "Low").toLowerCase();
-  const labels = { low: "Low", medium: "Medium", high: "High" };
+  const labels = { low: "Low", medium: "Medium", high: "High", critical: "Critical" };
   return `<span class="pill pill-${safe}">${labels[safe] || level}</span>`;
 }
 
 function formatDate(d) {
   if (!d) return "—";
   return new Date(d).toLocaleString("en-SG", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function formatRiskBreakdownHtml(value) {
+  if (!value) return "â€”";
+  let items = value;
+  try {
+    if (typeof value === "string") items = JSON.parse(value);
+  } catch {
+    items = String(value).split(/;|,/).map(item => item.trim()).filter(Boolean);
+  }
+  if (!Array.isArray(items)) items = [items];
+  const rows = items.map(item => {
+    const raw = typeof item === "object" && item
+      ? (item.rule || item.name || item.description || JSON.stringify(item))
+      : String(item || "");
+    const points = typeof item === "object" && item && item.points != null ? `+${item.points}` : "";
+    const match = raw.match(/^\+(\d+)\s+(.+)$/);
+    const score = match ? `+${match[1]}` : points;
+    const label = match ? match[2] : raw;
+    return `<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px"><strong style="min-width:44px;color:#b91c1c">${escapeHtml(score || "Rule")}</strong><span>${escapeHtml(label)}</span></div>`;
+  }).join("");
+  return rows || "â€”";
 }
 
 function pmBadge(method) {
@@ -530,7 +563,7 @@ async function showAlertDetails(alertId) {
 
   let triggered = alert.triggered_rules;
   try { const parsed = JSON.parse(alert.triggered_rules); if (Array.isArray(parsed)) triggered = parsed.join("; "); } catch {}
-  document.getElementById("detailTriggeredRules").textContent = triggered || "—";
+  document.getElementById("detailTriggeredRules").innerHTML = formatRiskBreakdownHtml(alert.triggered_rules);
   document.getElementById("detailEscalationReport").textContent = alert.escalation_report || "—";
 
   const actions = document.getElementById("detailActions");
@@ -749,7 +782,7 @@ async function runOneTxn() {
   const t = data.transaction;
   lastSimTxnId = t.transaction_id || null;
   simCounts.total++;
-  if (t.risk_level === "High") simCounts.suspicious++;
+  if (t.decision === "Rejected" || t.risk_level === "Critical" || t.risk_level === "High") simCounts.suspicious++;
   else if (t.risk_level === "Medium") simCounts.review++;
   else simCounts.normal++;
 
@@ -810,6 +843,11 @@ socket.on("newAlert", (alert) => {
   loadAlerts();
 });
 
+socket.on("transactionRejected", (txn) => {
+  showToast("Transaction Rejected", `${txn.transaction_id} — ${txn.rejection_reason || "Transaction rejected"}`);
+  loadTransactions();
+});
+
 function updateSimCountsFromAlert(alert) {
   if (!alert) return;
   if (alert.transaction_id && alert.transaction_id === lastSimTxnId) {
@@ -818,7 +856,7 @@ function updateSimCountsFromAlert(alert) {
   }
 
   const alertRiskLevel = String(alert.risk_level || alert.status || "").toLowerCase();
-  if (alertRiskLevel === "high") {
+  if (alertRiskLevel === "critical" || alertRiskLevel === "high" || alertRiskLevel === "rejected") {
     simCounts.total++;
     simCounts.suspicious++;
   } else if (alertRiskLevel === "medium") {

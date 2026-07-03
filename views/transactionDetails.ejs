@@ -17,9 +17,43 @@
     .severity-text { color: #dc3545; font-weight: bold; }
     .badge-status { padding: .65em .9em; font-size: 0.95rem; }
     .no-alert { color: #475569; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px; }
+    .risk-breakdown { list-style: none; padding: 0; margin: 0; }
+    .risk-breakdown li { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid #e2e8f0; }
+    .risk-breakdown li:last-child { border-bottom: 0; }
+    .risk-points { min-width: 54px; text-align: center; font-weight: 800; color: #b91c1c; background: #fee2e2; border-radius: 999px; padding: 4px 10px; }
+    .risk-rule { font-weight: 600; color: #0f172a; }
+    .risk-note { color: #64748b; font-size: 14px; margin-top: 3px; }
   </style>
 </head>
 <body>
+<%
+  function formatRiskBreakdown(value) {
+    if (!value) return [];
+    let items = value;
+    if (typeof value === 'string') {
+      try {
+        items = JSON.parse(value);
+      } catch {
+        items = value.split(/;|,/).map((item) => item.trim()).filter(Boolean);
+      }
+    }
+    if (!Array.isArray(items)) items = [items];
+    return items.map((item) => {
+      if (item && typeof item === 'object') {
+        const text = item.rule || item.name || item.description || JSON.stringify(item);
+        const points = item.points != null ? `+${item.points}` : '';
+        return { points, text };
+      }
+      const text = String(item || '').trim();
+      const match = text.match(/^\+(\d+)\s+(.+)$/);
+      if (match) return { points: `+${match[1]}`, text: match[2] };
+      return { points: '', text };
+    }).filter((item) => item.text);
+  }
+
+  const transactionBreakdown = formatRiskBreakdown(transaction.triggered_rules);
+  const alertBreakdown = formatRiskBreakdown(alert && alert.triggered_rules);
+%>
 <div class="container mt-5">
   <button type="button" class="btn btn-outline-secondary mb-3" onclick="window.history.back()">← Back</button>
   <h2 class="mb-4">Transaction Details</h2>
@@ -75,6 +109,44 @@
       </div>
     </div>
   </div>
+  <div class="card-box">
+    <h3 class="mb-3">Risk Score Breakdown</h3>
+    <div class="row mb-3">
+      <div class="col-md-3">
+        <div class="label-title">Final Risk Score</div>
+        <h2><%= transaction.risk_score != null ? transaction.risk_score : 'â€”' %></h2>
+      </div>
+      <div class="col-md-3">
+        <div class="label-title">Final Risk Level</div>
+        <h2><%= transaction.risk_level || 'â€”' %></h2>
+      </div>
+      <div class="col-md-3">
+        <div class="label-title">Merchant MCC Code</div>
+        <h4><%= transaction.mcc_code || 'Not provided' %></h4>
+      </div>
+      <div class="col-md-3">
+        <div class="label-title">Merchant Profile Risk Score</div>
+        <h4><%= transaction.merchant_risk_score != null ? transaction.merchant_risk_score : 'â€”' %></h4>
+      </div>
+    </div>
+    <% if (transactionBreakdown.length) { %>
+      <ul class="risk-breakdown">
+        <% transactionBreakdown.forEach((item) => { %>
+          <li>
+            <span class="risk-points"><%= item.points || 'Rule' %></span>
+            <div>
+              <div class="risk-rule"><%= item.text %></div>
+              <% if (item.text.toLowerCase().includes('mcc')) { %>
+                <div class="risk-note">This score comes from the merchant MCC category or merchant profile.</div>
+              <% } %>
+            </div>
+          </li>
+        <% }) %>
+      </ul>
+    <% } else { %>
+      <p class="text-muted mb-0">No scoring rules were triggered for this transaction.</p>
+    <% } %>
+  </div>
   <% if (alert) { %>
     <div class="card-box">
       <h3 class="mb-3">Related Alert</h3>
@@ -99,8 +171,19 @@
         </div>
       </div>
       <div class="mb-3">
-        <div class="label-title">Triggered Rules</div>
-        <p><%= alert.triggered_rules || '—' %></p>
+        <div class="label-title">Alert Triggered Rules</div>
+        <% if (alertBreakdown.length) { %>
+          <ul class="risk-breakdown">
+            <% alertBreakdown.forEach((item) => { %>
+              <li>
+                <span class="risk-points"><%= item.points || 'Rule' %></span>
+                <div class="risk-rule"><%= item.text %></div>
+              </li>
+            <% }) %>
+          </ul>
+        <% } else { %>
+          <p>—</p>
+        <% } %>
       </div>
       <div class="mb-3">
         <div class="label-title">Escalation Report</div>

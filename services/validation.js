@@ -10,6 +10,7 @@ const VALID_PAYMENT_METHODS = [
   "PayNow",
   "SGQR",
 ];
+const VALID_TRANSACTION_STATUSES = ["success", "completed", "cancelled", "canceled", "failed", "voided"];
 
 function toMysqlDateTime(value) {
   const textValue = String(value || "").trim();
@@ -48,7 +49,11 @@ function normalizeBoolean(value, fallback) {
 
 function validateTransaction(payload) {
   const errors = [];
-  const countryWasDefaulted = !payload.country;
+  const missingRequiredInfo =
+    !normalizeText(payload.masked_card_number) &&
+    !normalizeText(payload.masked_payment_ref) &&
+    !normalizeText(payload.terminal_id) &&
+    !normalizeText(payload.payment_gateway_ref);
 
   const requiredFields = [
     "transaction_id",
@@ -73,7 +78,11 @@ function validateTransaction(payload) {
   const customerRiskProfile = normalizeText(payload.customer_risk_profile)?.toLowerCase();
   const paymentMethod = normalizeText(payload.payment_method);
   const timestamp = toMysqlDateTime(payload.timestamp);
-  const merchantRiskScore = Number(payload.merchant_risk_score ?? 0);
+  const merchantRiskScore =
+    payload.merchant_risk_score === undefined || payload.merchant_risk_score === null || payload.merchant_risk_score === ""
+      ? null
+      : Number(payload.merchant_risk_score);
+  const transactionStatus = normalizeText(payload.transaction_status || payload.status)?.toLowerCase();
 
   if (!Number.isFinite(amount) || amount <= 0) {
     errors.push("amount must be greater than 0");
@@ -91,19 +100,19 @@ function validateTransaction(payload) {
     errors.push("transaction_type must be online or face_to_face");
   }
 
-  if (transactionType === "online" && !normalizeText(payload.ip_address)) {
-    errors.push("ip_address is required for online transactions");
-  }
-
   if (paymentMethod && !VALID_PAYMENT_METHODS.includes(paymentMethod)) {
     errors.push(`payment_method must be one of: ${VALID_PAYMENT_METHODS.join(", ")}`);
+  }
+
+  if (transactionStatus && !VALID_TRANSACTION_STATUSES.includes(transactionStatus)) {
+    errors.push(`transaction_status must be one of: ${VALID_TRANSACTION_STATUSES.join(", ")}`);
   }
 
   if (!timestamp) {
     errors.push("timestamp must be valid");
   }
 
-  if (!Number.isInteger(merchantRiskScore)) {
+  if (merchantRiskScore !== null && !Number.isInteger(merchantRiskScore)) {
     errors.push("merchant_risk_score must be an integer");
   }
 
@@ -124,7 +133,8 @@ function validateTransaction(payload) {
       timestamp,
       customer_risk_profile: customerRiskProfile,
       merchant_average_amount: merchantAverageAmount,
-      merchant_risk_score: merchantRiskScore,
+      merchant_risk_score: merchantRiskScore ?? 0,
+      merchant_risk_score_provided: merchantRiskScore !== null,
       has_physical_location: normalizeBoolean(
         payload.has_physical_location ?? payload.has_physical_store,
         true
@@ -136,9 +146,12 @@ function validateTransaction(payload) {
       terminal_id: normalizeText(payload.terminal_id) || null,
       payment_gateway_ref: normalizeText(payload.payment_gateway_ref) || null,
       payment_method: paymentMethod || null,
+      business_category: normalizeText(payload.business_category) || null,
+      mcc_code: normalizeText(payload.mcc_code) || null,
+      status: transactionStatus || "success",
       source_type: normalizeText(payload.source_type) || "text_input",
     },
-    metadata: { countryWasDefaulted },
+    metadata: { missingRequiredInfo },
   };
 }
 
