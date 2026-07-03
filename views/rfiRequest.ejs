@@ -62,8 +62,8 @@
     </div>
 
     <% if (message) { %><div class="notice success-note"><%= message %></div><% } %>
-    <% if (rfi && rfi.status === 'Draft') { %>
-      <div class="notice"><strong>Reminder:</strong> This RFI has not been marked as sent. Export the PDF and mark it as sent after emailing it to the merchant.</div>
+    <% if (rfi && !Number(rfi.is_sent)) { %>
+      <div class="notice"><strong>Analyst reminder:</strong> This RFI has not been marked as sent. Export the PDF and mark it as sent after emailing it to the merchant.</div>
     <% } %>
     <% if (isOverdue) { %>
       <div class="notice danger"><strong>Merchant has not responded.</strong> The response due date has passed.</div>
@@ -80,7 +80,7 @@
             <div><strong>Merchant</strong><%= alert.merchant_name || alert.merchant_id %></div>
             <div><strong>Transaction</strong><%= alert.transaction_id %></div>
           </div>
-          <p>Please provide the following documents by <strong data-preview="due"><%= dueDate %></strong>:</p>
+          <p>Please provide the following documents by <strong data-preview="due"><%= dueDateDisplay %></strong>:</p>
           <ul id="previewDocuments">
             <% documents.forEach(function(document) { %><li><%= document %></li><% }) %>
           </ul>
@@ -114,13 +114,8 @@
             </div>
           </form>
 
-          <% if (rfi && rfi.sent_at) { %>
-            <div class="meta" style="margin-top:20px;"><div><strong>RFI Sent</strong>Yes</div><div><strong>Sent Date</strong><%= new Date(rfi.sent_at).toLocaleDateString('en-SG') %></div><div><strong>Due Date</strong><%= dueDate %></div><div><strong>Reminders</strong><%= rfi.reminder_count || 0 %></div></div>
-          <% } %>
-          <% if (isOverdue) { %>
-            <form method="POST" action="/api/officer/rfi/<%= rfi.rfi_id %>/reminder"><button class="warning" type="submit">Send Reminder</button></form>
-          <% } else if (rfi && rfi.status === 'Pending Merchant Response') { %>
-            <button class="secondary disabled" type="button" disabled title="Available after <%= dueDate %>">Reminder available after due date</button>
+          <% if (rfi) { %>
+            <div class="meta" style="margin-top:20px;"><div><strong>RFI Sent</strong><%= Number(rfi.is_sent) ? 'Yes' : 'No' %></div><div><strong>Sent Date</strong><%= sentDateDisplay || '—' %></div><div><strong>Due Date</strong><%= dueDateDisplay %></div><div><strong>Analyst Reminder</strong><%= Number(rfi.is_sent) ? 'Completed' : 'Pending' %></div></div>
           <% } %>
         </div>
       </aside>
@@ -128,7 +123,7 @@
 
     <% if (rfi && rfi.status === 'Pending Merchant Response') { %>
       <section class="card full-card">
-        <div class="card-header"><h2>Record Merchant Response</h2></div>
+        <div class="card-header"><h2>Record Internal Response Note</h2></div>
         <div class="card-body">
           <form method="POST" enctype="multipart/form-data" action="/api/officer/rfi/<%= rfi.rfi_id %>/response">
             <div class="field"><label for="response_message">Merchant response message</label><textarea id="response_message" name="response_message" placeholder="Record the merchant's explanation or response details"></textarea></div>
@@ -143,7 +138,7 @@
         <div class="card-body">
           <div class="meta"><div><strong>Responded At</strong><%= rfi.responded_at ? new Date(rfi.responded_at).toLocaleString('en-SG') : 'Not recorded' %></div><div><strong>Status</strong><%= rfi.status %></div></div>
           <div class="field"><label>Response message</label><div class="response-file"><%= rfi.response_message || 'No message provided.' %></div></div>
-          <% if (rfi.response_stored_name) { %><a class="button secondary" href="/api/officer/rfi/<%= rfi.rfi_id %>/response-file">Download <%= rfi.response_file_name %></a><% } %>
+          <% if (rfi.response_attachment) { %><a class="button secondary" href="/api/officer/rfi/<%= rfi.rfi_id %>/response-file">Download <%= rfi.response_attachment %></a><% } %>
         </div>
       </section>
     <% } %>
@@ -166,8 +161,12 @@
     const dueInput = document.getElementById('due_date');
     const remarksInput = document.getElementById('additional_remarks');
     const checkboxes = [...document.querySelectorAll('input[name="documents"]')];
+    function formatDateValue(value) {
+      const parts = String(value || '').split('-');
+      return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : '—';
+    }
     function updatePreview() {
-      document.querySelector('[data-preview="due"]').textContent = dueInput.value || '—';
+      document.querySelector('[data-preview="due"]').textContent = formatDateValue(dueInput.value);
       document.getElementById('previewDocuments').innerHTML = checkboxes.filter(c => c.checked).map(c => `<li>${c.value.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}</li>`).join('');
       const remarks = remarksInput.value.trim();
       document.getElementById('previewRemarks').innerHTML = remarks ? `<p><strong>Additional remarks:</strong><br>${remarks.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])).replace(/\n/g,'<br>')}</p>` : '';

@@ -27,6 +27,16 @@ function inputDate(value) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+function displayDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(date);
+}
+
 function isPastDue(value) {
   const due = new Date(value);
   if (Number.isNaN(due.getTime())) return false;
@@ -86,7 +96,12 @@ async function loadRfiPage(alertId) {
     ORDER BY ca.created_at DESC, ca.action_id DESC
   `, [alertId]);
 
-  return { alert: alerts[0], rfi, dueDate, documents, referenceNo, isOverdue, caseHistory };
+  return {
+    alert: alerts[0], rfi, dueDate,
+    dueDateDisplay: displayDate(rfi ? rfi.due_at : dueDate),
+    sentDateDisplay: rfi && rfi.sent_at ? displayDate(rfi.sent_at) : "",
+    documents, referenceNo, isOverdue, caseHistory,
+  };
 }
 
 exports.showRfiPage = async (req, res) => {
@@ -105,8 +120,8 @@ exports.getAnalystRfiHistory = async (req, res) => {
     const rows = await query(`
       SELECT r.rfi_id, r.alert_id, r.reference_no, r.requested_documents,
              r.additional_remarks, r.status, r.created_at, r.updated_at,
-             r.sent_at, r.due_at, r.responded_at, r.reminder_count,
-             r.last_reminder_at, r.response_file_name,
+             r.sent_at, r.due_at, r.responded_at, r.is_sent,
+             r.response_attachment,
              a.transaction_id, a.risk_level, a.priority,
              m.merchant_id, m.merchant_name,
              CASE
@@ -176,6 +191,12 @@ exports.saveRfi = async (req, res) => {
         VALUES (?, ?, ?, ?, ?, ?, 'Draft', ?)
       `, [alertId, analysts[0].user_id, referenceNo, JSON.stringify(documents), remarks || null, requestMessage, dueDate]);
       rfiId = insertResult.insertId;
+      const alertRows = await query("SELECT status FROM alerts WHERE alert_id = ? LIMIT 1", [alertId]);
+      await query(`
+        INSERT INTO case_actions
+          (alert_id, user_id, action_type, status_after_action, remarks)
+        VALUES (?, ?, 'rfi_generated', ?, ?)
+      `, [alertId, analysts[0].user_id, alertRows[0]?.status || "Pending", `RFI generated: ${referenceNo}`]);
     }
 
     if (intent === "export") {
@@ -209,7 +230,8 @@ async function markRfiAsSent(rfiId) {
 
   const updateResult = await query(`
     UPDATE rfi_requests
-    SET status = 'Pending Merchant Response', sent_at = NOW(), updated_at = NOW()
+    SET status = 'Pending Merchant Response', is_sent = 1,
+        sent_at = NOW(), updated_at = NOW()
     WHERE rfi_id = ? AND status = 'Draft'
   `, [rfi.rfi_id]);
   if (updateResult.affectedRows !== 1) {
@@ -222,7 +244,7 @@ async function markRfiAsSent(rfiId) {
   await query(`
     INSERT INTO case_actions
       (alert_id, user_id, action_type, status_after_action, remarks)
-    VALUES (?, ?, 'rfi_sent', 'Pending Merchant Response', ?)
+    VALUES (?, ?, 'rfi_marked_sent', 'Pending Merchant Response', ?)
   `, [rfi.alert_id, rfi.requested_by, `RFI Sent: ${rfi.reference_no}; due ${inputDate(rfi.due_at)}`]);
 
   return rfi;
@@ -235,33 +257,6 @@ exports.markAsSent = async (req, res) => {
   } catch (err) {
     console.error("Error marking RFI as sent:", err);
     res.status(err.statusCode || 500).send(err.statusCode ? err.message : "Error marking RFI as sent");
-  }
-};
-
-exports.sendReminder = async (req, res) => {
-  try {
-    const rfis = await query("SELECT * FROM rfi_requests WHERE rfi_id = ? LIMIT 1", [req.params.id]);
-    if (!rfis.length) return res.status(404).send("RFI not found");
-    const rfi = rfis[0];
-    if (rfi.status !== "Pending Merchant Response" || !isPastDue(rfi.due_at)) {
-      return res.status(409).send("A reminder is only available for an overdue RFI");
-    }
-
-    await query(`
-      UPDATE rfi_requests
-      SET reminder_count = reminder_count + 1, last_reminder_at = NOW(), updated_at = NOW()
-      WHERE rfi_id = ?
-    `, [rfi.rfi_id]);
-    await query(`
-      INSERT INTO case_actions
-        (alert_id, user_id, action_type, status_after_action, remarks)
-      VALUES (?, ?, 'rfi_reminder', 'Pending Merchant Response', ?)
-    `, [rfi.alert_id, rfi.requested_by, `Merchant response reminder recorded for ${rfi.reference_no}`]);
-
-    res.redirect(`/api/officer/alerts/${rfi.alert_id}/rfi?message=${encodeURIComponent("Reminder recorded. Send it using the company's email process.")}`);
-  } catch (err) {
-    console.error("Error recording reminder:", err);
-    res.status(500).send("Error recording reminder");
   }
 };
 
@@ -290,18 +285,14 @@ exports.recordResponse = async (req, res) => {
       return res.status(409).send("Only a sent RFI can receive a merchant response");
     }
 
-    const fileName = req.file ? req.file.originalname : rfi.response_file_name;
-    const storedName = req.file ? req.file.filename : rfi.response_stored_name;
-    const mimeType = req.file ? req.file.mimetype : rfi.response_mime_type;
-    const fileSize = req.file ? req.file.size : rfi.response_file_size;
+    const attachment = req.file ? req.file.filename : rfi.response_attachment;
 
     await query(`
       UPDATE rfi_requests
-      SET response_message = ?, response_file_name = ?, response_stored_name = ?,
-          response_mime_type = ?, response_file_size = ?, status = 'Responded',
+      SET response_message = ?, response_attachment = ?, status = 'Responded',
           responded_at = NOW(), updated_at = NOW()
       WHERE rfi_id = ?
-    `, [responseMessage || rfi.response_message || null, fileName, storedName, mimeType, fileSize, rfi.rfi_id]);
+    `, [responseMessage || rfi.response_message || null, attachment, rfi.rfi_id]);
     responseSaved = true;
 
     await query(`
@@ -312,21 +303,16 @@ exports.recordResponse = async (req, res) => {
       END
       WHERE alert_id = ?
     `, [rfi.alert_id]);
+    const alertRows = await query("SELECT status FROM alerts WHERE alert_id = ? LIMIT 1", [rfi.alert_id]);
 
     await query(`
       INSERT INTO case_actions
         (alert_id, user_id, action_type, status_after_action, remarks)
-      VALUES (?, ?, 'rfi_received', 'RFI Responded', ?)
-    `, [rfi.alert_id, rfi.requested_by, responseMessage || `Merchant response file received: ${fileName}`]);
+      VALUES (?, ?, 'rfi_response_recorded', ?, ?)
+    `, [rfi.alert_id, rfi.requested_by, alertRows[0]?.status || "RFI Responded", responseMessage || `Merchant response file received: ${attachment}`]);
 
-    await query(`
-      INSERT INTO audit_logs
-        (user_id, event_type, table_name, record_id, message, new_value)
-      VALUES (?, 'RFI Merchant Response', 'rfi_requests', ?, ?, 'Responded')
-    `, [rfi.requested_by, String(rfi.rfi_id), `Merchant response recorded for ${rfi.reference_no}`]);
-
-    if (req.file && rfi.response_stored_name && rfi.response_stored_name !== req.file.filename) {
-      const previousPath = path.join(uploadDirectory, path.basename(rfi.response_stored_name));
+    if (req.file && rfi.response_attachment && rfi.response_attachment !== req.file.filename) {
+      const previousPath = path.join(uploadDirectory, path.basename(rfi.response_attachment));
       fs.unlink(previousPath, () => {});
     }
 
@@ -341,18 +327,18 @@ exports.recordResponse = async (req, res) => {
 exports.downloadResponseFile = async (req, res) => {
   try {
     const rfis = await query(`
-      SELECT response_file_name, response_stored_name
+      SELECT response_attachment
       FROM rfi_requests WHERE rfi_id = ? LIMIT 1
     `, [req.params.id]);
-    if (!rfis.length || !rfis[0].response_stored_name) {
+    if (!rfis.length || !rfis[0].response_attachment) {
       return res.status(404).send("Merchant response file not found");
     }
 
-    const storedName = path.basename(rfis[0].response_stored_name);
+    const storedName = path.basename(rfis[0].response_attachment);
     const filePath = path.join(uploadDirectory, storedName);
     if (!fs.existsSync(filePath)) return res.status(404).send("Merchant response file not found");
     res.setHeader("Cache-Control", "no-store");
-    res.download(filePath, rfis[0].response_file_name || storedName);
+    res.download(filePath, storedName);
   } catch (err) {
     console.error("Error downloading RFI response:", err);
     res.status(500).send("Error downloading merchant response file");
@@ -425,7 +411,7 @@ exports.exportPdf = async (req, res) => {
       "REQUEST FOR INFORMATION", "", `Reference No: ${rfi.reference_no}`, "", "Dear Merchant,", "",
       ...wrapText("As part of our routine compliance review, we require additional supporting information relating to the transaction(s) listed below."),
       "", `Merchant: ${rfi.merchant_name || "Not specified"}`, `Transaction: ${rfi.transaction_id}`,
-      "", `Please provide the following documents by ${inputDate(rfi.due_at)}:`, "",
+      "", `Please provide the following documents by ${displayDate(rfi.due_at)}:`, "",
       ...documents.map((document) => `[X] ${document}`),
       ...(rfi.additional_remarks ? ["", "Additional remarks:", ...wrapText(rfi.additional_remarks)] : []),
       "", "Thank you.", "", "Compliance Team"

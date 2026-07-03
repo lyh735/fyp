@@ -44,7 +44,6 @@ CREATE TABLE compliance_rules (
     threshold_value DECIMAL(12,2),
     threshold_count INT,
     time_window_minutes INT,
-    rule_expression JSON,
     points INT DEFAULT 0,
     is_active TINYINT DEFAULT 1,
     created_by INT,
@@ -60,16 +59,13 @@ CREATE TABLE transactions (
     transaction_id VARCHAR(50) PRIMARY KEY,
     merchant_id VARCHAR(50) NOT NULL,
 
-    masked_wallet_ref VARCHAR(100),
     masked_payment_ref VARCHAR(100),
 
     card_bin VARCHAR(10),
-    card_last4 VARCHAR(4),
     masked_card_number VARCHAR(30),
     card_presence VARCHAR(20), -- card_present / card_not_present
 
     terminal_id VARCHAR(50),
-    receipt_id VARCHAR(50),
     payment_gateway_ref VARCHAR(100),
 
     payment_method VARCHAR(50),
@@ -125,28 +121,16 @@ CREATE TABLE case_actions (
     user_id INT NOT NULL,
 
     action_type VARCHAR(50),
-    -- review_started, add_remark, send_rfi, rfi_received,
-    -- escalate_to_stro, approve_str, close_case, reassign_case
+    -- alert_created, review_started, add_remark, rfi_generated,
+    -- rfi_marked_sent, rfi_response_recorded, rfi_cancelled,
+    -- escalate_to_stro, str_draft_generated, approve_str,
+    -- reject_str, close_case, reassign_case
     status_after_action VARCHAR(40),
 
     remarks TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (alert_id) REFERENCES alerts(alert_id),
-    FOREIGN KEY (user_id) REFERENCES users(user_id)
-);
-
-CREATE TABLE audit_logs (
-    audit_id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT,
-    event_type VARCHAR(100) NOT NULL,
-    table_name VARCHAR(100),
-    record_id VARCHAR(100),
-    old_value TEXT,
-    new_value TEXT,
-    message TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-
     FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
 
@@ -159,18 +143,14 @@ CREATE TABLE rfi_requests (
     additional_remarks TEXT,
     request_message TEXT,
     response_message TEXT,
-    response_file_name VARCHAR(255),
-    response_stored_name VARCHAR(255),
-    response_mime_type VARCHAR(100),
-    response_file_size INT,
+    response_attachment VARCHAR(255),
     status VARCHAR(40) DEFAULT 'Draft',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     sent_at DATETIME NULL,
     due_at DATETIME NOT NULL,
     responded_at DATETIME,
-    reminder_count INT DEFAULT 0,
-    last_reminder_at DATETIME,
+    is_sent TINYINT(1) DEFAULT 0,
 
     FOREIGN KEY (alert_id) REFERENCES alerts(alert_id),
     FOREIGN KEY (requested_by) REFERENCES users(user_id)
@@ -190,8 +170,7 @@ CREATE TABLE str_reports (
     generated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     approved_at DATETIME,
-    submitted_at DATETIME,
-    closed_at DATETIME,
+    rejected_at DATETIME,
 
     FOREIGN KEY (alert_id) REFERENCES alerts(alert_id),
     FOREIGN KEY (generated_by) REFERENCES users(user_id),
@@ -215,9 +194,6 @@ ON transactions(masked_card_number, txn_time);
 
 CREATE INDEX idx_case_actions_created
 ON case_actions(created_at);
-
-CREATE INDEX idx_audit_logs_created
-ON audit_logs(created_at);
 
 CREATE INDEX idx_rfi_status_due
 ON rfi_requests(status, due_at);

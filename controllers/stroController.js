@@ -17,7 +17,7 @@ const alertSelect = `
          r.rfi_id, r.reference_no AS rfi_reference_no, r.status AS rfi_status,
          r.sent_at AS rfi_sent_at, r.due_at AS rfi_due_at,
          r.responded_at AS rfi_responded_at, r.response_message,
-         r.response_file_name, r.response_stored_name,
+         r.response_attachment,
          r.additional_remarks AS analyst_remarks,
          (
            SELECT ca.remarks

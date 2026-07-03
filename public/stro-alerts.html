@@ -158,7 +158,7 @@
         <strong>Analyst remarks</strong><br>${escapeHtml(a.analyst_remarks || "No remarks recorded.")}<br><br>
         <strong>Merchant response</strong><br>${escapeHtml(a.response_message || "No merchant response recorded.")}<br><br>
         <button class="btn btn-secondary" onclick="downloadProtected('/api/stro/rfi/${Number(a.rfi_id)}/pdf', 'rfi.pdf')">Download RFI PDF</button>
-        ${a.response_stored_name ? `<button class="btn btn-secondary" onclick="downloadProtected('/api/stro/rfi/${Number(a.rfi_id)}/response-file', 'merchant-response')">Download Merchant Response</button>` : ""}
+        ${a.response_attachment ? `<button class="btn btn-secondary" onclick="downloadProtected('/api/stro/rfi/${Number(a.rfi_id)}/response-file', 'merchant-response')">Download Merchant Response</button>` : ""}
       </div></div>` : `<div class="detail-field detail-wide"><label>Request for Information</label><div>No RFI is linked to this case.</div></div>`;
     const history = Array.isArray(a.case_history) && a.case_history.length
       ? `<ul class="case-history">${a.case_history.map(item => `<li><strong>${escapeHtml(String(item.action_type || "").replaceAll("_", " "))}</strong> - ${escapeHtml(item.status_after_action || "No status change")}<div>${escapeHtml(item.remarks || "")}</div><small>${escapeHtml(item.actor_name || "System")} · ${escapeHtml(formatDate(item.created_at))}</small></li>`).join("")}</ul>`

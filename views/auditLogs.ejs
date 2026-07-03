@@ -2,168 +2,84 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-
-  <title>Audit Logs</title>
-
-  <link
-    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-    rel="stylesheet"
-  />
-
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Audit Trail / Case History</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
   <style>
-
-    body{
-      background:#f4f6f9;
+    body { background:#f4f6f9; color:#172033; }
+    .page-header, .case-card { background:#fff; border:1px solid #e2e8f0; border-radius:14px; }
+    .page-header { padding:24px; }
+    .case-card { margin-bottom:22px; overflow:hidden; box-shadow:0 3px 14px rgba(15,23,42,.06); }
+    .case-summary { padding:22px; border-bottom:1px solid #e2e8f0; }
+    .summary-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:12px; }
+    .summary-field, .timeline-item { background:#f8fafc; border-radius:10px; padding:13px; }
+    .summary-field label, .timeline-label { display:block; color:#64748b; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+    .summary-field div { margin-top:5px; font-weight:650; overflow-wrap:anywhere; }
+    .timeline { padding:22px; }
+    .timeline-item { display:grid; grid-template-columns:160px 1.1fr .8fr 1fr 1.1fr 2fr; gap:14px; margin-top:12px; border-left:4px solid #2563eb; }
+    .timeline-value { margin-top:5px; overflow-wrap:anywhere; }
+    .action-type { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; color:#1d4ed8; font-weight:700; }
+    .empty { padding:30px; text-align:center; color:#64748b; }
+    @media (max-width:1000px) {
+      .summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .timeline-item { grid-template-columns:repeat(2,minmax(0,1fr)); }
     }
-
-    .log-card{
-      background:white;
-      border-radius:12px;
-      padding:25px;
-      margin-bottom:20px;
-      box-shadow:0 2px 10px rgba(0,0,0,0.08);
-      border-left:6px solid #0d6efd;
+    @media (max-width:600px) {
+      .summary-grid, .timeline-item { grid-template-columns:1fr; }
     }
-
-    .log-title{
-      font-size:22px;
-      font-weight:bold;
-    }
-
-    .log-time{
-      color:gray;
-      font-size:14px;
-    }
-
-    .action-badge{
-      font-size:14px;
-      padding:8px 14px;
-    }
-
   </style>
-
 </head>
-
 <body>
+  <script src="/js/auth.js"></script>
+  <script>if (!requireAuth()) throw new Error("Authentication required");</script>
 
-<script src="/js/auth.js"></script>
-<script>if (!requireAuth()) throw new Error("Authentication required");</script>
-
-<div class="mb-4">
-
-  <a href="/dashboard.html" class="btn btn-outline-secondary">
-    ← Back
-  </a>
-
-</div>
-
-<div class="container mt-5">
-
-  <div class="d-flex justify-content-between align-items-center mb-4">
-
-    <div>
-      <h1>Audit Log Dashboard</h1>
-      <p class="text-muted">
-        Compliance officer activity tracking & investigation history
-      </p>
-    </div>
-
-    <div>
-      <a href="/api/officer/alerts" class="btn btn-primary">
-        Alerts
-      </a>
-
-      <a href="/api/officer/report" class="btn btn-dark">
-        Reports
-      </a>
-
-      <a href="/stro-alerts.html" class="btn btn-outline-primary">
-        STRO Alerts
-      </a>
-    </div>
-
-  </div>
-
-  <% if(logs.length === 0){ %>
-
-    <div class="alert alert-warning">
-      No audit logs found.
-    </div>
-
-  <% } %>
-
-  <% logs.forEach(log => { %>
-
-    <div class="log-card">
-
-      <div class="d-flex justify-content-between">
-
-        <div>
-
-          <div class="log-title">
-            Officer:
-            <%= log.officer_name %>
-          </div>
-
-          <div class="mt-2">
-
-            <% if(log.action === 'escalate'){ %>
-
-              <span class="badge bg-danger action-badge">
-                Escalated Alert
-              </span>
-
-            <% } else if(log.action === 'dismiss'){ %>
-
-              <span class="badge bg-secondary action-badge">
-                Dismissed Alert
-              </span>
-
-            <% } else { %>
-
-              <span class="badge bg-success action-badge">
-                Reviewed Alert
-              </span>
-
-            <% } %>
-
-          </div>
-
-        </div>
-
-        <div class="text-end">
-
-          <div class="log-time">
-            <%= log.created_at %>
-          </div>
-
-          <div class="mt-2 text-muted">
-            Log ID:
-            <%= log.log_id %>
-          </div>
-
-        </div>
-
+  <main class="container py-4">
+    <a href="/dashboard.html" class="btn btn-outline-secondary mb-3">&larr; Back to dashboard</a>
+    <header class="page-header mb-4 d-flex justify-content-between align-items-center gap-3 flex-wrap">
+      <div>
+        <h1 class="h2 mb-1">Audit Trail / Case History</h1>
+        <p class="text-muted mb-0">Alert details and chronological compliance actions.</p>
       </div>
-
-      <hr>
-
-      <h5 class="mb-3">
-        Investigation Details
-      </h5>
-
-      <div class="p-3 bg-light rounded">
-
-        <%= log.details %>
-
+      <div class="d-flex gap-2">
+        <a href="/api/officer/alerts" class="btn btn-primary">Alerts</a>
+        <a href="/api/officer/report" class="btn btn-dark">Reports</a>
       </div>
+    </header>
 
-    </div>
+    <% if (!cases.length) { %>
+      <div class="case-card empty">No alert case history found.</div>
+    <% } %>
 
-  <% }) %>
+    <% cases.forEach(function(auditCase) { %>
+      <article class="case-card">
+        <section class="case-summary">
+          <div class="summary-grid">
+            <div class="summary-field"><label>Alert ID</label><div>#<%= auditCase.alert_id %></div></div>
+            <div class="summary-field"><label>Transaction ID</label><div><%= auditCase.transaction_id || '—' %></div></div>
+            <div class="summary-field"><label>Merchant</label><div><%= auditCase.merchant_name || auditCase.merchant_id || '—' %></div></div>
+            <div class="summary-field"><label>Risk Level</label><div><%= auditCase.risk_level || '—' %></div></div>
+            <div class="summary-field"><label>Current Status</label><div><%= auditCase.current_status || '—' %></div></div>
+          </div>
+        </section>
 
-</div>
-
+        <section class="timeline">
+          <h2 class="h5 mb-2">Timeline</h2>
+          <% if (!auditCase.timeline.length) { %>
+            <div class="empty">No actions have been recorded for this alert.</div>
+          <% } %>
+          <% auditCase.timeline.forEach(function(item) { %>
+            <div class="timeline-item">
+              <div><span class="timeline-label">Date &amp; time</span><div class="timeline-value"><%= item.created_at ? new Date(item.created_at).toLocaleString('en-SG') : '—' %></div></div>
+              <div><span class="timeline-label">User name</span><div class="timeline-value"><%= item.user_name || 'System' %></div></div>
+              <div><span class="timeline-label">Role</span><div class="timeline-value"><%= item.role || '—' %></div></div>
+              <div><span class="timeline-label">Action type</span><div class="timeline-value action-type"><%= item.action_type || '—' %></div></div>
+              <div><span class="timeline-label">Case status after action</span><div class="timeline-value"><%= item.status_after_action || '—' %></div></div>
+              <div><span class="timeline-label">Remarks</span><div class="timeline-value"><%= item.remarks || '—' %></div></div>
+            </div>
+          <% }) %>
+        </section>
+      </article>
+    <% }) %>
+  </main>
 </body>
 </html>

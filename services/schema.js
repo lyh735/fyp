@@ -11,7 +11,7 @@ async function ensureComplianceSchema() {
       first_login TINYINT DEFAULT 1,
       status VARCHAR(30) DEFAULT 'active',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
@@ -30,7 +30,7 @@ async function ensureComplianceSchema() {
       has_physical_location TINYINT(1) DEFAULT 1,
       status VARCHAR(30),
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       created_by INT,
       updated_by INT,
       FOREIGN KEY (created_by) REFERENCES users(user_id),
@@ -47,13 +47,12 @@ async function ensureComplianceSchema() {
       threshold_value DECIMAL(12,2),
       threshold_count INT,
       time_window_minutes INT,
-      rule_expression JSON,
       points INT DEFAULT 0,
       is_active TINYINT DEFAULT 1,
       created_by INT,
       updated_by INT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (created_by) REFERENCES users(user_id),
       FOREIGN KEY (updated_by) REFERENCES users(user_id)
     )
@@ -63,14 +62,11 @@ async function ensureComplianceSchema() {
     CREATE TABLE IF NOT EXISTS transactions (
       transaction_id VARCHAR(50) PRIMARY KEY,
       merchant_id VARCHAR(50) NOT NULL,
-      masked_wallet_ref VARCHAR(100),
       masked_payment_ref VARCHAR(100),
       card_bin VARCHAR(10),
-      card_last4 VARCHAR(4),
       masked_card_number VARCHAR(30),
       card_presence VARCHAR(20),
       terminal_id VARCHAR(50),
-      receipt_id VARCHAR(50),
       payment_gateway_ref VARCHAR(100),
       payment_method VARCHAR(50),
       transaction_type VARCHAR(50),
@@ -115,26 +111,11 @@ async function ensureComplianceSchema() {
   `);
 
   await query(`
-    CREATE TABLE IF NOT EXISTS audit_logs (
-      audit_id INT AUTO_INCREMENT PRIMARY KEY,
-      user_id INT,
-      event_type VARCHAR(100) NOT NULL,
-      table_name VARCHAR(100),
-      record_id VARCHAR(100),
-      old_value TEXT,
-      new_value TEXT,
-      message TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(user_id)
-    )
-  `);
-
-  await query(`
     CREATE TABLE IF NOT EXISTS case_actions (
       action_id INT AUTO_INCREMENT PRIMARY KEY,
       alert_id INT NOT NULL,
       user_id INT NOT NULL,
-      action_type VARCHAR(50) NOT NULL,
+      action_type VARCHAR(50),
       status_after_action VARCHAR(40),
       remarks TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -153,18 +134,14 @@ async function ensureComplianceSchema() {
       additional_remarks TEXT,
       request_message TEXT,
       response_message TEXT,
-      response_file_name VARCHAR(255),
-      response_stored_name VARCHAR(255),
-      response_mime_type VARCHAR(100),
-      response_file_size INT,
+      response_attachment VARCHAR(255),
       status VARCHAR(40) DEFAULT 'Draft',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       sent_at DATETIME NULL,
       due_at DATETIME NOT NULL,
       responded_at DATETIME NULL,
-      reminder_count INT DEFAULT 0,
-      last_reminder_at DATETIME NULL,
+      is_sent TINYINT(1) DEFAULT 0,
       FOREIGN KEY (alert_id) REFERENCES alerts(alert_id),
       FOREIGN KEY (requested_by) REFERENCES users(user_id)
     )
@@ -182,8 +159,7 @@ async function ensureComplianceSchema() {
       generated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       approved_at DATETIME,
-      submitted_at DATETIME,
-      closed_at DATETIME,
+      rejected_at DATETIME,
       FOREIGN KEY (alert_id) REFERENCES alerts(alert_id),
       FOREIGN KEY (generated_by) REFERENCES users(user_id),
       FOREIGN KEY (approved_by) REFERENCES users(user_id)
@@ -191,7 +167,6 @@ async function ensureComplianceSchema() {
   `);
 
   await ensureCurrentSchemaCompatibility();
-  await ensureRfiSchemaCompatibility();
 
   await ensureDefaultRules();
 }
@@ -217,11 +192,9 @@ async function ensureCurrentSchemaCompatibility() {
   await addColumnIfMissing("merchants", "updated_by", "INT NULL");
 
   await addColumnIfMissing("transactions", "card_bin", "VARCHAR(10) NULL");
-  await addColumnIfMissing("transactions", "card_last4", "VARCHAR(4) NULL");
   await addColumnIfMissing("transactions", "masked_card_number", "VARCHAR(30) NULL");
   await addColumnIfMissing("transactions", "card_presence", "VARCHAR(20) NULL");
   await addColumnIfMissing("transactions", "terminal_id", "VARCHAR(50) NULL");
-  await addColumnIfMissing("transactions", "receipt_id", "VARCHAR(50) NULL");
   await addColumnIfMissing("transactions", "payment_gateway_ref", "VARCHAR(100) NULL");
 
   await addColumnIfMissing("alerts", "priority", "VARCHAR(20) NULL");
@@ -230,10 +203,19 @@ async function ensureCurrentSchemaCompatibility() {
   await addColumnIfMissing("alerts", "reviewed_by", "INT NULL");
   await addColumnIfMissing("alerts", "escalated_at", "DATETIME NULL");
   await addColumnIfMissing("case_actions", "status_after_action", "VARCHAR(40) NULL");
-}
+  await query(`
+    UPDATE case_actions
+    SET action_type = CASE action_type
+      WHEN 'review' THEN 'review_started'
+      WHEN 'dismiss' THEN 'close_case'
+      WHEN 'escalate' THEN 'escalate_to_stro'
+      WHEN 'rfi_sent' THEN 'rfi_marked_sent'
+      WHEN 'rfi_received' THEN 'rfi_response_recorded'
+      ELSE action_type
+    END
+    WHERE action_type IN ('review', 'dismiss', 'escalate', 'rfi_sent', 'rfi_received')
+  `);
 
-async function ensureRfiSchemaCompatibility() {
-  // Upgrade installations created from the earlier RFI schema without deleting data.
   await query("ALTER TABLE rfi_requests MODIFY COLUMN status VARCHAR(40) DEFAULT 'Draft'");
   await query("ALTER TABLE rfi_requests MODIFY COLUMN sent_at DATETIME NULL DEFAULT NULL");
   await addColumnIfMissing("rfi_requests", "reference_no", "VARCHAR(30) NULL");
@@ -241,14 +223,11 @@ async function ensureRfiSchemaCompatibility() {
   await addColumnIfMissing("rfi_requests", "additional_remarks", "TEXT NULL");
   await addColumnIfMissing("rfi_requests", "created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
   await addColumnIfMissing("rfi_requests", "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
-  await addColumnIfMissing("rfi_requests", "reminder_count", "INT DEFAULT 0");
-  await addColumnIfMissing("rfi_requests", "last_reminder_at", "DATETIME NULL");
   await addColumnIfMissing("rfi_requests", "response_message", "TEXT NULL");
   await addColumnIfMissing("rfi_requests", "responded_at", "DATETIME NULL");
-  await addColumnIfMissing("rfi_requests", "response_file_name", "VARCHAR(255) NULL");
-  await addColumnIfMissing("rfi_requests", "response_stored_name", "VARCHAR(255) NULL");
-  await addColumnIfMissing("rfi_requests", "response_mime_type", "VARCHAR(100) NULL");
-  await addColumnIfMissing("rfi_requests", "response_file_size", "INT NULL");
+  await addColumnIfMissing("rfi_requests", "response_attachment", "VARCHAR(255) NULL");
+  await addColumnIfMissing("rfi_requests", "is_sent", "TINYINT(1) DEFAULT 0");
+  await addColumnIfMissing("str_reports", "rejected_at", "DATETIME NULL");
 
   await query(`
     UPDATE rfi_requests
@@ -257,6 +236,7 @@ async function ensureRfiSchemaCompatibility() {
   `);
   await query("UPDATE rfi_requests SET requested_documents = '[]' WHERE requested_documents IS NULL");
   await query("UPDATE rfi_requests SET status = 'Pending Merchant Response' WHERE status = 'Pending'");
+  await query("UPDATE rfi_requests SET is_sent = 1 WHERE sent_at IS NOT NULL");
 }
 
 async function ensureDefaultRules(createdBy = null) {

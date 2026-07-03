@@ -369,7 +369,7 @@ function txnRow(t) {
   const txnId = encodeURIComponent(t.transaction_id || "");
   return `<tr data-searchable="${searchable}" onclick="navigateToTransactionDetail('${txnId}')" style="cursor:pointer">
     <td style="font-family:monospace;font-size:11.5px;color:var(--text-muted)">${t.transaction_id || "—"}</td>
-    <td style="font-weight:600;max-width:160px">${t.merchant_name || t.user_id || "—"}</td>
+    <td style="font-weight:600;max-width:160px">${t.merchant_name || t.merchant_id || "—"}</td>
     <td>${pmBadge(t.payment_method)}</td>
     <td style="font-weight:700">$${parseFloat(t.amount||0).toLocaleString("en-SG",{minimumFractionDigits:2})}</td>
     <td>${t.country || "—"}</td>
@@ -820,7 +820,7 @@ function prependFeedItem(t) {
   item.innerHTML = `
     <div>
       <div class="feed-merchant">${t.merchant_name || "—"}</div>
-      <div class="feed-sub">${t.user_id} &nbsp;·&nbsp; ${t.country}</div>
+      <div class="feed-sub">${t.masked_payment_ref || "—"} &nbsp;·&nbsp; ${t.country}</div>
     </div>
     <span class="pm-badge ${pmCls[t.payment_method]||''}">${t.payment_method||"—"}</span>
     <div class="feed-amount">$${parseFloat(t.amount).toLocaleString("en-SG",{minimumFractionDigits:2})}</div>

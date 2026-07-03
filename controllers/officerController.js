@@ -97,9 +97,22 @@ exports.takeActionPage = (req, res) => {
   const {
     alert_id,
     officer_name,
-    action_type,
+    action_type: requestedActionType,
     remarks
   } = req.body;
+  const actionAliases = {
+    review: "review_started",
+    dismiss: "close_case",
+    escalate: "escalate_to_stro",
+  };
+  const action_type = actionAliases[requestedActionType] || requestedActionType;
+  const allowedActionTypes = new Set([
+    "review_started", "add_remark", "escalate_to_stro",
+    "close_case", "reassign_case",
+  ]);
+  if (!allowedActionTypes.has(action_type)) {
+    return res.status(400).send("Unsupported case action");
+  }
 
   // First, fetch the alert details
   const selectAlertSql = "SELECT * FROM alerts WHERE alert_id = ? LIMIT 1";
@@ -115,17 +128,17 @@ exports.takeActionPage = (req, res) => {
     }
 
     const alert = alerts[0];
-    let newStatus = "Pending Review";
+    let newStatus = alert.status;
 
-    if (action_type === "review") {
-      newStatus = "Reviewed";
+    if (action_type === "review_started") {
+      newStatus = "Pending Review";
     }
 
-    if (action_type === "dismiss" || action_type === "close_case") {
+    if (action_type === "close_case") {
       newStatus = "Closed";
     }
 
-    if (action_type === "escalate" || action_type === "escalate_to_stro") {
+    if (action_type === "escalate_to_stro") {
       newStatus = "Escalated to STRO";
     }
 
@@ -151,19 +164,6 @@ exports.takeActionPage = (req, res) => {
         remarks
       )
       VALUES (?, ?, ?, ?, ?)
-    `;
-
-    const insertAuditSql = `
-      INSERT INTO audit_logs
-      (
-        user_id,
-        event_type,
-        table_name,
-        record_id,
-        message,
-        new_value
-      )
-      VALUES (?, ?, ?, ?, ?, ?)
     `;
 
     db.query(findOfficerSql, [officer_name], (err, officers) => {
@@ -202,43 +202,8 @@ exports.takeActionPage = (req, res) => {
             return res.status(500).send("Error saving officer action");
           }
 
-          const details = `
-Officer ${officer_name} performed ${action_type}
-on alert database ID ${alert_id}.
-Remarks: ${remarks || "None"}
-`;
-
-          const eventType =
-            action_type === "escalate" || action_type === "escalate_to_stro"
-              ? "Compliance Escalation"
-              : action_type === "dismiss" || action_type === "close_case"
-              ? "Case Closure"
-              : "Alert Review";
-
-          const message = details;
-
-          db.query(
-            insertAuditSql,
-            [
-              officerId,
-              eventType,
-              "alerts",
-              String(alert_id),
-              message,
-              action_type
-            ],
-            (err) => {
-
-              if (err) {
-                console.error(err);
-                return res.status(500).send("Error saving audit log");
-              }
-
-              res.redirect(
-                `/api/officer/action-success/${alert_id}?action=${action_type}`
-              );
-
-            }
+          res.redirect(
+            `/api/officer/action-success/${alert_id}?action=${action_type}`
           );
 
         }
@@ -254,21 +219,72 @@ Remarks: ${remarks || "None"}
 exports.showAuditLogsPage = (req, res) => {
 
   const sql = `
-    SELECT al.audit_id AS log_id, al.*, u.name AS officer_name,
-           al.new_value AS action, al.message AS details
-    FROM audit_logs al
-    LEFT JOIN users u ON al.user_id = u.user_id
-    ORDER BY al.created_at DESC
+    SELECT a.alert_id, a.transaction_id, a.merchant_id,
+           a.risk_level, a.status AS current_status, a.created_at AS alert_created_at,
+           m.merchant_name,
+           ca.action_id, ca.created_at AS action_created_at, ca.action_type,
+           ca.status_after_action, ca.remarks,
+           u.name AS user_name, u.role AS user_role
+    FROM alerts a
+    LEFT JOIN merchants m ON m.merchant_id = a.merchant_id
+    LEFT JOIN case_actions ca ON ca.alert_id = a.alert_id
+    LEFT JOIN users u ON u.user_id = ca.user_id
+    ORDER BY a.created_at DESC, ca.created_at ASC, ca.action_id ASC
   `;
 
-  db.query(sql, (err, logs) => {
+  db.query(sql, (err, rows) => {
 
     if (err) {
       console.error(err);
       return res.send("Error loading audit logs");
     }
 
-    res.render("auditLogs", { logs });
+    const cases = [];
+    const caseMap = new Map();
+    for (const row of rows) {
+      let auditCase = caseMap.get(row.alert_id);
+      if (!auditCase) {
+        auditCase = {
+          alert_id: row.alert_id,
+          transaction_id: row.transaction_id,
+          merchant_id: row.merchant_id,
+          merchant_name: row.merchant_name,
+          risk_level: row.risk_level,
+          current_status: row.current_status,
+          alert_created_at: row.alert_created_at,
+          timeline: [],
+        };
+        caseMap.set(row.alert_id, auditCase);
+        cases.push(auditCase);
+      }
+      if (row.action_id) {
+        auditCase.timeline.push({
+          action_id: row.action_id,
+          created_at: row.action_created_at,
+          user_name: row.user_name,
+          role: row.user_role,
+          action_type: row.action_type,
+          status_after_action: row.status_after_action,
+          remarks: row.remarks,
+        });
+      }
+    }
+
+    for (const auditCase of cases) {
+      if (!auditCase.timeline.some((item) => item.action_type === "alert_created")) {
+        auditCase.timeline.unshift({
+          action_id: null,
+          created_at: auditCase.alert_created_at,
+          user_name: "System",
+          role: "system",
+          action_type: "alert_created",
+          status_after_action: "Pending",
+          remarks: "Alert created before case-action tracking was available.",
+        });
+      }
+    }
+
+    res.render("auditLogs", { cases });
 
   });
 

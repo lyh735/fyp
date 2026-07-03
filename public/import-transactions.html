@@ -150,7 +150,7 @@
           <div class="column-entry-wrap">
             <table class="column-entry-table">
               <thead><tr>
-                <th>Transaction ID *</th><th>Merchant ID *</th><th>Masked wallet reference</th>
+                <th>Transaction ID *</th><th>Merchant ID *</th><th>Masked payment reference</th>
                 <th>Amount *</th><th>Transaction time *</th><th>Payment method</th><th>Country</th>
                 <th>Currency</th><th>Merchant average amount</th><th></th>
               </tr></thead>
@@ -171,7 +171,7 @@
           <div class="guide-item"><code>merchant_id *</code><span>Merchant reference</span></div>
           <div class="guide-item"><code>amount *</code><span>Positive transaction amount</span></div>
           <div class="guide-item"><code>txn_time *</code><span>Date and time</span></div>
-          <div class="guide-item"><code>masked_wallet_ref</code><span>Masked wallet reference</span></div>
+          <div class="guide-item"><code>masked_payment_ref</code><span>Masked payment reference</span></div>
           <div class="guide-item"><code>payment_method</code><span>Visa, Mastercard, Alipay, WeChat Pay, GrabPay, ShopeePay, PayNow, or SGQR</span></div>
           <div class="guide-item"><code>country</code><span>Defaults to Singapore</span></div>
           <div class="guide-item"><code>currency</code><span>Defaults to SGD</span></div>
@@ -407,7 +407,7 @@ function columnRowTemplate() {
   return `<tr>
     <td><input data-field="transaction_id" placeholder="TXN001" /></td>
     <td><input data-field="merchant_id" placeholder="M001" /></td>
-    <td><input data-field="masked_wallet_ref" placeholder="WALLET123" /></td>
+    <td><input data-field="masked_payment_ref" placeholder="PAY-***123456" /></td>
     <td><input data-field="amount" type="number" min="0.01" step="0.01" placeholder="500.00" /></td>
     <td><input class="wide-input" data-field="txn_time" type="datetime-local" /></td>
     <td><select class="payment-select" data-field="payment_method" onchange="updatePaymentColour(this)">
@@ -478,7 +478,7 @@ function prepareColumnRows() {
   const rows = [...document.querySelectorAll("#columnRows tr")].map((row) =>
     Object.fromEntries([...row.querySelectorAll("[data-field]")].map((input) => [input.dataset.field, input.value.trim()]))
   ).filter((row) => [
-    row.transaction_id, row.merchant_id, row.masked_wallet_ref,
+    row.transaction_id, row.merchant_id, row.masked_payment_ref,
     row.amount, row.txn_time, row.payment_method,
   ].some(Boolean));
   prepareRows(rows, "column-entry");

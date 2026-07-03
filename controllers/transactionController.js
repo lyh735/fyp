@@ -21,19 +21,7 @@ async function withRetries(operation, attempts = 3) {
 }
 
 async function logAudit(eventType, txn, message) {
-  try {
-    const tableName = txn?.alert_id ? "alerts" : "transactions";
-    const recordId = txn?.alert_id || txn?.transaction_id || null;
-    await withRetries(() => query(
-      `
-        INSERT INTO audit_logs (event_type, table_name, record_id, message)
-        VALUES (?, ?, ?, ?)
-      `,
-      [eventType, tableName, recordId, message]
-    ));
-  } catch (err) {
-    console.error("CRITICAL: Failed to write audit log:", err.message || err);
-  }
+  console.info(`[${eventType}]`, txn?.alert_id || txn?.transaction_id || "system", message);
 }
 
 async function logCritical(txn, message) {
@@ -134,7 +122,7 @@ async function createAlertRecord(txn, result) {
 async function getAlertById(alertId) {
   const rows = await query(
     `
-      SELECT a.*, a.alert_id AS id, m.merchant_name, t.masked_wallet_ref AS user_id,
+      SELECT a.*, a.alert_id AS id, m.merchant_name,
              t.payment_method, t.amount, t.currency,
              t.transaction_type, t.ip_address, t.country, NULL AS customer_risk_profile,
              m.merchant_average_amount, m.risk_level AS merchant_risk_level,
@@ -237,26 +225,23 @@ async function processTransaction(payload, req) {
     `
       INSERT INTO transactions
         (
-          transaction_id, merchant_id, masked_wallet_ref, masked_payment_ref,
-          card_bin, card_last4, masked_card_number, card_presence,
-          terminal_id, receipt_id, payment_gateway_ref,
+          transaction_id, merchant_id, masked_payment_ref,
+          card_bin, masked_card_number, card_presence,
+          terminal_id, payment_gateway_ref,
           payment_method, transaction_type, amount, currency, ip_address,
           country, txn_time, transaction_status, risk_score, risk_level,
           triggered_rules, processing_status, source_type
         )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       txn.transaction_id,
       txn.merchant_id,
-      txn.masked_wallet_ref,
       txn.masked_payment_ref,
       txn.card_bin,
-      txn.card_last4,
       txn.masked_card_number,
       txn.card_presence,
       txn.terminal_id,
-      txn.receipt_id,
       txn.payment_gateway_ref,
       txn.payment_method,
       txn.transaction_type,
@@ -281,6 +266,16 @@ async function processTransaction(payload, req) {
   if (shouldGenerateAlert) {
     try {
       alertId = await createAlertRecord(txn, result);
+      try {
+        await query(
+          `INSERT INTO case_actions
+             (alert_id, user_id, action_type, status_after_action, remarks)
+           VALUES (?, ?, 'alert_created', 'Pending', ?)`,
+          [alertId, req.user.id, result.triggered_rules.join(", ") || "Alert created by risk engine"]
+        );
+      } catch (actionErr) {
+        await logCritical(txn, `Alert ${alertId} was created but its case history entry failed: ${actionErr.message}`);
+      }
       await logAudit("alert_generated", txn, `Alert generated: ${alertId}`);
 
       const io = req.app.get("io");
@@ -374,7 +369,7 @@ exports.simulate = async (req, res) => {
 exports.getTransactions = (req, res) => {
   db.query(
     `
-      SELECT t.*, t.masked_wallet_ref AS user_id, t.transaction_status AS status,
+      SELECT t.*, t.transaction_status AS status,
              m.merchant_name, m.merchant_average_amount,
              m.risk_level AS merchant_risk_level, m.merchant_risk_score,
              m.has_physical_location
@@ -394,7 +389,7 @@ exports.showTransactionDetailsPage = async (req, res) => {
     const transactionId = req.params.id;
     const transactions = await query(
       `
-        SELECT t.*, t.masked_wallet_ref AS user_id, t.transaction_status AS status,
+        SELECT t.*, t.transaction_status AS status,
                m.merchant_name, m.merchant_average_amount,
                m.risk_level AS merchant_risk_level, m.merchant_risk_score,
                m.has_physical_location
@@ -517,7 +512,7 @@ exports.uploadTransactions = async (req, res) => {
         customer_risk_profile: row.customer_risk_profile || "low",
         merchant_average_amount: row.merchant_average_amount || 1000,
         merchant_name: row.merchant_name || row.merchant_id,
-        source_type: "file_upload",
+        source_type: "excel_upload",
       };
 
       const processed = await processTransaction(payload, req);

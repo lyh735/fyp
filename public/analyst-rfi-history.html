@@ -75,7 +75,7 @@
         <div id="historyMessage" class="message" style="margin:16px 22px 0"></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Reference</th><th>Merchant / Transaction</th><th>Requested Documents</th><th>Status</th><th>Dates</th><th>Reminders</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Reference</th><th>Merchant / Transaction</th><th>Requested Documents</th><th>Status</th><th>Dates</th><th>Analyst Reminder</th><th>Actions</th></tr></thead>
             <tbody id="historyBody"><tr><td colspan="7"><div class="empty-state"><p>Loading RFI history...</p></div></td></tr></tbody>
           </table>
         </div>
@@ -142,7 +142,7 @@
         <td><div class="doc-list">${row.requested_documents.map(escapeHtml).join('<br>') || '-'}</div></td>
         <td><span class="pill ${statusClass(row)}">${row.is_overdue ? 'Overdue' : escapeHtml(row.status)}</span></td>
         <td><div>Created: ${escapeHtml(formatDate(row.created_at))}</div><div class="subtext">Sent: ${escapeHtml(formatDate(row.sent_at))}</div><div class="subtext">Due: ${escapeHtml(formatDate(row.due_at))}</div>${row.responded_at ? `<div class="subtext">Responded: ${escapeHtml(formatDate(row.responded_at))}</div>` : ''}</td>
-        <td>${Number(row.reminder_count || 0)}<div class="subtext">${row.last_reminder_at ? escapeHtml(formatDate(row.last_reminder_at, true)) : 'None sent'}</div></td>
+        <td><strong>${Number(row.is_sent) ? 'Completed' : 'Pending'}</strong><div class="subtext">${Number(row.is_sent) ? 'RFI marked as sent' : 'RFI must be sent'}</div></td>
         <td><div class="history-actions"><a class="btn btn-primary small-btn" href="/api/officer/alerts/${Number(row.alert_id)}/rfi">View</a><a class="btn btn-secondary small-btn" href="/api/officer/rfi/${Number(row.rfi_id)}/pdf">PDF</a></div></td>
       </tr>`).join('');
   }

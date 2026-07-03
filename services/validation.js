@@ -129,17 +129,14 @@ function validateTransaction(payload) {
         payload.has_physical_location ?? payload.has_physical_store,
         true
       ),
-      masked_wallet_ref: normalizeText(payload.masked_wallet_ref || payload.user_id) || null,
       masked_payment_ref: normalizeText(payload.masked_payment_ref) || null,
       card_bin: normalizeText(payload.card_bin) || null,
-      card_last4: normalizeText(payload.card_last4) || null,
       masked_card_number: normalizeText(payload.masked_card_number) || null,
       card_presence: normalizeText(payload.card_presence) || null,
       terminal_id: normalizeText(payload.terminal_id) || null,
-      receipt_id: normalizeText(payload.receipt_id) || null,
       payment_gateway_ref: normalizeText(payload.payment_gateway_ref) || null,
       payment_method: paymentMethod || null,
-      source_type: normalizeText(payload.source_type) || "api",
+      source_type: normalizeText(payload.source_type) || "text_input",
     },
     metadata: { countryWasDefaulted },
   };

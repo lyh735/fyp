@@ -96,12 +96,6 @@ function generateTxnId() {
   return `UWP-${ts}-${rnd}`;
 }
 
-function generateUserId(country) {
-  const prefixes = { Singapore: "SG", China: "CN", Malaysia: "MY", Indonesia: "ID", "Hong Kong": "HK", Taiwan: "TW" };
-  const prefix = prefixes[country] || "XX";
-  return `${prefix}-${randInt(10000, 99999)}`;
-}
-
 function merchantId(name) {
   return `MRC-${name.toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 32)}`;
 }
@@ -119,12 +113,10 @@ exports.generateTransaction = () => {
   const isCard = payment_method === "Visa" || payment_method === "Mastercard";
   const cardBin = isCard ? (payment_method === "Visa" ? "411111" : "555555") : null;
   const cardLast4 = isCard ? randomDigits(4) : null;
-  const userId = generateUserId(country);
 
   return {
     transaction_id: generateTxnId(),
     merchant_id:    merchantId(merchant.name),
-    user_id:        userId,
     merchant_name:  merchant.name,
     business_category: merchant.category,
     merchant_average_amount: MERCHANT_AVERAGES[merchant.category],
@@ -137,14 +129,11 @@ exports.generateTransaction = () => {
     currency:       "SGD",
     country,
     ip_address:     transaction_type === "online" ? `103.18.${randInt(1, 254)}.${randInt(1, 254)}` : null,
-    masked_wallet_ref: !isCard ? `${payment_method.toUpperCase().replace(/\s+/g, "-")}-***${userId.slice(-4)}` : null,
     masked_payment_ref: `PAY-***${randomDigits(6)}`,
     card_bin: cardBin,
-    card_last4: cardLast4,
     masked_card_number: isCard ? `${cardBin}******${cardLast4}` : null,
     card_presence: isCard ? (transaction_type === "online" ? "card_not_present" : "card_present") : null,
     terminal_id: transaction_type === "face_to_face" ? `TERM-${randInt(1000, 9999)}` : null,
-    receipt_id: `RCP-${Date.now()}-${randInt(100, 999)}`,
     payment_gateway_ref: `GW-${randomDigits(12)}`,
     txn_time:       new Date().toISOString().slice(0, 19).replace("T", " "),
   };

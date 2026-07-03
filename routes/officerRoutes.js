@@ -12,7 +12,6 @@ router.get("/alerts/:id/rfi", rfiController.showRfiPage);
 router.post("/alerts/:id/rfi", rfiController.saveRfi);
 router.get("/rfi/:id/pdf", rfiController.exportPdf);
 router.post("/rfi/:id/mark-sent", rfiController.markAsSent);
-router.post("/rfi/:id/reminder", rfiController.sendReminder);
 router.post("/rfi/:id/response", handleResponseUpload, rfiController.recordResponse);
 router.get("/rfi/:id/response-file", rfiController.downloadResponseFile);
 
