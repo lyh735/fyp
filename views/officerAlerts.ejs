@@ -206,7 +206,7 @@
 
             <td>
 
-              <% if (alert.status === 'Escalated') { %>
+              <% if (alert.status === 'Escalated' || alert.status === 'Escalated to STRO') { %>
 
                 <span class="badge bg-danger status-badge">
                   Escalated
@@ -218,10 +218,17 @@
                   Reviewed
                 </span>
 
-              <% } else if (alert.status === 'Dismissed') { %>
+              <% } else if (alert.status === 'Dismissed' || alert.status === 'Closed') { %>
 
                 <span class="badge bg-secondary status-badge">
-                  Dismissed
+                  Closed
+
+                </span>
+
+              <% } else if (alert.status === 'Pending Merchant Response') { %>
+
+                <span class="badge bg-info text-dark status-badge">
+                  Pending Merchant Response
                 </span>
 
               <% } else { %>

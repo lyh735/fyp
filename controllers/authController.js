@@ -2,6 +2,7 @@ const db = require("../config/db");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const JWT_SECRET = process.env.JWT_SECRET || "compliance_jwt_secret_2024";
+const ASSIGNABLE_ROLES = new Set(["analyst", "stro"]);
 
 exports.login = (req, res) => {
   const { email, password } = req.body;
@@ -16,6 +17,9 @@ exports.login = (req, res) => {
     }
 
     const user = results[0];
+    if (user.status !== "active") {
+      return res.status(403).json({ message: "Account is not active" });
+    }
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) {
       return res.status(401).json({ message: "Invalid email or password" });
@@ -41,16 +45,17 @@ exports.login = (req, res) => {
 };
 
 exports.createUser = async (req, res) => {
-  const { name, dob, email, password } = req.body;
-  if (!name || !email || !password) {
+  const { name, email, password } = req.body;
+  const role = String(req.body.role || "analyst").toLowerCase();
+  if (!name || !email || !password || !ASSIGNABLE_ROLES.has(role)) {
     return res.status(400).json({ message: "All fields are required" });
   }
 
   try {
     const hashed = await bcrypt.hash(password, 10);
     db.query(
-      "INSERT INTO users (name, email, password_hash, role, first_login) VALUES (?, ?, ?, 'user', TRUE)",
-      [name, email, hashed],
+      "INSERT INTO users (name, email, password_hash, role, first_login) VALUES (?, ?, ?, ?, TRUE)",
+      [name, email, hashed, role],
       (err) => {
         if (err) {
           if (err.code === "ER_DUP_ENTRY") {
@@ -90,7 +95,7 @@ exports.changePassword = async (req, res) => {
 };
 
 exports.updateProfile = (req, res) => {
-  const { name, dob, email } = req.body;
+  const { name, email } = req.body;
   const userId = req.user.id;
 
   if (!name || !email) {
@@ -120,7 +125,7 @@ exports.updateProfile = (req, res) => {
 
 exports.getProfile = (req, res) => {
   db.query(
-    "SELECT user_id AS id, name, NULL AS dob, email, role, first_login, created_at FROM users WHERE user_id = ?",
+    "SELECT user_id AS id, name, email, role, status, first_login, created_at, updated_at FROM users WHERE user_id = ?",
     [req.user.id],
     (err, results) => {
       if (err) return res.status(500).json({ message: "Server error" });
@@ -132,7 +137,7 @@ exports.getProfile = (req, res) => {
 
 exports.getUsers = (req, res) => {
   db.query(
-    "SELECT user_id AS id, name, NULL AS dob, email, role, first_login, created_at FROM users WHERE user_id != ? ORDER BY created_at DESC",
+    "SELECT user_id AS id, name, email, role, status, first_login, created_at, updated_at FROM users WHERE user_id != ? ORDER BY created_at DESC",
     [req.user.id],
     (err, results) => {
       if (err) return res.status(500).json({ message: "Server error" });
@@ -143,7 +148,7 @@ exports.getUsers = (req, res) => {
 
 exports.getUserById = (req, res) => {
   db.query(
-    "SELECT user_id AS id, name, NULL AS dob, email, role, first_login, created_at FROM users WHERE user_id = ?",
+    "SELECT user_id AS id, name, email, role, status, first_login, created_at, updated_at FROM users WHERE user_id = ?",
     [req.params.id],
     (err, results) => {
       if (err) return res.status(500).json({ message: "Server error" });
@@ -195,14 +200,14 @@ exports.upgradeUser = (req, res) => {
   const targetId = req.params.id;
 
   db.query(
-    "UPDATE users SET role = 'admin', updated_at = NOW() WHERE user_id = ? AND role = 'user'",
+    "UPDATE users SET role = 'compliance_manager', updated_at = NOW() WHERE user_id = ? AND role = 'analyst'",
     [targetId],
     (err, result) => {
       if (err) return res.status(500).json({ message: "Server error" });
       if (result.affectedRows === 0) {
-        return res.status(404).json({ message: "User not found or is already an admin" });
+        return res.status(404).json({ message: "Analyst not found or is already a compliance manager" });
       }
-      res.json({ message: "User upgraded to admin successfully" });
+      res.json({ message: "Analyst promoted to compliance manager successfully" });
     }
   );
 };

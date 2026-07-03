@@ -85,7 +85,7 @@
         <div class="sidebar-avatar" id="sidebarAvatar">—</div>
         <div>
           <div class="user-name" id="sidebarName">—</div>
-          <div class="user-role">Admin</div>
+          <div class="user-role">Compliance Manager</div>
         </div>
       </div>
       <button class="btn-logout" onclick="logout()">
@@ -105,7 +105,7 @@
       <h2>Manage Users</h2>
       <div class="topbar-right">
         <div class="topbar-user">
-          <span class="badge badge-admin">Admin</span>
+          <span class="badge badge-admin">Compliance Manager</span>
           <span class="user-name" id="topbarName">—</span>
         </div>
       </div>
@@ -125,8 +125,11 @@
                 <input type="text" id="name" placeholder="e.g. Jane Doe" required />
               </div>
               <div class="form-group">
-                <label for="dob">Date of Birth</label>
-                <input type="date" id="dob" required />
+                <label for="role">Role</label>
+                <select id="role" required>
+                  <option value="analyst">Analyst</option>
+                  <option value="stro">STRO</option>
+                </select>
               </div>
               <div class="form-group">
                 <label for="email">Email Address</label>
@@ -205,7 +208,6 @@
     <h3>User Details</h3>
     <div class="detail-row"><span class="lbl">Name</span><span class="val" id="vName">—</span></div>
     <div class="detail-row"><span class="lbl">Email</span><span class="val" id="vEmail">—</span></div>
-    <div class="detail-row"><span class="lbl">Date of Birth</span><span class="val" id="vDob">—</span></div>
     <div class="detail-row"><span class="lbl">Role</span><span class="val" id="vRole">—</span></div>
     <div class="detail-row"><span class="lbl">Status</span><span class="val" id="vStatus">—</span></div>
     <div class="detail-row"><span class="lbl">Account Created</span><span class="val" id="vCreated">—</span></div>
@@ -248,14 +250,14 @@
 <div class="modal-overlay" id="upgradeModal">
   <div class="modal">
     <button class="modal-close" onclick="closeModal('upgradeModal')">&#x2715;</button>
-    <h3>Upgrade to Admin</h3>
+    <h3>Promote to Compliance Manager</h3>
     <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px">
-      Are you sure you want to upgrade <strong id="upgradeName">—</strong> to admin? They will gain full administrative access.
+      Promote <strong id="upgradeName">—</strong> to compliance manager?
     </p>
     <div id="upgradeMsg" class="message"></div>
     <div class="modal-actions">
       <button class="btn btn-success" id="upgradeBtn" style="width:auto;padding:10px 24px" onclick="submitUpgrade()">
-        Yes, Upgrade
+        Yes, Promote
       </button>
       <button class="btn btn-secondary" onclick="closeModal('upgradeModal')">Cancel</button>
     </div>
@@ -283,7 +285,7 @@
 <script src="/js/auth.js"></script>
 <script>
   const user = requireAdminRole();
-  if (!user) throw new Error("Admin access required");
+  if (!user) throw new Error("Compliance manager access required");
 
   document.getElementById("sidebarName").textContent   = user.name;
   document.getElementById("sidebarAvatar").textContent = user.name.charAt(0).toUpperCase();
@@ -337,17 +339,15 @@
     }
 
     body.innerHTML = data.map((u, i) => {
-      const dob     = formatDate(u.dob);
       const created = formatDate(u.created_at);
-      const rolePill = u.role === "admin"
-        ? `<span class="pill" style="background:#eff6ff;color:#1d4ed8">Admin</span>`
-        : `<span class="pill" style="background:#f8fafc;color:#475569">User</span>`;
+      const roleLabel = u.role === "compliance_manager" ? "Compliance Manager" : u.role.toUpperCase();
+      const rolePill = `<span class="pill" style="background:#eff6ff;color:#1d4ed8">${roleLabel}</span>`;
       const statusPill = u.first_login
         ? `<span class="pill pill-pending">Pending</span>`
         : `<span class="pill pill-normal">Active</span>`;
 
-      const upgradeBtn = u.role === "user"
-        ? `<button class="action-btn upgrade" onclick="openUpgrade(${u.id},'${u.name.replace(/'/g,"\\'")}')">&#x2191; Upgrade</button>`
+      const upgradeBtn = u.role === "analyst"
+        ? `<button class="action-btn upgrade" onclick="openUpgrade(${u.id},'${u.name.replace(/'/g,"\\'")}')">&#x2191; Promote</button>`
         : "";
 
       const searchable = `${u.name} ${u.email}`.toLowerCase();
@@ -394,11 +394,11 @@
     e.preventDefault();
     hideMessage("createMsg");
     const name     = document.getElementById("name").value.trim();
-    const dob      = document.getElementById("dob").value;
+    const role     = document.getElementById("role").value;
     const email    = document.getElementById("email").value.trim();
     const password = document.getElementById("password").value;
 
-    if (!name || !dob || !email || !password) {
+    if (!name || !role || !email || !password) {
       showMessage("createMsg", "All fields are required.", "error"); return;
     }
     if (password.length < 6) {
@@ -411,7 +411,7 @@
     try {
       const res = await apiFetch("/api/auth/create-user", {
         method: "POST",
-        body: JSON.stringify({ name, dob, email, password })
+        body: JSON.stringify({ name, role, email, password })
       });
       if (!res) return;
       const data = await res.json();
@@ -431,7 +431,6 @@
     const u = await res.json();
     document.getElementById("vName").textContent    = u.name;
     document.getElementById("vEmail").textContent   = u.email;
-    document.getElementById("vDob").textContent     = formatDate(u.dob);
     document.getElementById("vRole").textContent    = u.role.charAt(0).toUpperCase() + u.role.slice(1);
     document.getElementById("vStatus").textContent  = u.first_login ? "Pending password change" : "Active";
     document.getElementById("vCreated").textContent = formatDate(u.created_at);
@@ -490,7 +489,7 @@
       setTimeout(() => closeModal("upgradeModal"), 1500);
       loadUsers();
     } catch { showMessage("upgradeMsg", "Network error.", "error"); }
-    finally { btn.disabled = false; btn.textContent = "Yes, Upgrade"; }
+    finally { btn.disabled = false; btn.textContent = "Yes, Promote"; }
   }
 
   // ── DELETE USER ──

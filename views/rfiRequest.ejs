@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title><%= referenceNo %> | Request for Information</title>
+  <style>
+    :root { --navy:#183153; --blue:#2563eb; --border:#dbe3ee; --muted:#64748b; --danger:#b91c1c; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:#f3f6fa; color:#172033; font-family:Arial,sans-serif; }
+    .page { max-width:1180px; margin:32px auto; padding:0 20px; }
+    .topbar { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:20px; }
+    .back { color:#475569; text-decoration:none; font-weight:600; }
+    .status { display:inline-block; padding:7px 12px; border-radius:999px; background:#e0e7ff; color:#3730a3; font-size:13px; font-weight:700; }
+    .grid { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(300px,.65fr); gap:22px; align-items:start; }
+    .card { background:white; border:1px solid var(--border); border-radius:14px; box-shadow:0 5px 20px rgba(15,23,42,.06); overflow:hidden; }
+    .card-header { padding:20px 24px; border-bottom:1px solid var(--border); }
+    .card-header h1,.card-header h2 { margin:0; }
+    .card-body { padding:24px; }
+    .document { min-height:700px; padding:54px 58px; color:#111827; line-height:1.65; }
+    .document h1 { text-align:center; font-size:22px; letter-spacing:1.2px; margin:0 0 30px; }
+    .document .reference { font-weight:700; margin-bottom:28px; }
+    .document ul { list-style:none; padding:0; margin:15px 0 26px; }
+    .document li { margin:7px 0; }
+    .document li::before { content:'☑'; margin-right:9px; }
+    label { display:block; font-size:13px; font-weight:700; margin-bottom:7px; }
+    input[type=text],input[type=date],textarea { width:100%; padding:11px 12px; border:1px solid #cbd5e1; border-radius:8px; font:inherit; }
+    textarea { resize:vertical; min-height:95px; }
+    .field { margin-bottom:19px; }
+    .check { display:flex; gap:9px; align-items:flex-start; margin:10px 0; font-size:14px; }
+    .check input { margin-top:2px; }
+    .actions { display:flex; flex-wrap:wrap; gap:9px; padding-top:5px; }
+    button,.button { border:0; border-radius:8px; padding:11px 15px; font-weight:700; font-size:14px; cursor:pointer; text-decoration:none; display:inline-block; }
+    .primary { background:var(--blue); color:white; }
+    .secondary { background:#e9eef5; color:#26364d; }
+    .success { background:#15803d; color:white; }
+    .warning { background:#b45309; color:white; }
+    .disabled { opacity:.45; pointer-events:none; }
+    .notice { margin-bottom:18px; padding:14px 16px; border-radius:10px; background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; }
+    .notice.success-note { background:#ecfdf5; border-color:#a7f3d0; color:#166534; }
+    .notice.danger { background:#fef2f2; border-color:#fecaca; color:var(--danger); }
+    .meta { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:18px; }
+    .meta div { background:#f8fafc; border-radius:8px; padding:11px; font-size:13px; }
+    .meta strong { display:block; color:var(--muted); font-size:11px; margin-bottom:4px; text-transform:uppercase; }
+    dialog { width:min(760px,90vw); border:0; border-radius:12px; padding:0; box-shadow:0 24px 60px rgba(0,0,0,.25); }
+    dialog::backdrop { background:rgba(15,23,42,.55); }
+    dialog .preview-actions { padding:14px 20px; text-align:right; border-top:1px solid var(--border); }
+    @media(max-width:850px) { .grid{grid-template-columns:1fr;} .document{padding:35px 28px;min-height:0;} }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="topbar">
+      <a class="back" href="/api/officer/alerts/<%= alert.alert_id %>/action">&larr; Back to case review</a>
+      <span class="status"><%= rfi ? rfi.status : 'New RFI' %></span>
+    </div>
+
+    <% if (message) { %><div class="notice success-note"><%= message %></div><% } %>
+    <% if (rfi && rfi.status === 'Draft') { %>
+      <div class="notice"><strong>Reminder:</strong> This RFI has not been marked as sent. Export the PDF and mark it as sent after emailing it to the merchant.</div>
+    <% } %>
+    <% if (isOverdue) { %>
+      <div class="notice danger"><strong>Merchant has not responded.</strong> The response due date has passed.</div>
+    <% } %>
+
+    <div class="grid">
+      <section class="card">
+        <div class="document" id="rfiDocument">
+          <h1>REQUEST FOR INFORMATION</h1>
+          <div class="reference">Reference No: <span data-preview="reference"><%= referenceNo %></span></div>
+          <p>Dear Merchant,</p>
+          <p>As part of our routine compliance review, we require additional supporting information relating to the transaction(s) listed below.</p>
+          <div class="meta">
+            <div><strong>Merchant</strong><%= alert.merchant_name || alert.merchant_id %></div>
+            <div><strong>Transaction</strong><%= alert.transaction_id %></div>
+          </div>
+          <p>Please provide the following documents by <strong data-preview="due"><%= dueDate %></strong>:</p>
+          <ul id="previewDocuments">
+            <% documents.forEach(function(document) { %><li><%= document %></li><% }) %>
+          </ul>
+          <div id="previewRemarks"><% if (rfi && rfi.additional_remarks) { %><p><strong>Additional remarks:</strong><br><%= rfi.additional_remarks %></p><% } %></div>
+          <p>Thank you.</p><p>Compliance Team</p>
+        </div>
+      </section>
+
+      <aside class="card">
+        <div class="card-header"><h2>RFI Details</h2></div>
+        <div class="card-body">
+          <form method="POST" action="/api/officer/alerts/<%= alert.alert_id %>/rfi" id="rfiForm">
+            <div class="field"><label for="analyst_name">Analyst name</label><input id="analyst_name" name="analyst_name" type="text" required value="<%= rfi ? rfi.analyst_name : '' %>" <%= rfi && rfi.status !== 'Draft' ? 'readonly' : '' %> /></div>
+            <div class="field"><label for="due_date">Due date</label><input id="due_date" name="due_date" type="date" required value="<%= dueDate %>" <%= rfi && rfi.status !== 'Draft' ? 'readonly' : '' %> /></div>
+            <div class="field">
+              <label>Requested documents</label>
+              <% standardDocuments.forEach(function(document) { %>
+                <label class="check"><input type="checkbox" name="documents" value="<%= document %>" <%= documents.includes(document) ? 'checked' : '' %> <%= rfi && rfi.status !== 'Draft' ? 'disabled' : '' %> /><span><%= document %></span></label>
+              <% }) %>
+            </div>
+            <div class="field"><label for="additional_remarks">Additional remarks (optional)</label><textarea id="additional_remarks" name="additional_remarks" <%= rfi && rfi.status !== 'Draft' ? 'readonly' : '' %>><%= rfi ? (rfi.additional_remarks || '') : '' %></textarea></div>
+            <div class="actions">
+              <% if (!rfi || rfi.status === 'Draft') { %><button class="primary" type="submit">Save Draft</button><% } %>
+              <button class="secondary" type="button" id="previewButton">Preview</button>
+              <a class="button secondary <%= !rfi ? 'disabled' : '' %>" href="<%= rfi ? '/api/officer/rfi/' + rfi.rfi_id + '/pdf' : '#' %>">Export PDF</a>
+            </div>
+          </form>
+
+          <% if (rfi && rfi.status === 'Draft') { %>
+            <form method="POST" action="/api/officer/rfi/<%= rfi.rfi_id %>/mark-sent" style="margin-top:12px;" onsubmit="return confirm('Confirm that the PDF has been sent to the merchant?')"><button class="success" type="submit">Mark as Sent</button></form>
+          <% } %>
+          <% if (rfi && rfi.sent_at) { %>
+            <div class="meta" style="margin-top:20px;"><div><strong>RFI Sent</strong>Yes</div><div><strong>Sent Date</strong><%= new Date(rfi.sent_at).toLocaleDateString('en-SG') %></div><div><strong>Due Date</strong><%= dueDate %></div><div><strong>Reminders</strong><%= rfi.reminder_count || 0 %></div></div>
+          <% } %>
+          <% if (isOverdue) { %><form method="POST" action="/api/officer/rfi/<%= rfi.rfi_id %>/reminder"><button class="warning" type="submit">Send Reminder</button></form><% } %>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <dialog id="previewDialog"><div id="dialogDocument"></div><div class="preview-actions"><button class="secondary" type="button" id="closePreview">Close Preview</button></div></dialog>
+  <script>
+    const dueInput = document.getElementById('due_date');
+    const remarksInput = document.getElementById('additional_remarks');
+    const checkboxes = [...document.querySelectorAll('input[name="documents"]')];
+    function updatePreview() {
+      document.querySelector('[data-preview="due"]').textContent = dueInput.value || '—';
+      document.getElementById('previewDocuments').innerHTML = checkboxes.filter(c => c.checked).map(c => `<li>${c.value.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}</li>`).join('');
+      const remarks = remarksInput.value.trim();
+      document.getElementById('previewRemarks').innerHTML = remarks ? `<p><strong>Additional remarks:</strong><br>${remarks.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])).replace(/\n/g,'<br>')}</p>` : '';
+    }
+    [dueInput, remarksInput, ...checkboxes].forEach(el => el.addEventListener('input', updatePreview));
+    document.getElementById('previewButton').addEventListener('click', () => {
+      updatePreview();
+      document.getElementById('dialogDocument').innerHTML = document.getElementById('rfiDocument').outerHTML;
+      document.getElementById('previewDialog').showModal();
+    });
+    document.getElementById('closePreview').addEventListener('click', () => document.getElementById('previewDialog').close());
+    const user = JSON.parse(localStorage.getItem('cms_user') || 'null');
+    const analyst = document.getElementById('analyst_name');
+    if (user && !analyst.value) analyst.value = user.name || '';
+  </script>
+</body>
+</html>

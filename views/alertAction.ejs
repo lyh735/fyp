@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 
-  <title>Take Action on Alert</title>
+  <title>Analyst Case Review</title>
 
   <link
     href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
@@ -125,7 +125,8 @@
     </div>
 
     <div class="card-box">
-      <h2 style="margin-bottom: 30px; color: #333;">Take Action on Alert</h2>
+      <h2 style="margin-bottom: 8px; color: #333;">Analyst Case Review</h2>
+      <p style="color:#6c757d; margin-bottom:30px;">Review the case and select the appropriate outcome.</p>
 
       <!-- Alert Summary -->
       <div style="margin-bottom: 30px; padding: 20px; background-color: #f8f9fa; border-radius: 8px;">
@@ -140,7 +141,7 @@
           </div>
           <div>
             <div class="label-title">Merchant</div>
-            <div class="value-text"><%= alert.merchant_id || '—' %></div>
+            <div class="value-text"><%= alert.merchant_name || alert.merchant_id || '—' %></div>
           </div>
           <div>
             <div class="label-title">Risk Level</div>
@@ -162,7 +163,7 @@
         <input type="hidden" name="alert_id" value="<%= alert.id %>" />
 
         <div class="form-group">
-          <label class="form-label">Officer Name *</label>
+          <label class="form-label">Analyst Name *</label>
           <input type="text" name="officer_name" placeholder="Enter your full name" required />
         </div>
 
@@ -172,11 +173,14 @@
         </div>
 
         <div class="btn-container">
-          <button type="submit" name="action_type" value="dismiss" class="btn btn-secondary">
-            Dismiss
+          <button type="submit" name="action_type" value="close_case" class="btn btn-secondary">
+            Close Case
           </button>
-          <button type="submit" name="action_type" value="escalate" class="btn btn-danger">
-            Escalate
+          <a href="/api/officer/alerts/<%= alert.id %>/rfi" class="btn" style="background:#0d6efd;color:white;text-decoration:none;">
+            Request Information (RFI)
+          </a>
+          <button type="submit" name="action_type" value="escalate_to_stro" class="btn btn-danger">
+            Escalate to STRO
           </button>
           <button type="button" onclick="history.back()" class="btn btn-light">
             Cancel

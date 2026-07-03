@@ -37,21 +37,21 @@
 
       <div class="success-card">
 
-        <% if(action === 'dismiss'){ %>
+        <% if(action === 'dismiss' || action === 'close_case'){ %>
 
           <h1 class="text-secondary mb-4">
-            Alert Dismissed
+            Case Closed
           </h1>
 
           <p class="fs-5">
             Alert ID <strong><%= alertId %></strong>
-            has been dismissed successfully.
+            has been closed successfully.
           </p>
 
-        <% } else if(action === 'escalate'){ %>
+        <% } else if(action === 'escalate' || action === 'escalate_to_stro'){ %>
 
           <h1 class="text-danger mb-4">
-            Alert Escalated
+            Case Escalated to STRO
           </h1>
 
           <p class="fs-5">

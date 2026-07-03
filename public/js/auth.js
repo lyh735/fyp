@@ -32,7 +32,7 @@ function requireAuth() {
 function requireAdminRole() {
   const user = requireAuth();
   if (!user) return null;
-  if (user.role !== "admin") {
+  if (!["admin", "compliance_manager"].includes(user.role)) {
     window.location.href = "/dashboard.html";
     return null;
   }

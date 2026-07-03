@@ -121,30 +121,36 @@ exports.takeActionPage = (req, res) => {
       newStatus = "Reviewed";
     }
 
-    if (action_type === "dismiss") {
-      newStatus = "Dismissed";
+    if (action_type === "dismiss" || action_type === "close_case") {
+      newStatus = "Closed";
     }
 
-    if (action_type === "escalate") {
-      newStatus = "Escalated";
+    if (action_type === "escalate" || action_type === "escalate_to_stro") {
+      newStatus = "Escalated to STRO";
     }
 
-    const findOfficerSql = "SELECT user_id FROM users WHERE name = ? LIMIT 1";
+    const findOfficerSql = `
+      SELECT user_id FROM users
+      WHERE name = ? AND role = 'analyst' AND status = 'active'
+      LIMIT 1
+    `;
     const updateAlertSql = `
       UPDATE alerts
-      SET status = ?, reviewed_by = ?, reviewed_at = NOW()
+      SET status = ?, reviewed_by = ?, reviewed_at = NOW(),
+          escalated_at = CASE WHEN ? = 'Escalated to STRO' THEN NOW() ELSE escalated_at END
       WHERE alert_id = ?
     `;
 
     const insertActionSql = `
-      INSERT INTO officer_actions
+      INSERT INTO case_actions
       (
         alert_id,
-        officer_id,
+        user_id,
         action_type,
+        status_after_action,
         remarks
       )
-      VALUES (?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?)
     `;
 
     const insertAuditSql = `
@@ -168,12 +174,12 @@ exports.takeActionPage = (req, res) => {
       }
 
       if (officers.length === 0) {
-        return res.status(400).send("Officer name must match an existing user account");
+        return res.status(400).send("Analyst name must match an active analyst account");
       }
 
       const officerId = officers[0].user_id;
 
-      db.query(updateAlertSql, [newStatus, officerId, alert_id], (err) => {
+      db.query(updateAlertSql, [newStatus, officerId, newStatus, alert_id], (err) => {
 
         if (err) {
           console.error(err);
@@ -186,6 +192,7 @@ exports.takeActionPage = (req, res) => {
           alert_id,
           officerId,
           action_type,
+          newStatus,
           remarks
         ],
         (err) => {
@@ -202,10 +209,10 @@ Remarks: ${remarks || "None"}
 `;
 
           const eventType =
-            action_type === "escalate"
+            action_type === "escalate" || action_type === "escalate_to_stro"
               ? "Compliance Escalation"
-              : action_type === "dismiss"
-              ? "Alert Dismissal"
+              : action_type === "dismiss" || action_type === "close_case"
+              ? "Case Closure"
               : "Alert Review";
 
           const message = details;
@@ -279,10 +286,10 @@ exports.showReportPage = (req, res) => {
       SUM(status = 'Reviewed')
       AS reviewed_alerts,
 
-      SUM(status = 'Dismissed')
+      SUM(status = 'Dismissed' OR status = 'Closed')
       AS dismissed_alerts,
 
-      SUM(status = 'Escalated')
+      SUM(status = 'Escalated' OR status = 'Escalated to STRO')
       AS escalated_alerts
 
     FROM alerts

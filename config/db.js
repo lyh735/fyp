@@ -1,11 +1,11 @@
 const mysql = require("mysql2");
 
 const db = mysql.createConnection({
-  host: "localhost",
-  user: "root",
-  password: "Republic_C207",
-  port: "3308",
-  database: "transaction_monitoring"
+  host: "dft-fyp.mysql.database.azure.com",
+  user: "dft_fyp",
+  password: "RepublicPoly2026",
+  port: "3306",
+  database: "soi-2026-0046-yuhan"
 });
 
 db.connect((err) => {

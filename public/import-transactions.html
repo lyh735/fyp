@@ -212,7 +212,7 @@ document.getElementById("topbarName").textContent = user.name;
 const roleElement = document.getElementById("topbarRole");
 roleElement.textContent = user.role;
 roleElement.className = `badge badge-${user.role}`;
-if (user.role === "admin") document.getElementById("adminNav").style.display = "block";
+if (["admin", "compliance_manager"].includes(user.role)) document.getElementById("adminNav").style.display = "block";
 
 let pendingRows = [];
 let pendingValidation = { issues: [], invalidIndexes: new Set(), defaults: [] };

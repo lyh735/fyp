@@ -14,8 +14,8 @@ exports.authenticate = (req, res, next) => {
 };
 
 exports.requireAdmin = (req, res, next) => {
-  if (req.user.role !== "admin") {
-    return res.status(403).json({ message: "Admin access required" });
+  if (!["admin", "compliance_manager"].includes(req.user.role)) {
+    return res.status(403).json({ message: "Compliance manager access required" });
   }
   next();
 };

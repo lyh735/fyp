@@ -68,10 +68,10 @@ async function ensureMerchantRecord(txn, payload = {}, userId) {
         (
           merchant_id, merchant_name, business_category, mcc_code,
           merchant_average_amount, operating_hours_start, operating_hours_end,
-          risk_level, merchant_risk_score, country, has_physical_store,
-          status, updated_by
+          risk_level, merchant_risk_score, country, has_physical_location,
+          status, created_by, updated_by
         )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         merchant_name = VALUES(merchant_name),
         business_category = COALESCE(VALUES(business_category), business_category),
@@ -82,9 +82,10 @@ async function ensureMerchantRecord(txn, payload = {}, userId) {
         risk_level = COALESCE(VALUES(risk_level), risk_level),
         merchant_risk_score = VALUES(merchant_risk_score),
         country = COALESCE(VALUES(country), country),
-        has_physical_store = VALUES(has_physical_store),
+        has_physical_location = VALUES(has_physical_location),
         status = VALUES(status),
-        updated_by = VALUES(updated_by)
+        updated_by = VALUES(updated_by),
+        updated_at = NOW()
     `,
     [
       txn.merchant_id,
@@ -97,8 +98,9 @@ async function ensureMerchantRecord(txn, payload = {}, userId) {
       payload.merchant_risk_level || txn.customer_risk_profile || null,
       txn.merchant_risk_score,
       payload.merchant_country || txn.country || "Singapore",
-      txn.has_physical_store,
+      txn.has_physical_location,
       "active",
+      userId,
       userId,
     ]
   );
@@ -110,9 +112,9 @@ async function createAlertRecord(txn, result) {
       INSERT INTO alerts
         (
           transaction_id, merchant_id, risk_score, risk_level,
-          triggered_rules, status, message
+          triggered_rules, status, priority, message
         )
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       txn.transaction_id,
@@ -121,6 +123,7 @@ async function createAlertRecord(txn, result) {
       result.risk_level,
       JSON.stringify(result.triggered_rules),
       "Pending",
+      result.risk_level === "High" ? "High" : "Medium",
       result.triggered_rules.join(", "),
     ]
   ));
@@ -135,7 +138,7 @@ async function getAlertById(alertId) {
              t.payment_method, t.amount, t.currency,
              t.transaction_type, t.ip_address, t.country, NULL AS customer_risk_profile,
              m.merchant_average_amount, m.risk_level AS merchant_risk_level,
-             m.merchant_risk_score, m.has_physical_store,
+             m.merchant_risk_score, m.has_physical_location,
              t.source_type, t.txn_time AS transaction_time,
              u.name AS officer_name, NULL AS escalation_report
       FROM alerts a
@@ -150,15 +153,25 @@ async function getAlertById(alertId) {
   return rows[0] || null;
 }
 
-async function updateAlertStatus(alertId, status, userId, report = null) {
+async function updateAlertStatus(alertId, status, userId, report = null, actionType = null) {
   await query(
     `
       UPDATE alerts
-      SET status = ?, reviewed_by = ?, reviewed_at = NOW()
+      SET status = ?, reviewed_by = ?, reviewed_at = NOW(),
+          escalated_at = CASE WHEN ? IN ('Escalated', 'Escalated to STRO') THEN NOW() ELSE escalated_at END
       WHERE alert_id = ?
     `,
-    [status, userId, alertId]
+    [status, userId, status, alertId]
   );
+
+  if (actionType) {
+    await query(
+      `INSERT INTO case_actions
+         (alert_id, user_id, action_type, status_after_action, remarks)
+       VALUES (?, ?, ?, ?, ?)`,
+      [alertId, userId, actionType, status, report]
+    );
+  }
 
   if (report) {
     await logAudit("escalation_report", { alert_id: alertId }, report);
@@ -225,18 +238,27 @@ async function processTransaction(payload, req) {
       INSERT INTO transactions
         (
           transaction_id, merchant_id, masked_wallet_ref, masked_payment_ref,
+          card_bin, card_last4, masked_card_number, card_presence,
+          terminal_id, receipt_id, payment_gateway_ref,
           payment_method, transaction_type, amount, currency, ip_address,
           country, txn_time, transaction_status, risk_score, risk_level,
           triggered_rules, processing_status, source_type
         )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       txn.transaction_id,
       txn.merchant_id,
-      payload.masked_wallet_ref || payload.user_id || null,
-      payload.masked_payment_ref || null,
-      payload.payment_method || null,
+      txn.masked_wallet_ref,
+      txn.masked_payment_ref,
+      txn.card_bin,
+      txn.card_last4,
+      txn.masked_card_number,
+      txn.card_presence,
+      txn.terminal_id,
+      txn.receipt_id,
+      txn.payment_gateway_ref,
+      txn.payment_method,
       txn.transaction_type,
       txn.amount,
       txn.currency,
@@ -330,12 +352,8 @@ exports.simulate = async (req, res) => {
     const generated = generateTransaction();
     const txn = {
       ...generated,
-      merchant_id: generated.merchant_name,
-      currency: "SGD",
-      transaction_type: "face_to_face",
       timestamp: generated.txn_time,
       customer_risk_profile: generated.amount > 3000 ? "high" : "low",
-      merchant_average_amount: generated.amount > 3000 ? 800 : Math.max(generated.amount, 25),
       source_type: "simulator",
     };
 
@@ -347,7 +365,7 @@ exports.simulate = async (req, res) => {
       });
     }
 
-    res.json({ transaction: { ...processed.txn, ...processed.result } });
+    res.json({ transaction: { ...txn, ...processed.txn, ...processed.result } });
   } catch (err) {
     res.status(500).json({ message: "Server error", error: err.message });
   }
@@ -359,7 +377,7 @@ exports.getTransactions = (req, res) => {
       SELECT t.*, t.masked_wallet_ref AS user_id, t.transaction_status AS status,
              m.merchant_name, m.merchant_average_amount,
              m.risk_level AS merchant_risk_level, m.merchant_risk_score,
-             m.has_physical_store
+             m.has_physical_location
       FROM transactions t
       LEFT JOIN merchants m ON t.merchant_id = m.merchant_id
       ORDER BY COALESCE(t.txn_time, t.created_at) DESC
@@ -380,7 +398,7 @@ exports.showTransactionDetailsPage = async (req, res) => {
         SELECT t.*, t.masked_wallet_ref AS user_id, t.transaction_status AS status,
                m.merchant_name, m.merchant_average_amount,
                m.risk_level AS merchant_risk_level, m.merchant_risk_score,
-               m.has_physical_store
+               m.has_physical_location
         FROM transactions t
         LEFT JOIN merchants m ON t.merchant_id = m.merchant_id
         WHERE t.transaction_id = ?
@@ -596,7 +614,7 @@ exports.dismissAlert = async (req, res) => {
       return res.status(400).json({ message: "Only pending alerts can be dismissed" });
     }
 
-    await updateAlertStatus(req.params.id, "Dismissed", req.user.id);
+    await updateAlertStatus(req.params.id, "Closed", req.user.id, null, "close_case");
     await logAudit("alert_dismissed", alert, `Alert dismissed by user ${req.user.id}`);
 
     res.json({ message: "Alert successfully dismissed" });
@@ -624,7 +642,7 @@ exports.escalateAlert = async (req, res) => {
     }
 
     const report = formatEscalationReport(alert);
-    await updateAlertStatus(req.params.id, "Escalated", req.user.id, report);
+    await updateAlertStatus(req.params.id, "Escalated to STRO", req.user.id, report, "escalate_to_stro");
     await logAudit("alert_escalated", alert, `Alert escalated by user ${req.user.id}`);
     await logAudit("escalation_report", alert, report);
 

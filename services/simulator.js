@@ -47,6 +47,13 @@ const AMOUNT_RANGES = {
   retail:        { min: 15,  max: 800  },
 };
 
+const MERCHANT_AVERAGES = {
+  fine_dining: 250,
+  casual_dining: 55,
+  food_court: 12,
+  retail: 120,
+};
+
 const COUNTRIES = [
   { name: "Singapore", weight: 0.74 },
   { name: "China",     weight: 0.18 },
@@ -95,19 +102,50 @@ function generateUserId(country) {
   return `${prefix}-${randInt(10000, 99999)}`;
 }
 
+function merchantId(name) {
+  return `MRC-${name.toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 32)}`;
+}
+
+function randomDigits(length) {
+  return Array.from({ length }, () => randInt(0, 9)).join("");
+}
+
 exports.generateTransaction = () => {
   const merchant       = MERCHANTS[randInt(0, MERCHANTS.length - 1)];
   const country        = weightedPick(COUNTRIES.map(c => c.name), COUNTRIES.map(c => c.weight));
   const payment_method = weightedPick(PAYMENT_METHODS, PAYMENT_WEIGHTS);
   const amount         = generateAmount(merchant.category);
+  const transaction_type = Math.random() < 0.35 ? "online" : "face_to_face";
+  const isCard = payment_method === "Visa" || payment_method === "Mastercard";
+  const cardBin = isCard ? (payment_method === "Visa" ? "411111" : "555555") : null;
+  const cardLast4 = isCard ? randomDigits(4) : null;
+  const userId = generateUserId(country);
 
   return {
     transaction_id: generateTxnId(),
-    user_id:        generateUserId(country),
+    merchant_id:    merchantId(merchant.name),
+    user_id:        userId,
     merchant_name:  merchant.name,
+    business_category: merchant.category,
+    merchant_average_amount: MERCHANT_AVERAGES[merchant.category],
+    merchant_risk_score: amount > 3000 ? 75 : randInt(5, 35),
+    merchant_country: "Singapore",
+    has_physical_location: true,
     payment_method,
+    transaction_type,
     amount,
+    currency:       "SGD",
     country,
+    ip_address:     transaction_type === "online" ? `103.18.${randInt(1, 254)}.${randInt(1, 254)}` : null,
+    masked_wallet_ref: !isCard ? `${payment_method.toUpperCase().replace(/\s+/g, "-")}-***${userId.slice(-4)}` : null,
+    masked_payment_ref: `PAY-***${randomDigits(6)}`,
+    card_bin: cardBin,
+    card_last4: cardLast4,
+    masked_card_number: isCard ? `${cardBin}******${cardLast4}` : null,
+    card_presence: isCard ? (transaction_type === "online" ? "card_not_present" : "card_present") : null,
+    terminal_id: transaction_type === "face_to_face" ? `TERM-${randInt(1000, 9999)}` : null,
+    receipt_id: `RCP-${Date.now()}-${randInt(100, 999)}`,
+    payment_gateway_ref: `GW-${randomDigits(12)}`,
     txn_time:       new Date().toISOString().slice(0, 19).replace("T", " "),
   };
 };

@@ -74,7 +74,7 @@
       <div class="col-md-6">
         <div class="label-title">Amount</div>
         <div class="value-text">
-          SGD <%= alert.amount || 1596 %>
+          <%= alert.currency || 'SGD' %> <%= alert.amount ?? '—' %>
         </div>
       </div>
 
@@ -83,13 +83,13 @@
     <div class="row mb-4">
 
       <div class="col-md-6">
-        <div class="label-title">User ID</div>
-        <h2><%= alert.user_id || 'USER4' %></h2>
+        <div class="label-title">Merchant ID</div>
+        <h2><%= alert.merchant_id || '—' %></h2>
       </div>
 
       <div class="col-md-6">
-        <div class="label-title">Account ID</div>
-        <h2><%= alert.account_id || 'ACC4' %></h2>
+        <div class="label-title">Merchant Name</div>
+        <h2><%= alert.merchant_name || '—' %></h2>
       </div>
 
     </div>
@@ -98,12 +98,12 @@
 
       <div class="col-md-6">
         <div class="label-title">IP Address</div>
-        <h2><%= alert.ip_address || '192.168.1.2' %></h2>
+        <h2><%= alert.ip_address || '—' %></h2>
       </div>
 
       <div class="col-md-6">
         <div class="label-title">Country</div>
-        <h2><%= alert.country || 'GB' %></h2>
+        <h2><%= alert.country || '—' %></h2>
       </div>
 
     </div>
@@ -113,12 +113,12 @@
       <div class="col-md-6">
         <div class="label-title">Status</div>
 
-        <% if(alert.status === 'Escalated') { %>
+        <% if(alert.status === 'Escalated' || alert.status === 'Escalated to STRO') { %>
           <span class="badge bg-danger fs-6">
             <%= alert.status %>
           </span>
 
-        <% } else if(alert.status === 'Reviewed') { %>
+        <% } else if(alert.status === 'Reviewed' || alert.status === 'Closed') { %>
 
           <span class="badge bg-success fs-6">
             <%= alert.status %>
@@ -158,17 +158,17 @@
 
     <div class="severity-text">
       Severity Score:
-      <%= alert.risk_level || '35' %>
+      <%= alert.risk_score ?? '—' %> (<%= alert.risk_level || 'Unclassified' %>)
     </div>
 
   </div>
 
-  <!-- Officer Review -->
+  <!-- Analyst Review -->
   <div class="card-box">
 
-    <h3 class="mb-4">Officer Review</h3>
+    <h3 class="mb-4">Analyst Review</h3>
 
-    <% if(alert.status === 'Pending') { %>
+    <% if(['Pending', 'Pending Review', 'open'].includes(alert.status)) { %>
       <button type="button" class="btn btn-danger" onclick="goToAlertAction(<%= alert.id %>)">Take Action</button>
     <% } else { %>
       <p class="text-muted">This alert has already been reviewed and cannot be modified.</p>
