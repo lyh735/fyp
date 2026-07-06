@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Escalated Alerts - STRO</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    .stro-shell { min-height: 100vh; background: var(--bg); }
+    .stro-header { height: 72px; padding: 0 32px; display: flex; align-items: center; justify-content: space-between; background: #fff; border-bottom: 1px solid var(--border); }
+    .stro-brand { display: flex; align-items: center; gap: 12px; }
+    .stro-brand-mark { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: #172554; color: #fff; }
+    .stro-brand-mark svg { width: 21px; height: 21px; fill: currentColor; }
+    .stro-brand h1 { margin: 0; font-size: 17px; color: var(--text); }
+    .stro-brand p { margin: 2px 0 0; color: var(--text-muted); font-size: 12px; }
+    .stro-user { display: flex; align-items: center; gap: 12px; }
+    .stro-nav { display: flex; align-items: center; gap: 5px; }
+    .stro-nav a { color: var(--text-muted); text-decoration: none; font-weight: 600; font-size: 13px; padding: 8px 10px; border-radius: 7px; }
+    .stro-nav a:hover { color: var(--primary); background: var(--accent-light); }
+    .stro-nav a.active { color: #fff; background: var(--primary); }
+    .stro-main { max-width: 1240px; margin: 0 auto; padding: 30px 24px 48px; }
+    .page-heading { display: flex; justify-content: space-between; align-items: end; margin-bottom: 20px; gap: 20px; }
+    .page-heading h2 { margin: 0 0 5px; font-size: 25px; }
+    .page-heading p { margin: 0; color: var(--text-muted); }
+    .summary-chip { padding: 10px 14px; border-radius: 10px; background: #fff7ed; color: #9a3412; font-weight: 700; white-space: nowrap; }
+    .alert-row { cursor: pointer; }
+    .alert-row:hover { background: #f8fafc; }
+    .risk { display: inline-flex; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .risk-high { background: #fee2e2; color: #b91c1c; }
+    .risk-medium { background: #fef3c7; color: #92400e; }
+    .risk-low { background: #dcfce7; color: #166534; }
+    .status-escalated { display: inline-flex; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #ede9fe; color: #6d28d9; }
+    .detail-panel { margin-top: 20px; display: none; }
+    .detail-panel.visible { display: block; }
+    .detail-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+    .detail-field label { display: block; color: var(--text-muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 5px; }
+    .detail-field div { overflow-wrap: anywhere; }
+    .detail-wide { grid-column: 1 / -1; padding-top: 16px; border-top: 1px solid var(--border); }
+    .detail-report { white-space: pre-wrap; line-height: 1.6; background: #f8fafc; padding: 14px; border-radius: 8px; }
+    .case-history { margin:0; padding:0; list-style:none; }
+    .case-history li { padding:10px 0; border-bottom:1px solid var(--border); }
+    .case-history li:last-child { border-bottom:0; }
+    .case-history small { display:block; color:var(--text-muted); margin-top:3px; }
+    .empty { padding: 48px 20px; text-align: center; color: var(--text-muted); }
+    .error-box { display: none; margin-bottom: 16px; padding: 12px 14px; color: #991b1b; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; }
+    @media (max-width: 900px) { .stro-nav { display: none; } }
+    @media (max-width: 760px) { .stro-header { padding: 0 16px; } .stro-main { padding: 22px 14px; } .detail-grid { grid-template-columns: 1fr 1fr; } .hide-mobile { display: none; } }
+  </style>
+</head>
+<body>
+<div class="stro-shell">
+  <header class="stro-header">
+    <div class="stro-brand">
+      <div class="stro-brand-mark"><svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg></div>
+      <div><h1>Compliance Monitor</h1><p>Suspicious Transaction Reporting Officer</p></div>
+    </div>
+    <nav class="stro-nav" aria-label="STRO navigation">
+      <a href="/dashboard.html">Overview</a>
+      <a href="/transactions.html">Past Transactions</a>
+      <a class="active" href="/stro-alerts.html">Escalated Alerts</a>
+      <a href="/str-draft.html">STR Drafting</a>
+      <a href="/api/officer/report">Reports</a>
+      <a href="/api/officer/audit-logs">Audit Trail</a>
+    </nav>
+    <div class="stro-user">
+      <div class="hide-mobile"><strong id="userName"></strong><div style="font-size:12px;color:var(--text-muted);text-align:right">STRO</div></div>
+      <button class="btn btn-secondary" onclick="logout()">Sign Out</button>
+    </div>
+  </header>
+
+  <main class="stro-main">
+    <div class="page-heading">
+      <div><h2>Escalated Alerts</h2><p>Alerts referred by compliance officers for your review.</p></div>
+      <div class="summary-chip"><span id="alertCount">0</span> escalated</div>
+    </div>
+    <div id="errorBox" class="error-box"></div>
+
+    <section class="card">
+      <div class="card-header">
+        <h3>STRO Review Queue</h3>
+        <div class="search-wrap">
+          <input id="searchInput" class="search-input" type="search" placeholder="Search alert, transaction, or merchant" />
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Alert</th><th>Transaction</th><th>Merchant</th><th>Amount</th><th>Risk</th><th>Escalated At</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody id="alertRows"><tr><td colspan="8"><div class="empty">Loading escalated alerts...</div></td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="detailPanel" class="card detail-panel">
+      <div class="card-header"><h3>Escalated Alert Details</h3><button class="btn btn-secondary" id="closeDetail">Close</button></div>
+      <div class="card-body"><div id="detailGrid" class="detail-grid"></div></div>
+    </section>
+  </main>
+</div>
+
+<script src="/js/auth.js"></script>
+<script>
+  const user = requireStroRole();
+  if (!user) throw new Error("STRO access required");
+  if (user.first_login) window.location.href = "/change-password.html";
+  document.getElementById("userName").textContent = user.name;
+
+  let alerts = [];
+  const rows = document.getElementById("alertRows");
+  const detailPanel = document.getElementById("detailPanel");
+
+  const escapeHtml = (value) => String(value ?? "-").replace(/[&<>'"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]));
+  const formatDate = (value) => value ? new Date(value).toLocaleString("en-SG", { dateStyle: "medium", timeStyle: "short" }) : "-";
+  const formatMoney = (alert) => alert.amount == null ? "-" : `${escapeHtml(alert.currency || "SGD")} ${Number(alert.amount).toLocaleString("en-SG", { minimumFractionDigits: 2 })}`;
+
+  function renderAlerts(items) {
+    if (!items.length) {
+      rows.innerHTML = '<tr><td colspan="8"><div class="empty">No escalated alerts found.</div></td></tr>';
+      return;
+    }
+    rows.innerHTML = items.map(a => `
+      <tr class="alert-row" data-id="${a.id}" tabindex="0">
+        <td><strong>#${escapeHtml(a.id)}</strong></td>
+        <td>${escapeHtml(a.transaction_id)}</td>
+        <td>${escapeHtml(a.merchant_name || a.merchant_id)}</td>
+        <td>${formatMoney(a)}</td>
+        <td><span class="risk risk-${String(a.risk_level || "low").toLowerCase()}">${escapeHtml(a.risk_level)}</span></td>
+        <td>${escapeHtml(formatDate(a.escalated_at))}</td>
+        <td><span class="status-escalated">${escapeHtml(a.status)}</span></td>
+        <td><button class="btn btn-secondary draft-link" type="button" data-id="${a.id}">Draft STR</button></td>
+      </tr>`).join("");
+    document.querySelectorAll(".alert-row").forEach(row => {
+      row.addEventListener("click", () => showDetail(row.dataset.id));
+      row.addEventListener("keydown", e => { if (e.key === "Enter") showDetail(row.dataset.id); });
+    });
+    document.querySelectorAll(".draft-link").forEach(btn => {
+      btn.addEventListener("click", e => {
+        e.stopPropagation();
+        window.location.href = `/str-draft.html?alert_id=${encodeURIComponent(btn.dataset.id)}`;
+      });
+    });
+  }
+
+  function rulesText(value) {
+    if (!value) return "-";
+    try {
+      const parsed = typeof value === "string" ? JSON.parse(value) : value;
+      return Array.isArray(parsed)
+        ? parsed.map((item) => item && typeof item === "object"
+          ? `+${Number(item.points || 0)} ${item.rule_name || item.rule || item.message || "Risk rule"}`
+          : String(item)
+        ).join(", ")
+        : JSON.stringify(parsed);
+    }
+    catch { return String(value); }
+  }
+
+  async function showDetail(id) {
+    const res = await apiFetch(`/api/stro/alerts/${id}`);
+    if (!res) return;
+    const a = await res.json();
+    if (!res.ok) return showError(a.message || "Unable to load alert details");
+    const fields = [
+      ["Alert ID", `#${a.id}`], ["Transaction ID", a.transaction_id], ["Merchant", a.merchant_name || a.merchant_id], ["Amount", `${a.currency || "SGD"} ${a.amount == null ? "-" : Number(a.amount).toFixed(2)}`],
+      ["Risk score", a.risk_score], ["Risk level", a.risk_level], ["Priority", a.priority], ["Escalated at", formatDate(a.escalated_at)],
+      ["Escalated by", a.escalated_by], ["Transaction type", a.transaction_type], ["Payment method", a.payment_method], ["Country", a.country]
+    ];
+    const rfiSection = a.rfi_id ? `
+      <div class="detail-field detail-wide"><label>Request for Information</label><div class="detail-report">
+        <strong>${escapeHtml(a.rfi_reference_no)}</strong><br>
+        Status: ${escapeHtml(a.rfi_status)}<br>
+        Sent: ${escapeHtml(formatDate(a.rfi_sent_at))}<br>
+        Due: ${escapeHtml(formatDate(a.rfi_due_at))}<br>
+        Responded: ${escapeHtml(formatDate(a.rfi_responded_at))}<br><br>
+        <strong>Analyst remarks</strong><br>${escapeHtml(a.analyst_remarks || "No remarks recorded.")}<br><br>
+        <strong>Merchant response</strong><br>${escapeHtml(a.response_message || "No merchant response recorded.")}<br><br>
+        <button class="btn btn-secondary" onclick="downloadProtected('/api/stro/rfi/${Number(a.rfi_id)}/pdf', 'rfi.pdf')">Download RFI PDF</button>
+        ${a.response_attachment ? `<button class="btn btn-secondary" onclick="downloadProtected('/api/stro/rfi/${Number(a.rfi_id)}/response-file', 'merchant-response')">Download Merchant Response</button>` : ""}
+      </div></div>` : `<div class="detail-field detail-wide"><label>Request for Information</label><div>No RFI is linked to this case.</div></div>`;
+    const history = Array.isArray(a.case_history) && a.case_history.length
+      ? `<ul class="case-history">${a.case_history.map(item => `<li><strong>${escapeHtml(String(item.action_type || "").replaceAll("_", " "))}</strong> - ${escapeHtml(item.status_after_action || "No status change")}<div>${escapeHtml(item.remarks || "")}</div><small>${escapeHtml(item.actor_name || "System")} · ${escapeHtml(formatDate(item.created_at))}</small></li>`).join("")}</ul>`
+      : "No case activity recorded.";
+    document.getElementById("detailGrid").innerHTML = fields.map(([label, value]) => `<div class="detail-field"><label>${escapeHtml(label)}</label><div>${escapeHtml(value)}</div></div>`).join("") +
+      `<div class="detail-field detail-wide"><label>STR Drafting</label><div><a class="btn btn-primary" href="/str-draft.html?alert_id=${encodeURIComponent(a.alert_id)}">Open STR Draft</a></div></div>` +
+      `<div class="detail-field detail-wide"><label>Triggered rules</label><div>${escapeHtml(rulesText(a.triggered_rules))}</div></div>` +
+      `<div class="detail-field detail-wide"><label>Escalation report / officer remarks</label><div class="detail-report">${escapeHtml(a.escalation_report || a.message || "No escalation remarks were provided.")}</div></div>` + rfiSection +
+      `<div class="detail-field detail-wide"><label>Case history</label>${history}</div>`;
+    detailPanel.classList.add("visible");
+    detailPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function downloadProtected(url, filename) {
+    const res = await apiFetch(url, { headers: {} });
+    if (!res) return;
+    if (!res.ok) return showError(await res.text() || "Download failed");
+    const disposition = res.headers.get("Content-Disposition") || "";
+    const nameMatch = disposition.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
+    let downloadName = nameMatch ? nameMatch[1] : filename;
+    try { downloadName = decodeURIComponent(downloadName); } catch {}
+    const blobUrl = URL.createObjectURL(await res.blob());
+    const link = document.createElement("a");
+    link.href = blobUrl; link.download = downloadName; document.body.appendChild(link); link.click(); link.remove();
+    URL.revokeObjectURL(blobUrl);
+  }
+
+  function showError(message) { const el = document.getElementById("errorBox"); el.textContent = message; el.style.display = "block"; }
+  document.getElementById("closeDetail").addEventListener("click", () => detailPanel.classList.remove("visible"));
+  document.getElementById("searchInput").addEventListener("input", e => {
+    const term = e.target.value.trim().toLowerCase();
+    renderAlerts(alerts.filter(a => [a.id, a.transaction_id, a.merchant_name, a.merchant_id].some(v => String(v || "").toLowerCase().includes(term))));
+  });
+
+  (async function loadAlerts() {
+    try {
+      const res = await apiFetch("/api/stro/alerts");
+      if (!res) return;
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Unable to load escalated alerts");
+      alerts = data;
+      document.getElementById("alertCount").textContent = alerts.length;
+      renderAlerts(alerts);
+    } catch (err) { rows.innerHTML = '<tr><td colspan="8"><div class="empty">Alerts could not be loaded.</div></td></tr>'; showError(err.message); }
+  })();
+</script>
+</body>
+</html>

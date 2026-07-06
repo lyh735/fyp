@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My RFI History - Compliance Monitoring System</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    .history-toolbar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    .history-toolbar .search-input { min-width:260px; }
+    .history-toolbar select { padding:9px 12px; border:1.5px solid var(--border); border-radius:var(--radius); background:#fff; color:var(--text); font:inherit; }
+    .rfi-ref { font-weight:700; color:var(--primary); white-space:nowrap; }
+    .subtext { margin-top:3px; color:var(--text-muted); font-size:11.5px; }
+    .doc-list { max-width:230px; line-height:1.5; }
+    .overdue-row { background:#fff7f7 !important; }
+    .status-draft { background:#e2e8f0; color:#475569; }
+    .status-pending { background:#fef3c7; color:#92400e; }
+    .status-responded { background:#dcfce7; color:#166534; }
+    .status-closed { background:#dbeafe; color:#1e40af; }
+    .history-actions { display:flex; gap:7px; flex-wrap:wrap; }
+    .small-btn { padding:7px 10px; font-size:12px; white-space:nowrap; }
+    @media (max-width:760px) { .content-area{padding:18px}.history-toolbar>*{width:100%}.history-toolbar .search-input{min-width:0} }
+  </style>
+</head>
+<body data-page="rfi-history">
+<div class="app-layout">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-logo"><svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg></div>
+      <div class="brand-text"><div class="brand-name">Compliance Monitor</div><div class="brand-sub">Transaction Surveillance</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Analyst</div>
+      <div class="nav-item" onclick="location.href='/dashboard.html'">Overview</div>
+      <div class="nav-item" onclick="location.href='/alerts.html'">Alerts</div>
+      <div class="nav-item active" onclick="location.href='/analyst-rfi-history.html'">My RFI History</div>
+      <div class="nav-section-label">Account</div>
+      <div class="nav-item" onclick="location.href='/account.html'">My Account</div>
+    </nav>
+    <div class="sidebar-user">
+      <div class="sidebar-user-info"><div class="sidebar-avatar" id="sidebarAvatar">-</div><div><div class="user-name" id="sidebarName">-</div><div class="user-role" id="sidebarRole">-</div></div></div>
+      <button class="btn-logout" onclick="logout()">Sign Out</button>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <div class="topbar">
+      <h2>My RFI History</h2>
+      <div class="topbar-right"><div class="topbar-user"><span id="topbarRole" class="badge"></span><span class="user-name" id="topbarName">-</span></div></div>
+    </div>
+    <main class="content-area">
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-info"><div class="label">Total RFIs</div><div class="value" id="totalCount">0</div></div></div>
+        <div class="stat-card"><div class="stat-info"><div class="label">Drafts</div><div class="value" id="draftCount">0</div></div></div>
+        <div class="stat-card"><div class="stat-info"><div class="label">Awaiting Response</div><div class="value" id="pendingCount">0</div></div></div>
+        <div class="stat-card"><div class="stat-info"><div class="label">Overdue</div><div class="value" id="overdueCount">0</div></div></div>
+        <div class="stat-card"><div class="stat-info"><div class="label">Responded</div><div class="value" id="respondedCount">0</div></div></div>
+      </div>
+
+      <section class="card">
+        <div class="card-header">
+          <h3>Requests for Information</h3>
+          <div class="history-toolbar">
+            <input class="search-input" id="historySearch" type="search" placeholder="Search reference, merchant or transaction" />
+            <select id="statusFilter">
+              <option value="all">All statuses</option>
+              <option value="Draft">Draft</option>
+              <option value="Pending Merchant Response">Pending Merchant Response</option>
+              <option value="Responded">Responded</option>
+              <option value="Closed">Closed</option>
+              <option value="overdue">Overdue</option>
+            </select>
+          </div>
+        </div>
+        <div id="historyMessage" class="message" style="margin:16px 22px 0"></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Reference</th><th>Merchant / Transaction</th><th>Requested Documents</th><th>Status</th><th>Dates</th><th>Analyst Reminder</th><th>Actions</th></tr></thead>
+            <tbody id="historyBody"><tr><td colspan="7"><div class="empty-state"><p>Loading RFI history...</p></div></td></tr></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script src="/js/auth.js"></script>
+<script>
+  const user = requireAuth();
+  if (!user) throw new Error('Authentication required');
+  if (user.first_login) window.location.href = '/change-password.html';
+  if (String(user.role).toLowerCase() !== 'analyst') {
+    window.location.href = '/dashboard.html';
+    throw new Error('Analyst access required');
+  }
+
+  document.getElementById('sidebarName').textContent = user.name;
+  document.getElementById('sidebarRole').textContent = user.role;
+  document.getElementById('sidebarAvatar').textContent = user.name.charAt(0).toUpperCase();
+  document.getElementById('topbarName').textContent = user.name;
+  document.getElementById('topbarRole').textContent = user.role;
+  document.getElementById('topbarRole').className = `badge badge-${user.role}`;
+
+  let historyRows = [];
+  const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+  const formatDate = (value, includeTime = false) => value ? new Date(value).toLocaleString('en-SG', includeTime ? {dateStyle:'medium',timeStyle:'short'} : {dateStyle:'medium'}) : '-';
+
+  function statusClass(row) {
+    if (row.is_overdue) return 'status-pending';
+    const value = String(row.status).toLowerCase();
+    if (value === 'draft') return 'status-draft';
+    if (value === 'responded') return 'status-responded';
+    if (value === 'closed') return 'status-closed';
+    return 'status-pending';
+  }
+
+  function updateStats() {
+    document.getElementById('totalCount').textContent = historyRows.length;
+    document.getElementById('draftCount').textContent = historyRows.filter(row => row.status === 'Draft').length;
+    document.getElementById('pendingCount').textContent = historyRows.filter(row => row.status === 'Pending Merchant Response').length;
+    document.getElementById('overdueCount').textContent = historyRows.filter(row => row.is_overdue).length;
+    document.getElementById('respondedCount').textContent = historyRows.filter(row => row.status === 'Responded').length;
+  }
+
+  function renderHistory() {
+    const query = document.getElementById('historySearch').value.trim().toLowerCase();
+    const filter = document.getElementById('statusFilter').value;
+    const rows = historyRows.filter(row => {
+      const searchable = `${row.reference_no} ${row.merchant_name} ${row.merchant_id} ${row.transaction_id}`.toLowerCase();
+      const statusMatches = filter === 'all' || (filter === 'overdue' ? row.is_overdue : row.status === filter);
+      return searchable.includes(query) && statusMatches;
+    });
+    const body = document.getElementById('historyBody');
+    if (!rows.length) {
+      body.innerHTML = '<tr><td colspan="7"><div class="empty-state"><p>No matching RFIs found.</p></div></td></tr>';
+      return;
+    }
+    body.innerHTML = rows.map(row => `
+      <tr class="${row.is_overdue ? 'overdue-row' : ''}">
+        <td><div class="rfi-ref">${escapeHtml(row.reference_no)}</div><div class="subtext">Alert #${Number(row.alert_id)}</div></td>
+        <td><strong>${escapeHtml(row.merchant_name || row.merchant_id || '-')}</strong><div class="subtext">${escapeHtml(row.transaction_id)}</div></td>
+        <td><div class="doc-list">${row.requested_documents.map(escapeHtml).join('<br>') || '-'}</div></td>
+        <td><span class="pill ${statusClass(row)}">${row.is_overdue ? 'Overdue' : escapeHtml(row.status)}</span></td>
+        <td><div>Created: ${escapeHtml(formatDate(row.created_at))}</div><div class="subtext">Sent: ${escapeHtml(formatDate(row.sent_at))}</div><div class="subtext">Due: ${escapeHtml(formatDate(row.due_at))}</div>${row.responded_at ? `<div class="subtext">Responded: ${escapeHtml(formatDate(row.responded_at))}</div>` : ''}</td>
+        <td><strong>${Number(row.is_sent) ? 'Completed' : 'Pending'}</strong><div class="subtext">${Number(row.is_sent) ? 'RFI marked as sent' : 'RFI must be sent'}</div></td>
+        <td><div class="history-actions"><a class="btn btn-primary small-btn" href="/api/officer/alerts/${Number(row.alert_id)}/rfi">View</a><a class="btn btn-secondary small-btn" href="/api/officer/rfi/${Number(row.rfi_id)}/pdf">PDF</a></div></td>
+      </tr>`).join('');
+  }
+
+  async function loadHistory() {
+    const response = await apiFetch('/api/rfis/history');
+    if (!response) return;
+    const data = await response.json();
+    if (!response.ok) {
+      showMessage('historyMessage', data.message || 'Unable to load RFI history');
+      document.getElementById('historyBody').innerHTML = '<tr><td colspan="7"><div class="empty-state"><p>Unable to load RFI history.</p></div></td></tr>';
+      return;
+    }
+    historyRows = data;
+    updateStats();
+    renderHistory();
+  }
+
+  document.getElementById('historySearch').addEventListener('input', renderHistory);
+  document.getElementById('statusFilter').addEventListener('change', renderHistory);
+  loadHistory();
+</script>
+</body>
+</html>

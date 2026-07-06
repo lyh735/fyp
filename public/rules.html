@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Compliance Rules - Compliance Monitoring System</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <div class="brand-name">Compliance Monitor</div>
+        <div class="brand-sub">Rules Library</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Main</div>
+      <div class="nav-item" onclick="window.location.href='/dashboard.html'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+          <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+        </svg>
+        Overview
+      </div>
+      <div class="nav-item" onclick="window.location.href='/transactions.html'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="1" x2="12" y2="23"/>
+          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        </svg>
+        Transactions
+      </div>
+      <div class="nav-item" onclick="window.location.href='/alerts.html'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+        Alerts
+      </div>
+      <div class="nav-item active" onclick="window.location.href='/rules.html'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 3h6l1 2h4v16H4V5h4l1-2z"/>
+          <path d="M8 11h8M8 15h6"/>
+        </svg>
+        Rules
+      </div>
+      <div class="nav-item" onclick="window.location.href='/flagged-transactions.html'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 17H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <path d="M17 7l5 5-5 5"/>
+          <line x1="12" y1="12" x2="22" y2="12"/>
+        </svg>
+        Flagged Transactions
+      </div>
+
+      <div id="adminNav" style="display:none">
+        <div class="nav-section-label">Administration</div>
+        <div class="nav-item" onclick="window.location.href='/simulator.html'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+          Simulator
+        </div>
+        <div class="nav-item" onclick="window.location.href='/create-user.html'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <line x1="19" y1="8" x2="19" y2="14"/>
+            <line x1="22" y1="11" x2="16" y2="11"/>
+          </svg>
+          Manage Users
+        </div>
+      </div>
+
+      <div class="nav-section-label">Account</div>
+      <div class="nav-item" onclick="window.location.href='/account.html'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+        My Account
+      </div>
+    </nav>
+
+    <div class="sidebar-user">
+      <div class="sidebar-user-info">
+        <div class="sidebar-avatar" id="sidebarAvatar">-</div>
+        <div>
+          <div class="user-name" id="sidebarName">-</div>
+          <div class="user-role" id="sidebarRole">-</div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="logout()">Sign Out</button>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <div class="topbar">
+      <h2 id="sectionTitle">Compliance Rules</h2>
+      <div class="topbar-right">
+        <div class="topbar-user">
+          <span id="topbarRole" class="badge"></span>
+          <span class="user-name" id="topbarName">-</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="content-area">
+      <div class="card" id="ruleEditorCard" style="display:none;margin-bottom:22px">
+        <div class="card-header">
+          <h3 id="ruleFormTitle">Create Rule</h3>
+          <button type="button" class="btn btn-secondary" id="cancelEditBtn" style="display:none;width:auto;padding:9px 16px" onclick="resetRuleForm()">Cancel Edit</button>
+        </div>
+        <form id="ruleForm">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="ruleName">Rule Name</label>
+              <input id="ruleName" name="rule_name" type="text" maxlength="100" required />
+            </div>
+            <div class="form-group">
+              <label for="ruleType">Rule Type</label>
+              <select id="ruleType" name="rule_type" required>
+                <option value="">Select rule type</option>
+                <option value="merchant_profile">Merchant MCC / industry risk</option>
+                <option value="amount_multiplier">Unusual amount</option>
+                <option value="velocity">High transaction velocity</option>
+                <option value="velocity_small_amount">Repeated small transactions</option>
+                <option value="large_amount_frequency">Frequent large transactions</option>
+                <option value="cancellation_velocity">Repeated failed or cancelled attempts</option>
+                <option value="failure_then_success">Failed attempts followed by success</option>
+                <option value="duplicate_transaction">Duplicate or replayed payment</option>
+                <option value="time">Outside operating hours</option>
+                <option value="customer_risk">High-risk customer</option>
+                <option value="data_quality">Missing identifying information</option>
+                <option value="ip_validation">Missing or invalid online IP</option>
+                <option value="high_risk_jurisdiction">High-risk jurisdiction</option>
+                <option value="ip_country_mismatch">IP country mismatch</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="thresholdValue">Threshold Value</label>
+              <input id="thresholdValue" name="threshold_value" type="number" min="0" step="0.01" />
+            </div>
+            <div class="form-group">
+              <label for="thresholdCount">Threshold Count</label>
+              <input id="thresholdCount" name="threshold_count" type="number" min="0" step="1" />
+            </div>
+            <div class="form-group">
+              <label for="timeWindow">Time Window (seconds)</label>
+              <input id="timeWindow" name="time_window_seconds" type="number" min="0" step="1" />
+            </div>
+            <div class="form-group">
+              <label for="rulePoints">Points</label>
+              <input id="rulePoints" name="points" type="number" min="0" step="1" value="0" required />
+            </div>
+            <div class="form-group">
+              <label for="ruleStatus">Status</label>
+              <select id="ruleStatus" name="is_active">
+                <option value="1">Active</option>
+                <option value="0">Inactive</option>
+              </select>
+            </div>
+            <div class="form-group full">
+              <label for="ruleDescription">Description</label>
+              <textarea id="ruleDescription" name="description" rows="3"></textarea>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary" id="saveRuleBtn" style="width:auto;padding:10px 26px">Save Rule</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3>Existing Rules</h3>
+          <div class="search-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input id="ruleSearch" class="search-input" type="text" placeholder="Search rules..." oninput="renderRules()" />
+          </div>
+          <div class="risk-filter-group">
+            <button type="button" class="filter-chip active" data-status="all" onclick="setStatusFilter('all', this)">All</button>
+            <button type="button" class="filter-chip" data-status="active" onclick="setStatusFilter('active', this)">Active</button>
+            <button type="button" class="filter-chip" data-status="inactive" onclick="setStatusFilter('inactive', this)">Inactive</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Rule</th>
+                <th>Type</th>
+                <th>Threshold</th>
+                <th>Window</th>
+                <th>Points</th>
+                <th>Status</th>
+                <th>Updated</th>
+                <th class="admin-only" style="display:none">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="rulesBody">
+              <tr><td colspan="9"><div class="empty-state"><p>Loading...</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/auth.js"></script>
+<script>
+const user = requireAuth();
+if (!user) throw new Error("not authenticated");
+if (user.first_login) window.location.href = "/change-password.html";
+
+document.getElementById("sidebarName").textContent = user.name;
+document.getElementById("sidebarRole").textContent = user.role;
+document.getElementById("sidebarAvatar").textContent = user.name.charAt(0).toUpperCase();
+document.getElementById("topbarName").textContent = user.name;
+const roleEl = document.getElementById("topbarRole");
+roleEl.textContent = user.role;
+roleEl.className = `badge badge-${user.role}`;
+if (["admin", "compliance_manager"].includes(user.role)) document.getElementById("adminNav").style.display = "block";
+
+let rules = [];
+let statusFilter = "all";
+let editingRuleId = null;
+const canManageRules = ["admin", "compliance_manager"].includes(user.role);
+const tableColspan = canManageRules ? 9 : 8;
+
+if (canManageRules) {
+  document.getElementById("ruleEditorCard").style.display = "block";
+  document.querySelectorAll(".admin-only").forEach((el) => {
+    el.style.display = "";
+  });
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function showToast(title, body) {
+  let container = document.getElementById("toastContainer");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "toastContainer";
+    container.className = "toast-container";
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement("div");
+  toast.className = "toast";
+  toast.innerHTML = `
+    <div class="toast-icon">&#9888;</div>
+    <div class="toast-content">
+      <div class="toast-title">${escapeHtml(title)}</div>
+      <div class="toast-body">${escapeHtml(body)}</div>
+    </div>`;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 4500);
+}
+
+function formatDate(value) {
+  if (!value) return "-";
+  return new Date(value).toLocaleString("en-SG", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatThreshold(rule) {
+  const parts = [];
+  if (rule.threshold_value !== null && rule.threshold_value !== undefined) {
+    parts.push(`Value ${Number(rule.threshold_value).toLocaleString("en-SG")}`);
+  }
+  if (rule.threshold_count !== null && rule.threshold_count !== undefined) {
+    parts.push(`Count ${rule.threshold_count}`);
+  }
+  return parts.length ? parts.join(" / ") : "-";
+}
+
+function formatWindow(seconds) {
+  const value = Number(seconds || 0);
+  if (!value) return "-";
+  if (value < 60) return `${value} sec`;
+  if (value % 60 === 0) return `${value / 60} min`;
+  return `${value} sec`;
+}
+
+function statusPill(isActive) {
+  return isActive
+    ? '<span class="pill pill-normal">Active</span>'
+    : '<span class="pill pill-pending">Inactive</span>';
+}
+
+function setStatusFilter(filter, button) {
+  statusFilter = filter;
+  document.querySelectorAll(".filter-chip").forEach((chip) => chip.classList.remove("active"));
+  button.classList.add("active");
+  renderRules();
+}
+
+function renderRules() {
+  const q = document.getElementById("ruleSearch").value.trim().toLowerCase();
+  const body = document.getElementById("rulesBody");
+  const filtered = rules.filter((rule) => {
+    const active = Number(rule.is_active) === 1;
+    const matchesStatus =
+      statusFilter === "all" ||
+      (statusFilter === "active" && active) ||
+      (statusFilter === "inactive" && !active);
+    const searchable = `${rule.rule_id} ${rule.rule_name || ""} ${rule.rule_type || ""} ${rule.description || ""}`.toLowerCase();
+    return matchesStatus && searchable.includes(q);
+  });
+
+  if (!filtered.length) {
+    body.innerHTML = `<tr><td colspan="${tableColspan}"><div class="empty-state"><p>No rules found.</p></div></td></tr>`;
+    return;
+  }
+
+  body.innerHTML = filtered.map((rule) => `
+    <tr>
+      <td style="font-family:monospace;color:var(--text-muted)">${rule.rule_id}</td>
+      <td>
+        <div style="font-weight:700">${escapeHtml(rule.rule_name || "-")}</div>
+        <div style="color:var(--text-muted);font-size:12px;max-width:420px">${escapeHtml(rule.description || "-")}</div>
+      </td>
+      <td>${escapeHtml(rule.rule_type || "-")}</td>
+      <td>${formatThreshold(rule)}</td>
+      <td>${formatWindow(rule.time_window_seconds)}</td>
+      <td style="font-weight:700">${rule.points || 0}</td>
+      <td>${statusPill(Number(rule.is_active) === 1)}</td>
+      <td style="color:var(--text-muted);font-size:12px">${formatDate(rule.updated_at || rule.created_at)}</td>
+      ${canManageRules ? `
+        <td>
+          <div class="table-actions">
+            <button type="button" class="btn btn-secondary" onclick="editRule(${Number(rule.rule_id)})">Edit</button>
+            <button type="button" class="btn btn-danger" onclick="deleteRule(${Number(rule.rule_id)})">Deactivate</button>
+          </div>
+        </td>` : ""}
+    </tr>
+  `).join("");
+}
+
+function getRulePayload() {
+  return {
+    rule_name: document.getElementById("ruleName").value.trim(),
+    rule_type: document.getElementById("ruleType").value.trim(),
+    threshold_value: document.getElementById("thresholdValue").value,
+    threshold_count: document.getElementById("thresholdCount").value,
+    time_window_seconds: document.getElementById("timeWindow").value,
+    points: document.getElementById("rulePoints").value,
+    is_active: document.getElementById("ruleStatus").value === "1",
+    description: document.getElementById("ruleDescription").value.trim(),
+  };
+}
+
+function resetRuleForm() {
+  editingRuleId = null;
+  document.getElementById("ruleForm").reset();
+  document.getElementById("rulePoints").value = "0";
+  document.getElementById("ruleStatus").value = "1";
+  document.getElementById("ruleType").disabled = false;
+  document.getElementById("ruleFormTitle").textContent = "Create Rule";
+  document.getElementById("saveRuleBtn").textContent = "Save Rule";
+  document.getElementById("cancelEditBtn").style.display = "none";
+}
+
+function editRule(ruleId) {
+  const rule = rules.find((item) => Number(item.rule_id) === Number(ruleId));
+  if (!rule) return;
+
+  editingRuleId = rule.rule_id;
+  document.getElementById("ruleName").value = rule.rule_name || "";
+  document.getElementById("ruleType").value = rule.rule_type || "";
+  document.getElementById("ruleType").disabled = true;
+  document.getElementById("thresholdValue").value = rule.threshold_value ?? "";
+  document.getElementById("thresholdCount").value = rule.threshold_count ?? "";
+  document.getElementById("timeWindow").value = rule.time_window_seconds ?? "";
+  document.getElementById("rulePoints").value = rule.points ?? 0;
+  document.getElementById("ruleStatus").value = Number(rule.is_active) === 1 ? "1" : "0";
+  document.getElementById("ruleDescription").value = rule.description || "";
+  document.getElementById("ruleFormTitle").textContent = `Edit Rule #${rule.rule_id}`;
+  document.getElementById("saveRuleBtn").textContent = "Update Rule";
+  document.getElementById("cancelEditBtn").style.display = "inline-flex";
+  document.getElementById("ruleEditorCard").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function deleteRule(ruleId) {
+  if (!confirm("Deactivate this rule? It will stop affecting new transactions.")) return;
+
+  const res = await apiFetch(`/api/rules/${ruleId}`, { method: "DELETE" });
+  if (!res) return;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    showToast("Rule Status", data.message || "Unable to deactivate rule.");
+    return;
+  }
+
+  showToast("Rule Status", data.message || "Rule deactivated successfully.");
+  if (Number(editingRuleId) === Number(ruleId)) resetRuleForm();
+  await loadRules();
+}
+
+document.getElementById("ruleForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!canManageRules) return;
+
+  const saveButton = document.getElementById("saveRuleBtn");
+  saveButton.disabled = true;
+  saveButton.textContent = editingRuleId ? "Updating..." : "Saving...";
+
+  try {
+    const url = editingRuleId ? `/api/rules/${editingRuleId}` : "/api/rules";
+    const method = editingRuleId ? "PUT" : "POST";
+    const res = await apiFetch(url, {
+      method,
+      body: JSON.stringify(getRulePayload()),
+    });
+    if (!res) return;
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      showToast("Rule Save", data.message || "Unable to save rule.");
+      return;
+    }
+
+    showToast("Rule Save", data.message || "Rule saved successfully.");
+    resetRuleForm();
+    await loadRules();
+  } finally {
+    saveButton.disabled = false;
+    saveButton.textContent = editingRuleId ? "Update Rule" : "Save Rule";
+  }
+});
+
+async function loadRules() {
+  const res = await apiFetch("/api/rules");
+  if (!res) return;
+  if (!res.ok) {
+    document.getElementById("rulesBody").innerHTML =
+      `<tr><td colspan="${tableColspan}"><div class="empty-state"><p>Unable to load rules.</p></div></td></tr>`;
+    return;
+  }
+  rules = await res.json();
+  renderRules();
+}
+
+loadRules();
+</script>
+</body>
+</html>

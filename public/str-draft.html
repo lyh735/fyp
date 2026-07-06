@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>STR Drafting - STRO</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    .stro-shell { min-height: 100vh; background: var(--bg); }
+    .stro-header { height: 72px; padding: 0 32px; display: flex; align-items: center; justify-content: space-between; background: #fff; border-bottom: 1px solid var(--border); }
+    .stro-brand { display: flex; align-items: center; gap: 12px; }
+    .stro-brand-mark { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: #172554; color: #fff; }
+    .stro-brand-mark svg { width: 21px; height: 21px; fill: currentColor; }
+    .stro-brand h1 { margin: 0; font-size: 17px; color: var(--text); }
+    .stro-brand p { margin: 2px 0 0; color: var(--text-muted); font-size: 12px; }
+    .stro-user { display: flex; align-items: center; gap: 12px; }
+    .stro-nav { display: flex; align-items: center; gap: 5px; }
+    .stro-nav a { color: var(--text-muted); text-decoration: none; font-weight: 600; font-size: 13px; padding: 8px 10px; border-radius: 7px; }
+    .stro-nav a:hover { color: var(--primary); background: var(--accent-light); }
+    .stro-nav a.active { color: #fff; background: var(--primary); }
+    .stro-main { max-width: 1360px; margin: 0 auto; padding: 30px 24px 48px; }
+    .page-heading { display: flex; justify-content: space-between; align-items: end; margin-bottom: 20px; gap: 20px; }
+    .page-heading h2 { margin: 0 0 5px; font-size: 25px; }
+    .page-heading p { margin: 0; color: var(--text-muted); }
+    .draft-layout { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 18px; align-items: start; }
+    .alert-list { display: grid; gap: 10px; max-height: 690px; overflow: auto; padding-right: 4px; }
+    .alert-card { border: 1px solid var(--border); border-radius: 8px; background: #fff; padding: 12px; cursor: pointer; text-align: left; }
+    .alert-card:hover, .alert-card.active { border-color: var(--primary); background: #f8fafc; }
+    .alert-card strong { display: block; color: var(--text); }
+    .alert-card span { display: block; margin-top: 3px; color: var(--text-muted); font-size: 12px; overflow-wrap: anywhere; }
+    .draft-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+    .summary-field { padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: #f8fafc; }
+    .summary-field label { display: block; color: var(--text-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 5px; }
+    .summary-field div { font-weight: 650; overflow-wrap: anywhere; }
+    .summary-field.wide { grid-column: span 2; }
+    .draft-toolbar { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+    .draft-toolbar .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .draft-status { color: var(--text-muted); font-size: 13px; }
+    .draft-editor { min-height: 520px; width: 100%; resize: vertical; font-family: Consolas, "Courier New", monospace; line-height: 1.5; }
+    .message-box { display: none; margin-bottom: 16px; padding: 12px 14px; border-radius: 8px; }
+    .message-box.error { display: block; color: #991b1b; background: #fef2f2; border: 1px solid #fecaca; }
+    .message-box.success { display: block; color: #14532d; background: #dcfce7; border: 1px solid #bbf7d0; }
+    .empty { padding: 36px 18px; color: var(--text-muted); text-align: center; }
+    @media (max-width: 1000px) { .draft-layout { grid-template-columns: 1fr; } .draft-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .stro-nav { display: none; } }
+    @media (max-width: 700px) { .stro-header { padding: 0 16px; } .stro-main { padding: 22px 14px; } .draft-grid { grid-template-columns: 1fr; } .summary-field.wide { grid-column: auto; } .hide-mobile { display: none; } }
+  </style>
+</head>
+<body>
+<div class="stro-shell">
+  <header class="stro-header">
+    <div class="stro-brand">
+      <div class="stro-brand-mark"><svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg></div>
+      <div><h1>Compliance Monitor</h1><p>Suspicious Transaction Reporting Officer</p></div>
+    </div>
+    <nav class="stro-nav" aria-label="STRO navigation">
+      <a href="/dashboard.html">Overview</a>
+      <a href="/transactions.html">Past Transactions</a>
+      <a href="/stro-alerts.html">Escalated Alerts</a>
+      <a class="active" href="/str-draft.html">STR Drafting</a>
+      <a href="/api/officer/report">Reports</a>
+      <a href="/api/officer/audit-logs">Audit Trail</a>
+    </nav>
+    <div class="stro-user">
+      <div class="hide-mobile"><strong id="userName"></strong><div style="font-size:12px;color:var(--text-muted);text-align:right">STRO</div></div>
+      <button class="btn btn-secondary" onclick="logout()">Sign Out</button>
+    </div>
+  </header>
+
+  <main class="stro-main">
+    <div class="page-heading">
+      <div><h2>STR Drafting</h2><p>Generate and edit an STR narrative from an escalated alert.</p></div>
+      <a class="btn btn-secondary" href="/stro-alerts.html">Back to Alerts</a>
+    </div>
+
+    <div id="messageBox" class="message-box"></div>
+
+    <div class="draft-layout">
+      <section class="card">
+        <div class="card-header">
+          <h3>Escalated Alerts</h3>
+          <div class="search-wrap"><input id="searchInput" class="search-input" type="search" placeholder="Search alerts" /></div>
+        </div>
+        <div class="card-body">
+          <div id="alertList" class="alert-list"><div class="empty">Loading escalated alerts...</div></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <h3 id="draftTitle">Select an Alert</h3>
+          <span class="draft-status" id="draftMeta">No draft loaded</span>
+        </div>
+        <div class="card-body">
+          <div id="alertSummary" class="draft-grid"></div>
+          <div class="draft-toolbar">
+            <div class="draft-status" id="aiNote">AI drafting uses the selected escalated alert data only.</div>
+            <div class="actions">
+              <button class="btn btn-secondary" id="copyBtn" type="button" disabled>Copy Text</button>
+              <button class="btn btn-primary" id="generateBtn" type="button" disabled>Generate AI Draft</button>
+              <button class="btn btn-success" id="saveBtn" type="button" disabled>Save Draft</button>
+            </div>
+          </div>
+          <textarea id="draftText" class="form-control draft-editor" placeholder="Select an escalated alert, then generate an STR draft." disabled></textarea>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script src="/js/auth.js"></script>
+<script>
+  const user = requireStroRole();
+  if (!user) throw new Error("STRO access required");
+  if (user.first_login) window.location.href = "/change-password.html";
+  document.getElementById("userName").textContent = user.name;
+
+  let alerts = [];
+  let selectedAlertId = new URLSearchParams(window.location.search).get("alert_id");
+  let currentDraftId = null;
+
+  const alertList = document.getElementById("alertList");
+  const draftText = document.getElementById("draftText");
+  const generateBtn = document.getElementById("generateBtn");
+  const saveBtn = document.getElementById("saveBtn");
+  const copyBtn = document.getElementById("copyBtn");
+
+  const escapeHtml = (value) => String(value ?? "-").replace(/[&<>'"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]));
+  const formatDate = (value) => value ? new Date(value).toLocaleString("en-SG", { dateStyle: "medium", timeStyle: "short" }) : "-";
+  const formatMoney = (a) => a.amount == null ? "-" : `${a.currency || "SGD"} ${Number(a.amount).toLocaleString("en-SG", { minimumFractionDigits: 2 })}`;
+
+  function showMessage(message, type = "error") {
+    const el = document.getElementById("messageBox");
+    el.textContent = message;
+    el.className = `message-box ${type}`;
+  }
+
+  function clearMessage() {
+    const el = document.getElementById("messageBox");
+    el.textContent = "";
+    el.className = "message-box";
+  }
+
+  function renderAlertList(items) {
+    if (!items.length) {
+      alertList.innerHTML = '<div class="empty">No escalated alerts found.</div>';
+      return;
+    }
+    alertList.innerHTML = items.map(a => `
+      <button class="alert-card ${String(a.id) === String(selectedAlertId) ? "active" : ""}" type="button" data-id="${escapeHtml(a.id)}">
+        <strong>#${escapeHtml(a.id)} - ${escapeHtml(a.risk_level || "Risk not set")}</strong>
+        <span>${escapeHtml(a.transaction_id)} / ${escapeHtml(a.merchant_name || a.merchant_id)}</span>
+        <span>${escapeHtml(formatMoney(a))} / ${escapeHtml(formatDate(a.escalated_at || a.created_at))}</span>
+      </button>
+    `).join("");
+    alertList.querySelectorAll(".alert-card").forEach(btn => {
+      btn.addEventListener("click", () => selectAlert(btn.dataset.id, true));
+    });
+  }
+
+  function renderSummary(alert) {
+    const fields = [
+      ["Alert", `#${alert.alert_id}`],
+      ["Transaction", alert.transaction_id],
+      ["Merchant", alert.merchant_name || alert.merchant_id],
+      ["Amount", formatMoney(alert)],
+      ["Risk", `${alert.risk_level || "-"} (${alert.risk_score ?? "-"})`],
+      ["Priority", alert.priority],
+      ["Country", alert.country],
+      ["Escalated", formatDate(alert.escalated_at || alert.created_at)],
+      ["Rules", rulesText(alert.triggered_rules), "wide"],
+      ["Escalation Notes", alert.escalation_report || alert.message || "No notes recorded.", "wide"]
+    ];
+    document.getElementById("alertSummary").innerHTML = fields.map(([label, value, width]) => `
+      <div class="summary-field ${width === "wide" ? "wide" : ""}">
+        <label>${escapeHtml(label)}</label>
+        <div>${escapeHtml(value)}</div>
+      </div>
+    `).join("");
+  }
+
+  function rulesText(value) {
+    if (!value) return "-";
+    try {
+      const parsed = typeof value === "string" ? JSON.parse(value) : value;
+      return Array.isArray(parsed)
+        ? parsed.map((item) => item && typeof item === "object"
+          ? `+${Number(item.points || 0)} ${item.rule_name || item.rule || item.message || "Risk rule"}`
+          : String(item)
+        ).join("; ")
+        : JSON.stringify(parsed);
+    } catch {
+      return String(value);
+    }
+  }
+
+  function setWorking(isWorking) {
+    generateBtn.disabled = isWorking || !selectedAlertId;
+    saveBtn.disabled = isWorking || !currentDraftId;
+    copyBtn.disabled = isWorking || !draftText.value.trim();
+  }
+
+  async function selectAlert(id, pushState = false) {
+    clearMessage();
+    selectedAlertId = id;
+    currentDraftId = null;
+    draftText.value = "";
+    draftText.disabled = true;
+    document.getElementById("draftTitle").textContent = `Alert #${id}`;
+    document.getElementById("draftMeta").textContent = "Loading draft...";
+    renderAlertList(alerts);
+    if (pushState) history.replaceState(null, "", `/str-draft.html?alert_id=${encodeURIComponent(id)}`);
+    setWorking(true);
+
+    try {
+      const res = await apiFetch(`/api/stro/alerts/${encodeURIComponent(id)}/str-draft`);
+      if (!res) return;
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Unable to load STR draft");
+
+      renderSummary(data.alert);
+      if (data.draft) {
+        currentDraftId = data.draft.str_id;
+        draftText.value = data.draft.narrative_text || "";
+        document.getElementById("draftMeta").textContent = `Draft ${data.draft.status} / updated ${formatDate(data.draft.updated_at)}`;
+      } else {
+        document.getElementById("draftMeta").textContent = "No draft generated yet";
+      }
+      document.getElementById("aiNote").textContent = "AI drafting uses the selected escalated alert data only.";
+      draftText.disabled = false;
+    } catch (err) {
+      showMessage(err.message);
+      document.getElementById("draftMeta").textContent = "Draft could not be loaded";
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function generateDraft() {
+    if (!selectedAlertId) return;
+    clearMessage();
+    setWorking(true);
+    generateBtn.textContent = "Generating...";
+    try {
+      const res = await apiFetch(`/api/stro/alerts/${encodeURIComponent(selectedAlertId)}/str-draft/generate`, { method: "POST" });
+      if (!res) return;
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Unable to generate STR draft");
+      currentDraftId = data.draft.str_id;
+      draftText.value = data.draft.narrative_text || "";
+      draftText.disabled = false;
+      document.getElementById("draftMeta").textContent = `Draft ${data.draft.status} / updated ${formatDate(data.draft.updated_at)}`;
+      document.getElementById("aiNote").textContent = data.note || (data.ai_used ? "AI draft generated." : "Structured draft generated.");
+      showMessage(data.ai_used ? "AI-assisted STR draft generated." : "Draft generated without AI because the server has no API key.", "success");
+    } catch (err) {
+      showMessage(err.message);
+    } finally {
+      generateBtn.textContent = "Generate AI Draft";
+      setWorking(false);
+    }
+  }
+
+  async function saveDraft() {
+    if (!currentDraftId) return;
+    clearMessage();
+    const narrative = draftText.value.trim();
+    if (!narrative) return showMessage("Draft narrative cannot be empty.");
+    setWorking(true);
+    try {
+      const res = await apiFetch(`/api/stro/str-drafts/${encodeURIComponent(currentDraftId)}`, {
+        method: "PUT",
+        body: JSON.stringify({ narrative_text: narrative })
+      });
+      if (!res) return;
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Unable to save STR draft");
+      document.getElementById("draftMeta").textContent = `Draft ${data.draft.status} / updated ${formatDate(data.draft.updated_at)}`;
+      showMessage("STR draft saved.", "success");
+    } catch (err) {
+      showMessage(err.message);
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function copyDraft() {
+    if (!draftText.value.trim()) return;
+    await navigator.clipboard.writeText(draftText.value);
+    showMessage("Draft copied to clipboard.", "success");
+  }
+
+  generateBtn.addEventListener("click", generateDraft);
+  saveBtn.addEventListener("click", saveDraft);
+  copyBtn.addEventListener("click", copyDraft);
+  draftText.addEventListener("input", () => setWorking(false));
+  document.getElementById("searchInput").addEventListener("input", e => {
+    const term = e.target.value.trim().toLowerCase();
+    renderAlertList(alerts.filter(a => [a.id, a.transaction_id, a.merchant_name, a.merchant_id, a.risk_level].some(v => String(v || "").toLowerCase().includes(term))));
+  });
+
+  (async function loadAlerts() {
+    try {
+      const res = await apiFetch("/api/stro/alerts");
+      if (!res) return;
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Unable to load escalated alerts");
+      alerts = data;
+      if (!selectedAlertId && alerts.length) selectedAlertId = alerts[0].id;
+      renderAlertList(alerts);
+      if (selectedAlertId) await selectAlert(selectedAlertId);
+    } catch (err) {
+      alertList.innerHTML = '<div class="empty">Alerts could not be loaded.</div>';
+      showMessage(err.message);
+    }
+  })();
+</script>
+</body>
+</html>

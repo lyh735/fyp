@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+  <title>Alert Details</title>
+
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+
+  <style>
+    body {
+      background-color: #f4f6f9;
+    }
+
+    .card-box {
+      background: white;
+      border-radius: 12px;
+      padding: 25px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+      margin-bottom: 25px;
+    }
+
+    .label-title {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 5px;
+    }
+
+    .value-text {
+      font-size: 28px;
+      font-weight: bold;
+    }
+
+    .violation-box {
+      border: 1px solid #ffb3b3;
+      background: #fff5f5;
+      border-radius: 10px;
+      padding: 20px;
+    }
+
+    .violation-box > h3.text-danger {
+      display: none;
+    }
+
+    .severity-text {
+      color: #dc3545;
+      font-weight: bold;
+    }
+
+    .risk-breakdown {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .risk-breakdown li {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      padding: 12px 0;
+      border-bottom: 1px solid #f1c2c2;
+    }
+
+    .risk-breakdown li:last-child {
+      border-bottom: 0;
+    }
+
+    .risk-points {
+      min-width: 54px;
+      text-align: center;
+      font-weight: 800;
+      color: #b91c1c;
+      background: #fee2e2;
+      border-radius: 999px;
+      padding: 4px 10px;
+    }
+
+    .risk-rule {
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .risk-note {
+      color: #64748b;
+      font-size: 14px;
+      margin-top: 3px;
+    }
+
+    textarea {
+      resize: none;
+    }
+  </style>
+</head>
+
+<body>
+<%
+  function formatRiskBreakdown(value) {
+    if (!value) return [];
+    let items = value;
+    if (typeof value === 'string') {
+      try {
+        items = JSON.parse(value);
+      } catch {
+        items = value.split(/;|,/).map((item) => item.trim()).filter(Boolean);
+      }
+    }
+    if (!Array.isArray(items)) items = [items];
+    return items.map((item) => {
+      if (item && typeof item === 'object') {
+        const text = item.rule || item.name || item.description || JSON.stringify(item);
+        const points = item.points != null ? `+${item.points}` : '';
+        return { points, text };
+      }
+      const text = String(item || '').trim();
+      const match = text.match(/^\+(\d+)\s+(.+)$/);
+      if (match) return { points: `+${match[1]}`, text: match[2] };
+      return { points: '', text };
+    }).filter((item) => item.text);
+  }
+
+  const riskBreakdown = formatRiskBreakdown(alert.triggered_rules);
+%>
+
+<div class="container mt-5">
+
+  <button type="button" class="btn btn-outline-secondary mb-3" onclick="window.history.back()">← Back</button>
+
+  <h2 class="mb-4">Transaction Information</h2>
+
+  <!-- Transaction Card -->
+  <div class="card-box">
+
+    <div class="row mb-4">
+
+      <div class="col-md-6">
+        <div class="label-title">Transaction ID</div>
+        <div class="value-text"><%= alert.transaction_id %></div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="label-title">Amount</div>
+        <div class="value-text">
+          <%= alert.currency || 'SGD' %> <%= alert.amount ?? '—' %>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="row mb-4">
+
+      <div class="col-md-6">
+        <div class="label-title">Merchant ID</div>
+        <h2><%= alert.merchant_id || '—' %></h2>
+      </div>
+
+      <div class="col-md-6">
+        <div class="label-title">Merchant Name</div>
+        <h2><%= alert.merchant_name || '—' %></h2>
+      </div>
+
+    </div>
+
+    <div class="row mb-4">
+
+      <div class="col-md-6">
+        <div class="label-title">IP Address</div>
+        <h2><%= alert.ip_address || '—' %></h2>
+      </div>
+
+      <div class="col-md-6">
+        <div class="label-title">Country</div>
+        <h2><%= alert.country || '—' %></h2>
+      </div>
+
+    </div>
+
+    <div class="row">
+
+      <div class="col-md-6">
+        <div class="label-title">Status</div>
+
+        <% if(alert.status === 'Escalated' || alert.status === 'Escalated to STRO') { %>
+          <span class="badge bg-danger fs-6">
+            <%= alert.status %>
+          </span>
+
+        <% } else if(alert.status === 'Reviewed' || alert.status === 'Closed') { %>
+
+          <span class="badge bg-success fs-6">
+            <%= alert.status %>
+          </span>
+
+        <% } else { %>
+
+          <span class="badge bg-warning text-dark fs-6">
+            <%= alert.status %>
+          </span>
+
+        <% } %>
+
+      </div>
+
+      <div class="col-md-6">
+        <div class="label-title">Timestamp</div>
+        <h4><%= alert.created_at %></h4>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Risk breakdown -->
+  <h3 class="mb-3">Risk Score Breakdown</h3>
+
+  <div class="violation-box mb-5">
+
+    <div class="row mb-3">
+      <div class="col-md-3">
+        <div class="label-title">Risk Score</div>
+        <h3><%= alert.risk_score ?? '—' %></h3>
+      </div>
+      <div class="col-md-3">
+        <div class="label-title">Risk Level</div>
+        <h3><%= alert.risk_level || 'Unclassified' %></h3>
+      </div>
+      <div class="col-md-3">
+        <div class="label-title">Merchant MCC Code</div>
+        <h3><%= alert.mcc_code || 'Not provided' %></h3>
+      </div>
+      <div class="col-md-3">
+        <div class="label-title">Merchant Profile Risk Score</div>
+        <h3><%= alert.merchant_risk_score != null ? alert.merchant_risk_score : '—' %></h3>
+      </div>
+    </div>
+
+    <h3 class="text-danger">
+      ⚠ Dormant Account Activation
+    </h3>
+
+    <div class="severity-text">
+      Severity Score:
+      <%= alert.risk_score ?? '—' %> (<%= alert.risk_level || 'Unclassified' %>)
+    </div>
+
+    <% if (riskBreakdown.length) { %>
+      <ul class="risk-breakdown mt-3">
+        <% riskBreakdown.forEach((item) => { %>
+          <li>
+            <span class="risk-points"><%= item.points || 'Rule' %></span>
+            <div>
+              <div class="risk-rule"><%= item.text %></div>
+              <% if (item.text.toLowerCase().includes('mcc')) { %>
+                <div class="risk-note">This score comes from the merchant MCC category or merchant profile.</div>
+              <% } %>
+            </div>
+          </li>
+        <% }) %>
+      </ul>
+    <% } else { %>
+      <p class="text-muted mt-3 mb-0">No scoring rules were recorded for this alert.</p>
+    <% } %>
+
+  </div>
+
+  <!-- Analyst Review -->
+  <div class="card-box">
+
+    <h3 class="mb-4">Analyst Review</h3>
+
+    <% if(['Pending', 'Pending Review', 'open'].includes(alert.status)) { %>
+      <button type="button" class="btn btn-danger" onclick="goToAlertAction(<%= alert.id %>)">Take Action</button>
+    <% } else { %>
+      <p class="text-muted">This alert has already been reviewed and cannot be modified.</p>
+    <% } %>
+
+  </div>
+
+</div>
+
+</body>
+</html>
+<script>
+
+function goToAlertAction(alertId) {
+  window.location.href = `/api/officer/alerts/${alertId}/action`;
+}
+
+</script>

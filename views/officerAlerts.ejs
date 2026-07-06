@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Officer Alerts</title>
+
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+
+  <style>
+
+    body{
+      background:#f4f6f9;
+    }
+
+    .page-header{
+      background:white;
+      border-radius:14px;
+      padding:25px 30px;
+      box-shadow:0 2px 12px rgba(0,0,0,0.08);
+      margin-bottom:25px;
+    }
+
+    .main-card{
+      background:white;
+      border-radius:14px;
+      padding:25px;
+      box-shadow:0 2px 12px rgba(0,0,0,0.08);
+    }
+
+    .back-btn{
+      border-radius:10px;
+      padding:10px 22px;
+      font-weight:600;
+      box-shadow:0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .table th{
+      vertical-align:middle;
+    }
+
+    .table td{
+      vertical-align:middle;
+    }
+
+    .status-badge{
+      font-size:13px;
+      padding:8px 12px;
+    }
+
+    .table-hover tbody tr:hover{
+      background:#f8fbff;
+      transition:0.2s;
+    }
+
+    .dashboard-subtitle{
+      color:#6c757d;
+    }
+
+    .risk-card{
+      background:#eef5ff;
+      border-left:5px solid #0d6efd;
+      border-radius:12px;
+      padding:18px;
+      margin-top:25px;
+    }
+
+  </style>
+
+</head>
+
+<body>
+
+<div class="container mt-5 mb-5">
+
+  <!-- Top Buttons -->
+
+  <div class="mb-4 d-flex justify-content-between align-items-center">
+
+    <a href="/dashboard.html" class="btn btn-dark back-btn">
+      ← Back to Dashboard
+    </a>
+
+    <div class="text-muted">
+      Officer Investigation Panel
+    </div>
+
+  </div>
+
+  <!-- Header -->
+
+  <div class="page-header d-flex justify-content-between align-items-center">
+
+    <div>
+
+      <h1 class="mb-2">
+        Compliance Officer Dashboard
+      </h1>
+
+      <p class="dashboard-subtitle mb-0">
+        AML/CFT suspicious transaction review & monitoring system
+      </p>
+
+    </div>
+
+    <div>
+
+      <a href="/api/officer/alerts" class="btn btn-primary me-2">
+        Alerts
+      </a>
+
+      <a href="/api/officer/audit-logs" class="btn btn-outline-dark me-2">
+        Audit Logs
+      </a>
+
+      <a href="/api/officer/report" class="btn btn-dark">
+        Reports
+      </a>
+
+    </div>
+
+  </div>
+
+  <!-- Main Table -->
+
+  <div class="main-card">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+      <div>
+
+        <h2 class="mb-1">
+          Alert Review Queue
+        </h2>
+
+        <p class="text-muted mb-0">
+          Transactions flagged for compliance investigation
+        </p>
+
+      </div>
+
+      <span class="badge bg-danger fs-6">
+        <%= alerts.length %> Active Alerts
+      </span>
+
+    </div>
+
+    <table class="table table-bordered table-hover align-middle">
+
+      <thead class="table-dark">
+
+        <tr>
+          <th>Database ID</th>
+          <th>Alert ID</th>
+          <th>Transaction ID</th>
+          <th>Risk Level</th>
+          <th>Status</th>
+          <th>Reason</th>
+          <th>Action</th>
+        </tr>
+
+      </thead>
+
+      <tbody>
+
+        <% alerts.forEach(alert => { %>
+
+          <tr>
+
+            <td>
+              <strong>#<%= alert.id %></strong>
+            </td>
+
+            <td>
+              <%= alert.alert_id || 'N/A' %>
+            </td>
+
+            <td>
+              <%= alert.transaction_id %>
+            </td>
+
+            <td>
+
+              <% if (alert.risk_level === 'High') { %>
+
+                <span class="badge bg-danger status-badge">
+                  High Risk
+                </span>
+
+              <% } else if (alert.risk_level === 'Medium') { %>
+
+                <span class="badge bg-warning text-dark status-badge">
+                  Medium Risk
+                </span>
+
+              <% } else { %>
+
+                <span class="badge bg-success status-badge">
+                  Low Risk
+                </span>
+
+              <% } %>
+
+            </td>
+
+            <td>
+
+              <% if (alert.status === 'Escalated' || alert.status === 'Escalated to STRO') { %>
+
+                <span class="badge bg-danger status-badge">
+                  Escalated
+                </span>
+
+              <% } else if (alert.status === 'Reviewed') { %>
+
+                <span class="badge bg-success status-badge">
+                  Reviewed
+                </span>
+
+              <% } else if (alert.status === 'Dismissed' || alert.status === 'Closed') { %>
+
+                <span class="badge bg-secondary status-badge">
+                  Closed
+
+                </span>
+
+              <% } else if (alert.status === 'Pending Merchant Response') { %>
+
+                <span class="badge bg-info text-dark status-badge">
+                  Pending Merchant Response
+                </span>
+
+              <% } else { %>
+
+                <span class="badge bg-warning text-dark status-badge">
+                  Pending Review
+                </span>
+
+              <% } %>
+
+            </td>
+
+            <td>
+              <%= alert.reason || 'No reason provided' %>
+            </td>
+
+            <td>
+
+              <a
+                href="/api/officer/alerts/<%= alert.id %>"
+                class="btn btn-primary btn-sm"
+              >
+                View Details
+              </a>
+
+            </td>
+
+          </tr>
+
+        <% }) %>
+
+      </tbody>
+
+    </table>
+
+  </div>
+
+  <!-- Bottom Info -->
+
+  <div class="risk-card">
+
+    <h5 class="mb-3">
+      Investigation Overview
+    </h5>
+
+    <p class="mb-2">
+      This dashboard displays suspicious transactions detected by the AML/CFT monitoring engine.
+    </p>
+
+    <p class="mb-0">
+      Compliance officers may review, dismiss, or escalate alerts for further investigation based on transaction behaviour and risk indicators.
+    </p>
+
+  </div>
+
+</div>
+
+</body>
+</html>

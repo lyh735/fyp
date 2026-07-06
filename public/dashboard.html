@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Overview - Compliance Monitoring System</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    .unread-row { background: rgba(254,243,199,0.7); }
+  </style>
+</head>
+<body data-page="overview">
+
+<div class="app-layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <div class="brand-name">Compliance Monitor</div>
+        <div class="brand-sub">Transaction Surveillance</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Main</div>
+      <div class="nav-item active" onclick="window.location.href='/dashboard.html'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+          <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+        </svg>
+        Overview
+      </div>
+      <div class="nav-item" onclick="window.location.href='/transactions.html'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="1" x2="12" y2="23"/>
+          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        </svg>
+        Transactions
+      </div>
+      <div class="nav-item" onclick="window.location.href='/merchants.html'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 21h18M5 21V7l7-4 7 4v14"/>
+          <path d="M9 21v-6h6v6M9 9h.01M15 9h.01"/>
+        </svg>
+        Merchant Profiles
+      </div>
+      <div class="nav-item" onclick="window.location.href='/alerts.html'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+        Alerts
+        <span id="alertCount" class="badge badge-admin" style="margin-left:auto;display:none"></span>
+      </div>
+      <div class="nav-item" id="analystRfiHistoryNav" style="display:none" onclick="window.location.href='/analyst-rfi-history.html'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/>
+        </svg>
+        My RFI History
+      </div>
+      <div class="nav-item" onclick="window.location.href='/rules.html'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 3h6l1 2h4v16H4V5h4l1-2z"/>
+          <path d="M8 11h8M8 15h6"/>
+        </svg>
+        Rules
+      </div>
+      <div class="nav-item" onclick="window.location.href='/flagged-transactions.html'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 17H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <path d="M17 7l5 5-5 5"/>
+          <line x1="12" y1="12" x2="22" y2="12"/>
+        </svg>
+        Flagged Transactions
+      </div>
+      <div class="nav-item" onclick="window.location.href='/api/officer/audit-logs'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 2h9l5 5v15H6z"/>
+          <path d="M14 2v6h6M9 13h8M9 17h8"/>
+        </svg>
+        Audit Report
+      </div>
+
+      <div id="adminNav" style="display:none">
+        <div class="nav-section-label">Administration</div>
+        <div class="nav-item" onclick="window.location.href='/simulator.html'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+          Simulator
+          <span id="simRunBadge" style="margin-left:auto;display:none;width:8px;height:8px;border-radius:50%;background:#22c55e;animation:simPulse 1.5s infinite"></span>
+        </div>
+        <div class="nav-item" onclick="window.location.href='/create-user.html'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <line x1="19" y1="8" x2="19" y2="14"/>
+            <line x1="22" y1="11" x2="16" y2="11"/>
+          </svg>
+          Manage Users
+        </div>
+      </div>
+
+      <div id="stroNav" style="display:none">
+        <div class="nav-section-label">STRO Review</div>
+        <div class="nav-item" onclick="window.location.href='/stro-alerts.html'">Escalated Alerts</div>
+        <div class="nav-item" onclick="window.location.href='/str-draft.html'">STR Drafting</div>
+        <div class="nav-item" onclick="window.location.href='/api/officer/report'">Reports</div>
+      </div>
+
+      <div class="nav-section-label">Account</div>
+      <div class="nav-item" onclick="window.location.href='/account.html'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+        My Account
+      </div>
+    </nav>
+
+    <div class="sidebar-user">
+      <div class="sidebar-user-info">
+        <div class="sidebar-avatar" id="sidebarAvatar">—</div>
+        <div>
+          <div class="user-name" id="sidebarName">—</div>
+          <div class="user-role" id="sidebarRole">—</div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="logout()">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+        Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main-content">
+    <div class="topbar">
+      <h2 id="sectionTitle">Overview</h2>
+      <div class="topbar-right">
+        <div class="topbar-user">
+          <span id="topbarRole" class="badge"></span>
+          <span class="user-name" id="topbarName">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="content-area">
+
+      <!-- OVERVIEW SECTION -->
+      <div class="section active" id="section-overview">
+
+        <div class="stats-grid">
+          <div class="stat-card" data-target="transactions">
+            <div class="stat-icon blue">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="1" x2="12" y2="23"/>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+              </svg>
+            </div>
+            <div class="stat-info">
+              <div class="label">Total Transactions</div>
+              <div class="value" id="statTxnTotal">—</div>
+            </div>
+          </div>
+          <div class="stat-card" data-target="transactions" data-filter="High">
+            <div class="stat-icon red">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+            </div>
+            <div class="stat-info">
+              <div class="label">High Risk</div>
+              <div class="value" id="statHigh">—</div>
+            </div>
+          </div>
+          <div class="stat-card" data-target="transactions" data-filter="Medium">
+            <div class="stat-icon orange">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2a10 10 0 0 0-3.22 19.48"/>
+                <path d="M12 2a10 10 0 0 1 3.22 19.48"/>
+              </svg>
+            </div>
+            <div class="stat-info">
+              <div class="label">Medium Risk</div>
+              <div class="value" id="statMedium">—</div>
+            </div>
+          </div>
+          <div class="stat-card" data-target="transactions" data-filter="attention">
+            <div class="stat-icon purple">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 19V5"/>
+                <path d="M5 12h14"/>
+              </svg>
+            </div>
+            <div class="stat-info">
+              <div class="label">Needs Action</div>
+              <div class="value" id="statAttention">—</div>
+            </div>
+          </div>
+          <div class="stat-card" data-target="transactions" data-filter="Low">
+            <div class="stat-icon green">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 6L9 17l-5-5"/>
+              </svg>
+            </div>
+            <div class="stat-info">
+              <div class="label">Low Risk</div>
+              <div class="value" id="statLow">—</div>
+            </div>
+          </div>
+          <div class="stat-card" data-target="alerts" data-filter="unread">
+            <div class="stat-icon yellow">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+              </svg>
+            </div>
+            <div class="stat-info">
+              <div class="label">Unread Alerts</div>
+              <div class="value" id="statAlerts">—</div>
+            </div>
+          </div>
+          <div class="stat-card" id="statUsersCard" data-href="/create-user.html" style="display:none">
+            <div class="stat-icon green">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+            </div>
+            <div class="stat-info">
+              <div class="label">Total Users</div>
+              <div class="value" id="statUsers">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h3>Recent Transactions</h3></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Transaction ID</th><th>Merchant</th><th>Payment</th><th>Amount</th>
+                  <th>Country</th><th>Risk Score</th><th>Status</th><th>Date / Time</th>
+                </tr>
+              </thead>
+              <tbody id="overviewTxnBody">
+                <tr><td colspan="8"><div class="empty-state"><p>Loading…</p></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      </div><!-- /content-area -->
+  </div><!-- /main-content -->
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="/js/auth.js"></script>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script>
+const user = requireAuth();
+if (!user) throw new Error("not authenticated");
+if (user.first_login) window.location.href = "/change-password.html";
+const currentPage = document.body.dataset.page || "overview";
+if (currentPage === "simulator" && !["admin", "compliance_manager"].includes(user.role)) {
+  window.location.href = "/dashboard.html";
+  throw new Error("admin required");
+}
+
+// Populate sidebar/topbar
+document.getElementById("sidebarName").textContent   = user.name;
+document.getElementById("sidebarRole").textContent   = user.role;
+document.getElementById("sidebarAvatar").textContent = user.name.charAt(0).toUpperCase();
+document.getElementById("topbarName").textContent    = user.name;
+const roleEl = document.getElementById("topbarRole");
+roleEl.textContent = user.role;
+roleEl.className   = `badge badge-${user.role}`;
+
+if (["admin", "compliance_manager"].includes(user.role)) {
+  const adminNav = document.getElementById("adminNav");
+  const statUsersCard = document.getElementById("statUsersCard");
+  if (adminNav) adminNav.style.display = "block";
+  if (statUsersCard) statUsersCard.style.display = "";
+}
+if (String(user.role).trim().toLowerCase() === "stro") {
+  document.getElementById("stroNav").style.display = "block";
+}
+if (String(user.role).trim().toLowerCase() === "analyst") {
+  document.getElementById("analystRfiHistoryNav").style.display = "flex";
+}
+
+// ── SECTION NAVIGATION ──
+const navItems = document.querySelectorAll(".nav-item[data-section]");
+const sections = document.querySelectorAll(".section");
+const titleEl  = document.getElementById("sectionTitle");
+const sectionLabels = { overview: "Overview", transactions: "Transactions", alerts: "Alerts", simulator: "Transaction Simulator", account: "My Account" };
+let currentAlertFilter = null;
+
+navItems.forEach((item) => {
+  item.addEventListener("click", () => {
+    const target = item.dataset.section;
+    if (!document.getElementById(`section-${target}`)) return;
+    navItems.forEach(n => n.classList.remove("active"));
+    sections.forEach(s => s.classList.remove("active"));
+    item.classList.add("active");
+    document.getElementById(`section-${target}`).classList.add("active");
+    titleEl.textContent = sectionLabels[target] || target;
+    if (target === "account") loadProfile();
+  });
+});
+
+const dashboardCards = document.querySelectorAll(".stat-card[data-target], .stat-card[data-href]");
+dashboardCards.forEach((card) => {
+  card.classList.add("clickable");
+  card.addEventListener("click", () => {
+    const href = card.dataset.href;
+    if (href) {
+      window.location.href = href;
+      return;
+    }
+
+    const target = card.dataset.target;
+    if (!target) return;
+    const cardFilter = card.dataset.filter;
+    const targetUrl = target === "overview" ? "/dashboard.html" : `/${target}.html`;
+    const params = cardFilter ? `?filter=${encodeURIComponent(cardFilter)}` : "";
+    window.location.href = `${targetUrl}${params}`;
+  });
+});
+
+function setAlertFilter(filter) {
+  currentAlertFilter = filter || null;
+  const label = document.getElementById("alertFilterLabel");
+  if (label) {
+    if (filter === "unread") {
+      label.textContent = "Showing unread alerts only";
+      label.style.display = "inline-block";
+    } else {
+      label.textContent = "";
+      label.style.display = "none";
+    }
+  }
+  loadAlerts();
+}
+
+// ── HELPERS ──
+function toggleInput(id) {
+  const inp = document.getElementById(id);
+  inp.type = inp.type === "password" ? "text" : "password";
+}
+
+function statusPill(s) {
+  const safe = String(s || "normal").toLowerCase();
+  const labels = { normal: "Normal", review: "Review", suspicious: "Suspicious", rejected: "Rejected" };
+  return `<span class="pill pill-${safe}">${labels[safe] || s}</span>`;
+}
+
+function riskPill(level) {
+  const safe = String(level || "Low").toLowerCase();
+  const labels = { low: "Low", medium: "Medium", high: "High", critical: "Critical" };
+  return `<span class="pill pill-${safe}">${labels[safe] || level}</span>`;
+}
+
+function formatDate(d) {
+  if (!d) return "—";
+  return new Date(d).toLocaleString("en-SG", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function formatRiskBreakdownHtml(value) {
+  if (!value) return "â€”";
+  let items = value;
+  try {
+    if (typeof value === "string") items = JSON.parse(value);
+  } catch {
+    items = String(value).split(/;|,/).map(item => item.trim()).filter(Boolean);
+  }
+  if (!Array.isArray(items)) items = [items];
+  const rows = items.map(item => {
+    const raw = typeof item === "object" && item
+      ? (item.rule || item.name || item.description || JSON.stringify(item))
+      : String(item || "");
+    const points = typeof item === "object" && item && item.points != null ? `+${item.points}` : "";
+    const match = raw.match(/^\+(\d+)\s+(.+)$/);
+    const score = match ? `+${match[1]}` : points;
+    const label = match ? match[2] : raw;
+    return `<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px"><strong style="min-width:44px;color:#b91c1c">${escapeHtml(score || "Rule")}</strong><span>${escapeHtml(label)}</span></div>`;
+  }).join("");
+  return rows || "â€”";
+}
+
+function pmBadge(method) {
+  if (!method) return "—";
+  const map = {
+    "Visa":       "pm-badge pm-card",
+    "Mastercard": "pm-badge pm-card",
+    "Alipay":     "pm-badge pm-wallet",
+    "WeChat Pay": "pm-badge pm-wallet",
+    "GrabPay":    "pm-badge pm-wallet",
+    "ShopeePay":  "pm-badge pm-wallet",
+    "PayNow":     "pm-badge pm-bankqr",
+    "SGQR":       "pm-badge pm-bankqr",
+  };
+  return `<span class="${map[method] || 'pm-badge'}">${method}</span>`;
+}
+
+function riskBar(score) {
+  const clr = score >= 50 ? "#ef4444" : score >= 25 ? "#f59e0b" : "#22c55e";
+  return `<div style="display:flex;align-items:center;gap:6px">
+    <div style="flex:1;background:#e2e8f0;border-radius:99px;height:5px;max-width:64px">
+      <div style="width:${Math.min(score,100)}%;background:${clr};height:100%;border-radius:99px"></div>
+    </div>
+    <span style="font-size:12px;font-weight:700;color:${clr}">${score}</span>
+  </div>`;
+}
+
+let allTransactions = [];
+let currentTransactionFilter = null;
+
+function txnRow(t) {
+  const searchable = `${t.transaction_id} ${t.merchant_name||''} ${t.payment_method||''} ${t.country} ${t.status} ${t.risk_level}`.toLowerCase();
+  const txnId = encodeURIComponent(t.transaction_id || "");
+  return `<tr data-searchable="${searchable}" onclick="navigateToTransactionDetail('${txnId}')" style="cursor:pointer">
+    <td style="font-family:monospace;font-size:11.5px;color:var(--text-muted)">${t.transaction_id || "—"}</td>
+    <td style="font-weight:600;max-width:160px">${t.merchant_name || t.merchant_id || "—"}</td>
+    <td>${pmBadge(t.payment_method)}</td>
+    <td style="font-weight:700">$${parseFloat(t.amount||0).toLocaleString("en-SG",{minimumFractionDigits:2})}</td>
+    <td>${t.country || "—"}</td>
+    <td>${riskBar(t.risk_score||0)}</td>
+    <td>${statusPill(t.status||"normal")}</td>
+    <td style="color:var(--text-muted);font-size:12px">${formatDate(t.txn_time)}</td>
+  </tr>`;
+}
+
+function navigateToTransactionDetail(transactionId) {
+  if (!transactionId) return;
+  window.location.href = `/transaction/${transactionId}`;
+}
+
+function navigateToAlertDetails(alertId) {
+  if (!alertId) return;
+  showAlertDetails(alertId);
+}
+
+async function markAlertAsRead(alertId) {
+  if (!alertId) return;
+  const res = await apiFetch(`/api/alerts/${alertId}/read`, { method: "POST" });
+  if (!res) return;
+  await res.json();
+}
+
+function renderTransactions() {
+  const body = document.getElementById("txnBody");
+  if (!body) return;
+
+  const data = currentTransactionFilter === "attention"
+    ? allTransactions.filter(t => t.risk_level === "High" || t.risk_level === "Medium")
+    : currentTransactionFilter
+      ? allTransactions.filter(t => t.risk_level === currentTransactionFilter)
+      : allTransactions;
+  const empty = `<tr><td colspan="8"><div class="empty-state"><p>No transactions found</p></div></td></tr>`;
+  body.innerHTML = data.length ? data.map(txnRow).join("") : empty;
+
+  const filterLabel = document.getElementById("txnFilterLabel");
+  const filterValue = document.getElementById("txnFilterValue");
+  if (filterLabel) filterLabel.style.display = currentTransactionFilter ? "" : "none";
+  if (filterValue) {
+    filterValue.textContent = currentTransactionFilter
+      ? currentTransactionFilter === "attention"
+        ? "Medium / High Risk"
+        : `${currentTransactionFilter} Risk`
+      : "";
+  }
+}
+
+function setTransactionFilter(filter) {
+  currentTransactionFilter = filter || null;
+  renderTransactions();
+  filterTable('txnBody', 'txnSearch', 'txnNoResults');
+}
+
+function highlightTxnFilter(button) {
+  const group = button.closest('.risk-filter-group');
+  if (!group) return;
+  group.querySelectorAll('.filter-chip').forEach(el => el.classList.remove('active'));
+  button.classList.add('active');
+}
+
+function filterTable(bodyId, searchId, noResultsId) {
+  const search = document.getElementById(searchId);
+  if (!search) return;
+  const q = search.value.trim().toLowerCase();
+  const rows = document.querySelectorAll(`#${bodyId} tr[data-searchable]`);
+  let visible = 0;
+  rows.forEach(row => {
+    const match = row.dataset.searchable.includes(q);
+    row.style.display = match ? "" : "none";
+    if (match) visible++;
+  });
+  const noRes = document.getElementById(noResultsId);
+  if (noRes) noRes.style.display = visible === 0 && rows.length > 0 ? "" : "none";
+}
+
+// DATA LOADING
+async function loadTransactions() {
+  const res = await apiFetch("/api/transactions");
+  if (!res) return;
+  const data = await res.json();
+  const priority = { High: 3, Medium: 2, Low: 1 };
+  data.sort((a, b) => {
+    const scoreA = parseFloat(a.risk_score) || 0;
+    const scoreB = parseFloat(b.risk_score) || 0;
+    if (scoreA !== scoreB) return scoreB - scoreA;
+    const levelA = priority[a.risk_level] || 1;
+    const levelB = priority[b.risk_level] || 1;
+    if (levelA !== levelB) return levelB - levelA;
+    return new Date(b.txn_time || b.created_at) - new Date(a.txn_time || a.created_at);
+  });
+  allTransactions = data;
+  renderTransactions();
+
+  const overviewBody = document.getElementById("overviewTxnBody");
+  if (overviewBody) {
+    overviewBody.innerHTML = data.length ? data.slice(0,5).map(txnRow).join("") : `<tr><td colspan="8"><div class="empty-state"><p>No transactions found</p></div></td></tr>`;
+  }
+
+  const lowCount = data.filter(t => t.risk_level === "Low").length;
+  const mediumCount = data.filter(t => t.risk_level === "Medium").length;
+  const highCount = data.filter(t => t.risk_level === "High").length;
+  const setText = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  };
+
+  setText("statTxnTotal", data.length);
+  setText("statLow", lowCount);
+  setText("statMedium", mediumCount);
+  setText("statAttention", highCount + mediumCount);
+  setText("statHigh", highCount);
+  setText("statSuspicious", data.filter(t => t.status === "suspicious").length);
+}
+
+async function loadAlerts() {
+  const res = await apiFetch("/api/alerts");
+  if (!res) return;
+  const data = await res.json();
+  const priority = { High: 3, Medium: 2, Low: 1 };
+  data.sort((a, b) => {
+    if (!!a.read_at !== !!b.read_at) return a.read_at ? 1 : -1;
+    const levelA = priority[a.risk_level] || 1;
+    const levelB = priority[b.risk_level] || 1;
+    if (levelA !== levelB) return levelB - levelA;
+    const scoreA = parseFloat(a.risk_score) || 0;
+    const scoreB = parseFloat(b.risk_score) || 0;
+    if (scoreA !== scoreB) return scoreB - scoreA;
+    return new Date(b.created_at) - new Date(a.created_at);
+  });
+  // Only show pending alerts (exclude dismissed/escalated)
+  const pendingAlerts = data.filter(a => a.status === "Pending");
+  const filtered = currentAlertFilter === "unread" ? pendingAlerts.filter(a => !a.read_at) : pendingAlerts;
+  const body = document.getElementById("alertBody");
+  if (body) {
+    body.innerHTML = filtered.length
+      ? filtered.map(a => {
+          const unread = !a.read_at;
+          const searchable = `${a.transaction_id} ${a.message} ${a.risk_level} ${a.status}`.toLowerCase();
+          return `<tr class="${unread ? 'unread-row' : ''}" data-alert-id="${a.alert_id}" onclick="showAlertDetails(${a.id})" style="cursor:pointer" data-searchable="${searchable}">
+            <td style="font-family:monospace;font-size:12px">${a.transaction_id}</td>
+            <td>${a.message}</td>
+            <td>${riskPill(a.risk_level)}</td>
+            <td>${a.status || "Pending"}</td>
+            <td>${a.read_at ? '<span class="pill pill-normal">Read</span>' : '<span class="pill pill-pending">Unread</span>'}</td>
+            <td style="color:var(--text-muted);font-size:12px">${formatDate(a.created_at)}</td>
+          </tr>`;
+        }).join("")
+      : `<tr><td colspan="6"><div class="empty-state"><p>No alerts ??? all clear!</p></div></td></tr>`;
+  }
+  const unreadCount = pendingAlerts.filter(a => !a.read_at).length;
+  const statAlerts = document.getElementById("statAlerts");
+  if (statAlerts) statAlerts.textContent = unreadCount;
+  const badge = document.getElementById("alertCount");
+  if (!badge) return;
+  if (unreadCount > 0) {
+    badge.textContent = unreadCount;
+    badge.style.display = "";
+  } else {
+    badge.style.display = "none";
+  }
+}
+
+let currentAlertId = null;
+
+async function showAlertDetails(alertId) {
+  const res = await apiFetch(`/api/alerts/${alertId}`);
+  if (!res) return;
+  if (!res.ok) {
+    showToast("Alert Detail", "Unable to load alert details. Please try again.");
+    return;
+  }
+
+  let alert = await res.json();
+  if (!alert.read_at) {
+    await markAlertAsRead(alert.alert_id);
+    await loadAlerts();
+    const res2 = await apiFetch(`/api/alerts/${alertId}`);
+    if (res2 && res2.ok) {
+      alert = await res2.json();
+    }
+  }
+
+  currentAlertId = alert.alert_id;
+  document.getElementById("alertDetailCard").style.display = "";
+  document.getElementById("detailTxnId").textContent = alert.transaction_id || "—";
+  document.getElementById("detailMerchant").textContent = alert.merchant_name || "—";
+  document.getElementById("detailAmount").textContent = alert.amount ? `$${parseFloat(alert.amount).toLocaleString("en-SG", { minimumFractionDigits: 2 })}` : "—";
+  document.getElementById("detailRiskLevel").textContent = alert.risk_level || "—";
+  document.getElementById("detailAlertStatus").textContent = alert.status || "Pending";
+  document.getElementById("detailReadStatus").textContent = alert.read_at ? "Read" : "Unread";
+  document.getElementById("detailReadAt").textContent = alert.read_at ? formatDate(alert.read_at) : "—";
+  document.getElementById("detailRaisedAt").textContent = formatDate(alert.created_at);
+
+  let triggered = alert.triggered_rules;
+  try {
+    const parsed = JSON.parse(alert.triggered_rules);
+    if (Array.isArray(parsed)) {
+      triggered = parsed.map((item) => item && typeof item === "object"
+        ? `+${Number(item.points || 0)} ${item.rule_name || item.rule || item.message || "Risk rule"}`
+        : String(item)
+      ).join("; ");
+    }
+  } catch {}
+  document.getElementById("detailTriggeredRules").innerHTML = formatRiskBreakdownHtml(alert.triggered_rules);
+  document.getElementById("detailEscalationReport").textContent = alert.escalation_report || "—";
+
+  const actions = document.getElementById("detailActions");
+  actions.innerHTML = "";
+  if (alert.status === "Pending" && String(user.role).trim().toLowerCase() !== "stro") {
+    actions.innerHTML = `
+      <button class="btn btn-danger" onclick="goToAlertAction(${alert.id})">Take Action</button>
+    `;
+  }
+}
+
+function goToAlertAction(alertId) {
+  window.location.href = `/api/officer/alerts/${alertId}/action`;
+}
+
+async function dismissCurrentAlert() {
+  if (!currentAlertId || !confirm("Dismiss this alert?")) return;
+  const res = await apiFetch(`/api/alerts/${currentAlertId}/dismiss`, { method: "POST" });
+  if (!res) return;
+  const data = await res.json();
+  if (!res.ok) { showToast("Dismiss Alert", data.message || "Failed to dismiss Alert."); return; }
+  showToast("Dismiss Alert", data.message || "Alert successfully dismissed.");
+  loadAlerts();
+  showAlertDetails(currentAlertId);
+}
+
+async function escalateCurrentAlert() {
+  if (!currentAlertId || !confirm("Escalate this alert?")) return;
+  const res = await apiFetch(`/api/alerts/${currentAlertId}/escalate`, { method: "POST" });
+  if (!res) return;
+  const data = await res.json();
+  if (!res.ok) { showToast("Escalate Alert", data.message || "Failed to escalate Alert."); return; }
+  showToast("Escalate Alert", data.message || "Alert successfully escalated.");
+  loadAlerts();
+  showAlertDetails(currentAlertId);
+}
+
+async function loadUsers() {
+  if (!["admin", "compliance_manager"].includes(user.role)) return;
+  const statUsers = document.getElementById("statUsers");
+  if (!statUsers) return;
+  const res = await apiFetch("/api/auth/users");
+  if (!res) return;
+  const data = await res.json();
+  statUsers.textContent = data.length;
+}
+
+// MY ACCOUNT
+async function loadProfile() {
+  const res = await apiFetch("/api/auth/profile");
+  if (!res) return;
+  const data = await res.json();
+
+  // Always populate the read-only view
+  document.getElementById("viewName").textContent  = data.name  || "—";
+  document.getElementById("viewEmail").textContent = data.email || "—";
+  document.getElementById("viewRole").textContent  = data.role ? (data.role.charAt(0).toUpperCase() + data.role.slice(1)) : "—";
+
+  // Admin also gets the editable form
+  if (["admin", "compliance_manager"].includes(user.role)) {
+    document.getElementById("profileView").style.display  = "none";
+    document.getElementById("profileForm").style.display  = "";
+    document.getElementById("profName").value  = data.name  || "";
+    document.getElementById("profEmail").value = data.email || "";
+    document.getElementById("profRole").value  = data.role  || "";
+  }
+}
+
+const profileForm = document.getElementById("profileForm");
+if (profileForm) profileForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  hideMessage("profileMsg");
+  const name  = document.getElementById("profName").value.trim();
+  const email = document.getElementById("profEmail").value.trim();
+
+  if (!name || !email) { showMessage("profileMsg", "Name and email are required.", "error"); return; }
+
+  const btn = document.getElementById("profileBtn");
+  btn.disabled = true; btn.textContent = "Saving…";
+
+  try {
+    const res = await apiFetch("/api/auth/profile", {
+      method: "PUT",
+      body: JSON.stringify({ name, email })
+    });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) { showMessage("profileMsg", data.message, "error"); return; }
+
+    // Update sidebar and token cache
+    const cached = getUser();
+    cached.name  = data.name;
+    cached.email = data.email;
+    localStorage.setItem("cms_user", JSON.stringify(cached));
+    document.getElementById("sidebarName").textContent = data.name;
+    document.getElementById("topbarName").textContent  = data.name;
+
+    showMessage("profileMsg", "Profile updated successfully.", "success");
+  } catch { showMessage("profileMsg", "Network error.", "error"); }
+  finally { btn.disabled = false; btn.textContent = "Save Changes"; }
+});
+
+const pwForm = document.getElementById("pwForm");
+if (pwForm) pwForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  hideMessage("pwMsg");
+  const currentPw = document.getElementById("currentPw").value;
+  const newPw     = document.getElementById("newPw").value;
+  const confirmPw = document.getElementById("confirmPw").value;
+
+  if (!currentPw) { showMessage("pwMsg", "Please enter your current password.", "error"); return; }
+  if (newPw.length < 8) { showMessage("pwMsg", "New password must be at least 8 characters.", "error"); return; }
+  if (newPw !== confirmPw) { showMessage("pwMsg", "New passwords do not match.", "error"); return; }
+
+  // Verify current password by attempting login first
+  const verifyRes = await fetch("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: getUser().email, password: currentPw })
+  });
+  if (!verifyRes.ok) { showMessage("pwMsg", "Current password is incorrect.", "error"); return; }
+
+  const btn = document.getElementById("pwBtn");
+  btn.disabled = true; btn.textContent = "Updating…";
+
+  try {
+    const res = await apiFetch("/api/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify({ newPassword: newPw })
+    });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) { showMessage("pwMsg", data.message, "error"); return; }
+    showMessage("pwMsg", "Password updated successfully.", "success");
+    document.getElementById("pwForm").reset();
+  } catch { showMessage("pwMsg", "Network error.", "error"); }
+  finally { btn.disabled = false; btn.textContent = "Update Password"; }
+});
+
+const initialPageFilter = new URLSearchParams(window.location.search).get("filter");
+if (currentPage === "transactions" && initialPageFilter) {
+  currentTransactionFilter = initialPageFilter;
+  const label = initialPageFilter === "attention" ? "Needs Action" : initialPageFilter;
+  const button = Array.from(document.querySelectorAll(".risk-filter-group .filter-chip"))
+    .find((btn) => btn.textContent.trim() === label || btn.dataset.filter === initialPageFilter);
+  if (button) highlightTxnFilter(button);
+}
+if (currentPage === "alerts" && initialPageFilter) {
+  currentAlertFilter = initialPageFilter;
+  const label = document.getElementById("alertFilterLabel");
+  if (label && initialPageFilter === "unread") {
+    label.textContent = "Showing unread alerts only";
+    label.style.display = "inline-block";
+  }
+}
+
+const shouldLoadTransactions = currentPage === "overview" || currentPage === "transactions";
+const shouldLoadAlerts = true;
+
+if (shouldLoadTransactions) loadTransactions();
+if (shouldLoadAlerts) loadAlerts();
+if (currentPage === "overview") loadUsers();
+if (currentPage === "account") loadProfile();
+
+// ══════════════════════════════════════════
+// SIMULATOR
+// ══════════════════════════════════════════
+let simInterval  = null;
+let simCounts    = { total: 0, normal: 0, review: 0, suspicious: 0 };
+let lastSimTxnId = null;
+const MAX_FEED   = 20;
+
+function toggleSimulator() {
+  if (simInterval) stopSimulator();
+  else             startSimulator();
+}
+
+function startSimulator() {
+  const speed = parseInt(document.getElementById("simSpeed").value);
+  simInterval = setInterval(runOneTxn, speed);
+
+  document.getElementById("simDot").classList.add("running");
+  document.getElementById("simStatusText").textContent = "Running";
+  document.getElementById("simToggleBtn").textContent  = "⏹ Stop";
+  document.getElementById("simToggleBtn").classList.add("running");
+  document.getElementById("simRunBadge").style.display = "";
+  document.getElementById("feedDot").style.display     = "";
+  runOneTxn(); // fire immediately
+}
+
+function stopSimulator() {
+  clearInterval(simInterval);
+  simInterval = null;
+  document.getElementById("simDot").classList.remove("running");
+  document.getElementById("simStatusText").textContent = "Stopped";
+  document.getElementById("simToggleBtn").textContent  = "▶ Start";
+  document.getElementById("simToggleBtn").classList.remove("running");
+  document.getElementById("simRunBadge").style.display = "none";
+  document.getElementById("feedDot").style.display     = "none";
+}
+
+function resetSimulator() {
+  stopSimulator();
+  simCounts = { total: 0, normal: 0, review: 0, suspicious: 0 };
+  updateSimStats();
+  document.getElementById("liveFeed").innerHTML =
+    `<div style="padding:40px;text-align:center;color:var(--text-muted);font-size:13px">Start the simulator to see live transactions.</div>`;
+}
+
+async function runOneTxn() {
+  const res = await apiFetch("/api/simulate", { method: "POST" });
+  if (!res) return;
+  const data = await res.json();
+  if (!data.transaction) return;
+
+  const t = data.transaction;
+  lastSimTxnId = t.transaction_id || null;
+  simCounts.total++;
+  if (t.decision === "Rejected" || t.risk_level === "Critical" || t.risk_level === "High") simCounts.suspicious++;
+  else if (t.risk_level === "Medium") simCounts.review++;
+  else simCounts.normal++;
+
+  updateSimStats();
+  prependFeedItem(t);
+  loadTransactions();
+  loadAlerts();
+}
+
+function updateSimStats() {
+  const simTotal = document.getElementById("simTotal");
+  if (!simTotal) return;
+  simTotal.textContent = simCounts.total;
+  document.getElementById("simNormal").textContent = simCounts.normal;
+  document.getElementById("simReview").textContent = simCounts.review;
+  document.getElementById("simSusp").textContent   = simCounts.suspicious;
+}
+
+function prependFeedItem(t) {
+  const feed = document.getElementById("liveFeed");
+  if (feed.querySelector("[data-placeholder]")) feed.innerHTML = "";
+
+  const pmCls = {
+    Visa:"pm-card", Mastercard:"pm-card", Alipay:"pm-wallet",
+    "WeChat Pay":"pm-wallet", GrabPay:"pm-wallet", ShopeePay:"pm-wallet",
+    PayNow:"pm-bankqr", SGQR:"pm-bankqr"
+  };
+  const item = document.createElement("div");
+  item.className = "live-feed-item";
+  item.innerHTML = `
+    <div>
+      <div class="feed-merchant">${t.merchant_name || "—"}</div>
+      <div class="feed-sub">${t.masked_payment_ref || "—"} &nbsp;·&nbsp; ${t.country}</div>
+    </div>
+    <span class="pm-badge ${pmCls[t.payment_method]||''}">${t.payment_method||"—"}</span>
+    <div class="feed-amount">$${parseFloat(t.amount).toLocaleString("en-SG",{minimumFractionDigits:2})}</div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+      ${statusPill(t.status)}
+      <span class="feed-time">${new Date().toLocaleTimeString("en-SG")}</span>
+    </div>`;
+  feed.insertBefore(item, feed.firstChild);
+
+  // Keep max 20 items
+  while (feed.children.length > MAX_FEED) feed.removeChild(feed.lastChild);
+}
+
+// Also update simulator speed on change without restart
+document.getElementById("simSpeed")?.addEventListener("change", () => {
+  if (simInterval) { stopSimulator(); startSimulator(); }
+});
+
+// ── REAL-TIME ALERTS ──
+const socket = io();
+socket.on("newAlert", (alert) => {
+  showToast("Suspicious Transaction", `ID: ${alert.transaction_id} — Risk: ${alert.risk_score}`);
+  updateSimCountsFromAlert(alert);
+  loadTransactions();
+  loadAlerts();
+});
+
+socket.on("transactionRejected", (txn) => {
+  showToast("Transaction Rejected", `${txn.transaction_id} — ${txn.rejection_reason || "Transaction rejected"}`);
+  loadTransactions();
+});
+
+function updateSimCountsFromAlert(alert) {
+  if (!alert) return;
+  if (alert.transaction_id && alert.transaction_id === lastSimTxnId) {
+    lastSimTxnId = null;
+    return;
+  }
+
+  const alertRiskLevel = String(alert.risk_level || alert.status || "").toLowerCase();
+  if (alertRiskLevel === "critical" || alertRiskLevel === "high" || alertRiskLevel === "rejected") {
+    simCounts.total++;
+    simCounts.suspicious++;
+  } else if (alertRiskLevel === "medium") {
+    simCounts.total++;
+    simCounts.review++;
+  } else {
+    return;
+  }
+
+  updateSimStats();
+}
+
+function showToast(title, body) {
+  const container = document.getElementById("toastContainer");
+  const toast = document.createElement("div");
+  toast.className = "toast";
+  toast.innerHTML = `
+    <div class="toast-icon">&#9888;</div>
+    <div class="toast-content">
+      <div class="toast-title">${title}</div>
+      <div class="toast-body">${body}</div>
+    </div>`;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 5000);
+}
+</script>
+</body>
+</html>
