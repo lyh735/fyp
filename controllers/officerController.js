@@ -222,7 +222,7 @@ exports.generateSTRDraft = (req, res) => {
   const alertSql = `
     SELECT * FROM alerts
     WHERE alert_id = ?
-`;
+  `;
 
   db.query(alertSql, [alertId], (err, results) => {
     if (err) {
@@ -262,20 +262,22 @@ Recommended Action:
 Prepare STR draft and escalate for approval.
 `;
 
+    const generatedBy = 1; // officer user_id, temporary for testing
+
     const insertSql = `
       INSERT INTO str_reports
-      (alert_id, generated_by, str_reference_number, narrative_text, status, generated_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, NOW(), NOW())
+      (alert_id, generated_by, str_reference_number, narrative_text, status)
+      VALUES (?, ?, ?, ?, ?)
     `;
 
     db.query(
       insertSql,
       [
-        alert.alert_id,
-        "Compliance Officer",
+        Number(alert.alert_id),
+        generatedBy,
         strReference,
         narrativeText,
-        "Draft"
+        "draft"
       ],
       (err, result) => {
         if (err) {
@@ -290,30 +292,37 @@ Prepare STR draft and escalate for approval.
 };
 
 exports.viewSTRDraft = (req, res) => {
-    const strId = req.params.strId;
+  const strId = req.params.strId;
 
-    const sql = `
-        SELECT s.*, a.transaction_id, a.merchant_id,
-               a.risk_score, a.risk_level, a.triggered_rules
-        FROM str s
-        LEFT JOIN alerts a ON s.alert_id = a.id
-        WHERE s.str_id = ?
-    `;
+  const sql = `
+    SELECT 
+      s.*,
+      a.transaction_id,
+      a.merchant_id,
+      a.risk_score,
+      a.risk_level,
+      CAST(a.triggered_rules AS CHAR) AS triggered_rules,
+      a.message
+    FROM str_reports s
+    LEFT JOIN alerts a 
+      ON s.alert_id = a.alert_id
+    WHERE s.str_id = ?
+  `;
 
-    db.query(sql, [strId], (err, results) => {
-        if (err) {
-            console.error(err);
-            return res.send("Error fetching STR draft");
-        }
+  db.query(sql, [strId], (err, results) => {
+    if (err) {
+      console.error("Error fetching STR draft:", err.message);
+      return res.send("Error fetching STR draft: " + err.message);
+    }
 
-        if (results.length === 0) {
-            return res.send("STR Draft not found");
-        }
+    if (results.length === 0) {
+      return res.send("STR draft not found");
+    }
 
-        res.render("strDraft", {
-            str: results[0]
-        });
+    res.render("strDraft", {
+      str: results[0]
     });
+  });
 };
 
 exports.showAuditLogsPage = (req, res) => {
