@@ -8,19 +8,27 @@
   <style>
     .import-layout { display:grid;grid-template-columns:1fr;gap:20px;margin-bottom:22px; }
     .import-card { background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:22px;box-shadow:var(--shadow-sm); }
+    .main-content,.content-area,.import-card,.card,.column-entry-wrap,.table-wrap { min-width:0; }
     .import-card h3 { font-size:16px;margin-bottom:6px; }
     .import-card p { color:var(--text-muted);font-size:12.5px;line-height:1.6;margin-bottom:16px; }
     .drop-zone { border:2px dashed #94a3b8;border-radius:12px;padding:34px 18px;text-align:center;background:#f8fafc;cursor:pointer;transition:.18s; }
     .drop-zone:hover,.drop-zone.dragging { border-color:var(--primary);background:#eff6ff; }
     .drop-zone strong { display:block;color:var(--text);font-size:14px;margin-bottom:6px; }
     .drop-zone span { color:var(--text-muted);font-size:12px; }
-    .column-entry-wrap { overflow-x:auto;border:1px solid var(--border);border-radius:10px; }
-    .column-entry-table { min-width:920px; }
-    .column-entry-table th { padding:9px 8px;font-size:10.5px;white-space:nowrap; }
-    .column-entry-table td { padding:6px; }
-    .column-entry-table input,.column-entry-table select { width:100%;min-width:115px;padding:8px;border:1px solid var(--border);border-radius:6px;background:#fff;color:var(--text);font:inherit;font-size:12px; }
-    .column-entry-table input:focus,.column-entry-table select:focus { outline:none;border-color:var(--primary);box-shadow:0 0 0 2px rgba(37,99,235,.1); }
-    .column-entry-table .wide-input { min-width:170px; }
+    .template-actions { display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px; }
+    .template-note { color:var(--text-muted);font-size:12px; }
+    .column-entry-wrap { width:100%;max-width:100%; }
+    .column-entry-list { display:grid;gap:14px; }
+    .column-entry-row { border:1px solid var(--border);border-radius:14px;padding:14px;background:linear-gradient(180deg,#f8fafc 0,#fff 38%);box-shadow:var(--shadow-sm); }
+    .column-entry-row-header { display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #e2e8f0; }
+    .column-row-index { font-size:12px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:#334155; }
+    .column-entry-grid { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px; }
+    .field-group { display:flex;flex-direction:column;gap:6px;min-width:0; }
+    .field-group label { font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted); }
+    .field-group input,.field-group select { width:100%;min-width:0;padding:9px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text);font:inherit;font-size:12px; }
+    .field-group input:focus,.field-group select:focus { outline:none;border-color:var(--primary);box-shadow:0 0 0 2px rgba(37,99,235,.1); }
+    .field-group.wide { grid-column:span 2; }
+    .field-help { font-size:11px;color:var(--text-muted);line-height:1.4; }
     .payment-select.payment-card { background:#eff6ff;color:#1d4ed8;border-color:#93c5fd; }
     .payment-select.payment-wallet { background:#f0fdf4;color:#15803d;border-color:#86efac; }
     .payment-select.payment-bankqr { background:#faf5ff;color:#7e22ce;border-color:#d8b4fe; }
@@ -46,6 +54,7 @@
     .validation-reminder strong { display:block;margin-bottom:4px; }
     .validation-reminder ul { margin:5px 0 0;padding-left:20px;max-height:180px;overflow:auto; }
     .invalid-preview-row { background:#fff7ed; }
+    .card-header { gap:10px;flex-wrap:wrap; }
     .process-bar { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 22px;border-top:1px solid var(--border); }
     .process-bar .btn-primary { width:auto;padding:11px 22px;font-size:13px; }
     .result-stats { display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:20px 22px; }
@@ -54,8 +63,35 @@
     .result-stat span { color:var(--text-muted);font-size:11px;text-transform:uppercase;font-weight:700; }
     .error-list { margin:0;padding:0 22px 22px 42px;color:#b91c1c;font-size:12.5px;line-height:1.7;max-height:220px;overflow:auto; }
     .page-message { display:none;margin-bottom:20px; }
-    @media (max-width:900px) { .import-layout{grid-template-columns:1fr}.guide-grid{grid-template-columns:repeat(2,1fr)} }
-    @media (max-width:600px) { .guide-grid,.result-stats{grid-template-columns:1fr 1fr}.process-bar{align-items:flex-start;flex-direction:column} }
+    @media (max-width:1200px) { .column-entry-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.field-group.wide{grid-column:span 3} }
+    @media (max-width:900px) {
+      .topbar { padding:14px 20px;gap:12px;align-items:flex-start;flex-wrap:wrap; }
+      .topbar-right { width:100%;justify-content:flex-start; }
+      .content-area { padding:20px; }
+      .column-entry-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .field-group.wide { grid-column:span 2; }
+      .guide-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .result-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .process-bar { align-items:flex-start;flex-direction:column; }
+      .process-bar .btn-primary { width:100%; }
+      .import-actions { flex-wrap:wrap; }
+      .import-actions .btn-primary,.import-actions .btn-secondary,
+      .template-actions .btn { width:100%; }
+    }
+    @media (max-width:760px) {
+      .content-area { padding:16px; }
+      .import-card,.card { padding:16px; }
+      .guide-grid,.result-stats { grid-template-columns:1fr; padding:16px; }
+      .validation-reminder,.process-bar,.error-list { margin-left:16px;margin-right:16px;padding-left:16px;padding-right:16px; }
+      .column-entry-row { padding:12px; }
+      .column-entry-row-header { align-items:flex-start;flex-direction:column; }
+      .column-entry-grid { grid-template-columns:1fr; }
+      .field-group.wide { grid-column:span 1; }
+      .field-group input,.field-group select { font-size:13px; }
+      .template-actions,.import-actions { flex-direction:column;align-items:stretch; }
+      .template-note { line-height:1.5; }
+      .remove-row { width:100%; }
+    }
   </style>
 </head>
 <body>
@@ -89,10 +125,6 @@
       <div class="nav-item" onclick="window.location.href='/rules.html'">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3h6l1 2h4v16H4V5h4l1-2z"/><path d="M8 11h8M8 15h6"/></svg>
         Rules
-      </div>
-      <div class="nav-item" onclick="window.location.href='/flagged-transactions.html'">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3h14v18l-7-4-7 4z"/></svg>
-        Flagged Transactions
       </div>
       <div id="adminNav" style="display:none">
         <div class="nav-section-label">Administration</div>
@@ -130,32 +162,30 @@
       <div class="import-layout">
         <section class="import-card">
           <h3>Upload Excel or delimited file</h3>
-          <p>Select or drop an XLSX, XLS, CSV, TSV, or TXT file. The first worksheet and first row of headings will be used.</p>
+          <p>Select or drop an XLSX, XLS, CSV, TSV, or TXT file. The first worksheet and first row of headings will be used. The upload source is assigned automatically as <code>excel_upload</code>.</p>
           <input id="fileInput" type="file" accept=".xlsx,.xls,.csv,.tsv,.txt" hidden />
           <div id="dropZone" class="drop-zone" tabindex="0">
             <strong>Drop a file here or click to browse</strong>
             <span>Maximum 500 transaction rows</span>
+          </div>
+          <div class="template-actions">
+            <button type="button" class="btn btn-secondary" onclick="downloadImportTemplate()">Download template</button>
+            <span class="template-note">Template includes required and conditionally required headers only.</span>
           </div>
           <div id="fileMeta" class="file-meta"></div>
         </section>
 
         <section class="import-card" style="grid-column:1/-1">
           <h3>Enter transaction rows</h3>
-          <p>Type transactions directly into columns. Use Tab to move across fields and add more rows when needed.</p>
+          <p>Type transactions directly into columns. Use Tab to move across fields and add more rows when needed. Manual entries are stored with source type <code>manual</code>.</p>
           <div class="payment-legend" aria-label="Payment categories">
             <span class="card-payment">Card Payments</span>
             <span class="wallet-payment">Digital Wallets</span>
             <span class="bankqr-payment">Bank Transfer / QR</span>
           </div>
           <div class="column-entry-wrap">
-            <table class="column-entry-table">
-              <thead><tr>
-                <th>Transaction ID *</th><th>Merchant ID *</th><th>Masked payment reference</th>
-                <th>Amount *</th><th>Transaction time *</th><th>Payment method</th><th>Country</th>
-                <th>Currency</th><th>Merchant average amount</th><th></th>
-              </tr></thead>
-              <tbody id="columnRows"></tbody>
-            </table>
+            <div id="columnRows" class="column-entry-list"></div>
+            <datalist id="merchantOptions"></datalist>
           </div>
           <div class="import-actions">
             <button type="button" class="btn btn-secondary" onclick="addColumnRow()">Add row</button>
@@ -170,12 +200,19 @@
           <div class="guide-item"><code>transaction_id *</code><span>Unique transaction reference</span></div>
           <div class="guide-item"><code>merchant_id *</code><span>Merchant reference</span></div>
           <div class="guide-item"><code>amount *</code><span>Positive transaction amount</span></div>
-          <div class="guide-item"><code>txn_time *</code><span>Date and time</span></div>
+          <div class="guide-item"><code>currency *</code><span>3-letter currency such as SGD</span></div>
+          <div class="guide-item"><code>transaction_type *</code><span><code>online</code> or <code>face_to_face</code></span></div>
+          <div class="guide-item"><code>payment_method *</code><span>Visa, Mastercard, Alipay, WeChat Pay, GrabPay, ShopeePay, PayNow, or SGQR</span></div>
+          <div class="guide-item"><code>txn_time *</code><span>Valid date and time</span></div>
+          <div class="guide-item"><code>source_type *</code><span>Assigned automatically as <code>manual</code> or <code>excel_upload</code></span></div>
+          <div class="guide-item"><code>terminal_id</code><span>Required when <code>transaction_type</code> is <code>face_to_face</code></span></div>
+          <div class="guide-item"><code>ip_address</code><span>Required when <code>transaction_type</code> is <code>online</code></span></div>
           <div class="guide-item"><code>masked_payment_ref</code><span>Masked payment reference</span></div>
-          <div class="guide-item"><code>payment_method</code><span>Visa, Mastercard, Alipay, WeChat Pay, GrabPay, ShopeePay, PayNow, or SGQR</span></div>
-          <div class="guide-item"><code>country</code><span>Defaults to Singapore</span></div>
-          <div class="guide-item"><code>currency</code><span>Defaults to SGD</span></div>
-          <div class="guide-item"><code>merchant_average_amount</code><span>Merchant record or 1,000 default</span></div>
+          <div class="guide-item"><code>payment_gateway_ref</code><span>Generated safely if omitted</span></div>
+          <div class="guide-item"><code>card_bin</code><span>Optional card metadata</span></div>
+          <div class="guide-item"><code>masked_card_number</code><span>Optional masked PAN</span></div>
+          <div class="guide-item"><code>card_presence</code><span>Optional card-present indicator</span></div>
+          <div class="guide-item"><code>country</code><span>Defaults to Singapore if omitted</span></div>
         </div>
       </section>
 
@@ -217,8 +254,11 @@ if (["admin", "compliance_manager"].includes(user.role)) document.getElementById
 let pendingRows = [];
 let pendingValidation = { issues: [], invalidIndexes: new Set(), defaults: [] };
 let sourceName = "column-entry";
+let pendingSourceType = "manual";
+let merchantOptions = [];
 const fileInput = document.getElementById("fileInput");
 const dropZone = document.getElementById("dropZone");
+const merchantOptionsList = document.getElementById("merchantOptions");
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (character) => ({
@@ -293,6 +333,86 @@ function normalizeTransactionRow(row) {
   return Object.fromEntries(Object.entries(row || {}).map(([key, value]) => [normalizeFieldName(key), value]));
 }
 
+function merchantOptionLabel(merchant) {
+  return `${merchant.merchant_id} - ${merchant.merchant_name}`;
+}
+
+function renderMerchantOptions() {
+  merchantOptionsList.innerHTML = merchantOptions.map((merchant) =>
+    `<option value="${escapeHtml(merchantOptionLabel(merchant))}"></option>`
+  ).join("");
+}
+
+async function loadMerchantOptions() {
+  try {
+    const response = await apiFetch("/api/merchants");
+    if (!response || !response.ok) return;
+    const merchants = await response.json();
+    merchantOptions = Array.isArray(merchants)
+      ? merchants
+        .filter((merchant) => merchant?.merchant_id && merchant?.merchant_name)
+        .map((merchant) => ({
+          merchant_id: String(merchant.merchant_id).trim(),
+          merchant_name: String(merchant.merchant_name).trim(),
+        }))
+      : [];
+    renderMerchantOptions();
+  } catch {}
+}
+
+function resolveMerchantId(rawValue) {
+  const value = String(rawValue || "").trim();
+  if (!value) return "";
+  if (!merchantOptions.length) return value;
+
+  const lowerValue = value.toLowerCase();
+  const directIdMatch = merchantOptions.find((merchant) => merchant.merchant_id.toLowerCase() === lowerValue);
+  if (directIdMatch) return directIdMatch.merchant_id;
+
+  const directLabelMatch = merchantOptions.find((merchant) => merchantOptionLabel(merchant).toLowerCase() === lowerValue);
+  if (directLabelMatch) return directLabelMatch.merchant_id;
+
+  const prefixedMatch = merchantOptions.find((merchant) => lowerValue.startsWith(`${merchant.merchant_id.toLowerCase()} -`));
+  if (prefixedMatch) return prefixedMatch.merchant_id;
+
+  return "";
+}
+
+function syncMerchantField(input, normalizeDisplay = false) {
+  const row = input.closest(".column-entry-row");
+  const hiddenMerchantId = row.querySelector('[data-field="merchant_id"]');
+  const resolvedMerchantId = resolveMerchantId(input.value);
+  hiddenMerchantId.value = resolvedMerchantId;
+
+  if (!normalizeDisplay || !merchantOptions.length) return;
+  const matchedMerchant = merchantOptions.find((merchant) => merchant.merchant_id === resolvedMerchantId);
+  if (matchedMerchant) input.value = merchantOptionLabel(matchedMerchant);
+}
+
+function downloadImportTemplate() {
+  const headers = [
+    "transaction_id",
+    "merchant_id",
+    "amount",
+    "currency",
+    "transaction_type",
+    "payment_method",
+    "txn_time",
+    "terminal_id",
+    "ip_address",
+  ];
+  const content = `${headers.join(",")}\n`;
+  const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "transaction-import-template.csv";
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 function validateImportRows(rows) {
   const normalizedRows = rows.map(normalizeTransactionRow);
   const headers = new Set(normalizedRows.flatMap((row) => Object.keys(row)));
@@ -303,7 +423,14 @@ function validateImportRows(rows) {
     "Visa", "Mastercard", "Alipay", "WeChat Pay",
     "GrabPay", "ShopeePay", "PayNow", "SGQR",
   ]);
-  const requiredColumns = ["transaction_id", "merchant_id", "amount"];
+  const requiredColumns = [
+    "transaction_id",
+    "merchant_id",
+    "amount",
+    "currency",
+    "transaction_type",
+    "payment_method",
+  ];
   const missingRequired = requiredColumns.filter((column) => !headers.has(column));
   if (!["txn_time", "timestamp", "transaction_time"].some((column) => headers.has(column))) {
     missingRequired.push("txn_time");
@@ -314,10 +441,7 @@ function validateImportRows(rows) {
     normalizedRows.forEach((_, index) => invalidIndexes.add(index));
   }
 
-  const optionalDefaults = [
-    ["country", "Singapore"], ["currency", "SGD"],
-    ["merchant_average_amount", "1,000"],
-  ];
+  const optionalDefaults = [["country", "Singapore"]];
   const defaults = optionalDefaults
     .filter(([column]) => !headers.has(column))
     .map(([column, fallback]) => `${column} is missing; ${fallback} will be used`);
@@ -328,7 +452,12 @@ function validateImportRows(rows) {
     const transactionId = String(row.transaction_id ?? "").trim();
     const merchantId = String(row.merchant_id ?? "").trim();
     const amount = Number(row.amount);
+    const currency = String(row.currency ?? "").trim().toUpperCase();
+    const transactionType = String(row.transaction_type ?? "").trim().toLowerCase();
+    const paymentMethod = String(row.payment_method ?? "").trim();
     const timestamp = row.txn_time ?? row.timestamp ?? row.transaction_time;
+    const terminalId = String(row.terminal_id ?? "").trim();
+    const ipAddress = String(row.ip_address ?? "").trim();
 
     if (!transactionId) rowIssues.push("transaction_id is required");
     else if (transactionId.length > 50) rowIssues.push("transaction_id exceeds 50 characters");
@@ -339,16 +468,15 @@ function validateImportRows(rows) {
     else if (merchantId.length > 50) rowIssues.push("merchant_id exceeds 50 characters");
 
     if (!Number.isFinite(amount) || amount <= 0) rowIssues.push("amount must be greater than 0");
+    if (!currency) rowIssues.push("currency is required");
+    else if (!/^[A-Z]{3}$/.test(currency)) rowIssues.push("currency must be a 3-letter code");
+    if (!transactionType) rowIssues.push("transaction_type is required");
+    else if (!["online", "face_to_face"].includes(transactionType)) rowIssues.push("transaction_type must be online or face_to_face");
+    if (!paymentMethod) rowIssues.push("payment_method is required");
+    else if (!paymentOptions.has(paymentMethod)) rowIssues.push("payment_method is not one of the supported options");
     if (!timestamp || Number.isNaN(new Date(timestamp).getTime())) rowIssues.push("txn_time must be a valid date and time");
-
-    if (row.merchant_average_amount !== undefined && row.merchant_average_amount !== "") {
-      const average = Number(row.merchant_average_amount);
-      if (!Number.isFinite(average) || average <= 0) rowIssues.push("merchant_average_amount must be greater than 0");
-    }
-    if (row.payment_method && !paymentOptions.has(String(row.payment_method).trim())) {
-      rowIssues.push("payment_method is not one of the supported options");
-    }
-    if (row.currency && String(row.currency).trim().length > 10) rowIssues.push("currency exceeds 10 characters");
+    if (transactionType === "face_to_face" && !terminalId) rowIssues.push("terminal_id is required for face_to_face transactions");
+    if (transactionType === "online" && !ipAddress) rowIssues.push("ip_address is required for online transactions");
 
     if (rowIssues.length) {
       invalidIndexes.add(index);
@@ -359,11 +487,12 @@ function validateImportRows(rows) {
   return { issues, invalidIndexes, defaults };
 }
 
-function prepareRows(rows, name) {
+function prepareRows(rows, name, sourceType) {
   hidePageMessage();
   if (!rows.length) return showPageMessage("No transaction rows were found.");
   if (rows.length > 500) return showPageMessage("A maximum of 500 transactions is allowed per import.");
   pendingRows = rows;
+  pendingSourceType = sourceType;
   pendingValidation = validateImportRows(rows);
   sourceName = name;
   renderPreview();
@@ -381,10 +510,11 @@ function renderPreview() {
     reminder.className = "validation-reminder warning";
     reminder.innerHTML = `<strong>Check the import before processing</strong>
       ${pendingValidation.invalidIndexes.size ? `${pendingValidation.invalidIndexes.size} row(s) contain invalid or missing data.` : "Some columns will use default values."}
+      Merchant existence is checked during processing.
       <ul>${[...pendingValidation.issues, ...pendingValidation.defaults].slice(0, 25).map((issue) => `<li>${escapeHtml(issue)}</li>`).join("")}</ul>`;
   } else {
     reminder.className = "validation-reminder valid";
-    reminder.innerHTML = "<strong>Validation passed</strong>All required fields and values look valid.";
+    reminder.innerHTML = "<strong>Validation passed</strong>All required fields and values look valid. Merchant existence is checked during processing.";
   }
   reminder.style.display = "block";
   document.getElementById("previewCard").style.display = "block";
@@ -397,60 +527,127 @@ async function prepareFile(file) {
     const rows = await readFile(file);
     document.getElementById("fileMeta").innerHTML = `<strong>${escapeHtml(file.name)}</strong> &middot; ${rows.length} rows`;
     document.getElementById("fileMeta").style.display = "block";
-    prepareRows(rows, file.name);
+    prepareRows(rows, file.name, "excel_upload");
   } catch (error) {
     showPageMessage(error.message);
   }
 }
 
 function columnRowTemplate() {
-  return `<tr>
-    <td><input data-field="transaction_id" placeholder="TXN001" /></td>
-    <td><input data-field="merchant_id" placeholder="M001" /></td>
-    <td><input data-field="masked_payment_ref" placeholder="PAY-***123456" /></td>
-    <td><input data-field="amount" type="number" min="0.01" step="0.01" placeholder="500.00" /></td>
-    <td><input class="wide-input" data-field="txn_time" type="datetime-local" /></td>
-    <td><select class="payment-select" data-field="payment_method" onchange="updatePaymentColour(this)">
-      <option value="">Select payment</option>
-      <optgroup label="Card Payments">
-        <option value="Visa">Visa</option>
-        <option value="Mastercard">Mastercard</option>
-      </optgroup>
-      <optgroup label="Digital Wallets">
-        <option value="Alipay">Alipay</option>
-        <option value="WeChat Pay">WeChat Pay</option>
-        <option value="GrabPay">GrabPay</option>
-        <option value="ShopeePay">ShopeePay</option>
-      </optgroup>
-      <optgroup label="Bank Transfer / QR Payments">
-        <option value="PayNow">PayNow</option>
-        <option value="SGQR">SGQR</option>
-      </optgroup>
-    </select></td>
-    <td><select data-field="country">
-      <option value="Singapore">Singapore</option>
-      <option value="China">China</option>
-      <option value="Malaysia">Malaysia</option>
-      <option value="Indonesia">Indonesia</option>
-      <option value="Hong Kong">Hong Kong</option>
-      <option value="Taiwan">Taiwan</option>
-    </select></td>
-    <td><select data-field="currency">
-      <option value="SGD">SGD</option>
-      <option value="USD">USD</option>
-      <option value="CNY">CNY</option>
-      <option value="MYR">MYR</option>
-      <option value="IDR">IDR</option>
-      <option value="HKD">HKD</option>
-      <option value="TWD">TWD</option>
-    </select></td>
-    <td><input data-field="merchant_average_amount" type="number" min="0.01" step="0.01" value="1000" /></td>
-    <td><button type="button" class="remove-row" onclick="removeColumnRow(this)" title="Remove row">&times;</button></td>
-  </tr>`;
+  return `<div class="column-entry-row">
+    <div class="column-entry-row-header">
+      <span class="column-row-index">Transaction row</span>
+      <button type="button" class="remove-row" onclick="removeColumnRow(this)" title="Remove row">&times;</button>
+    </div>
+    <div class="column-entry-grid">
+      <div class="field-group">
+        <label>Transaction ID *</label>
+        <input data-field="transaction_id" placeholder="TXN001" />
+      </div>
+      <div class="field-group">
+        <label>Merchant ID *</label>
+        <input type="hidden" data-field="merchant_id" />
+        <input
+          data-role="merchant-picker"
+          list="merchantOptions"
+          placeholder="Search merchant ID or name"
+          autocomplete="off"
+          oninput="syncMerchantField(this)"
+          onchange="syncMerchantField(this, true)"
+          onblur="syncMerchantField(this, true)"
+        />
+        <span class="field-help">Search by merchant ID or merchant name.</span>
+      </div>
+      <div class="field-group">
+        <label>Amount *</label>
+        <input data-field="amount" type="number" min="0.01" step="0.01" placeholder="500.00" />
+      </div>
+      <div class="field-group">
+        <label>Currency *</label>
+        <select data-field="currency">
+          <option value="">Select currency</option>
+          <option value="SGD">SGD</option>
+          <option value="USD">USD</option>
+          <option value="CNY">CNY</option>
+          <option value="MYR">MYR</option>
+          <option value="IDR">IDR</option>
+          <option value="HKD">HKD</option>
+          <option value="TWD">TWD</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label>Transaction Type *</label>
+        <select data-field="transaction_type" onchange="updateTransactionType(this)">
+          <option value="">Select type</option>
+          <option value="online">online</option>
+          <option value="face_to_face">face_to_face</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label>Payment Method *</label>
+        <select class="payment-select" data-field="payment_method" onchange="updatePaymentColour(this)">
+          <option value="">Select payment</option>
+          <optgroup label="Card Payments">
+            <option value="Visa">Visa</option>
+            <option value="Mastercard">Mastercard</option>
+          </optgroup>
+          <optgroup label="Digital Wallets">
+            <option value="Alipay">Alipay</option>
+            <option value="WeChat Pay">WeChat Pay</option>
+            <option value="GrabPay">GrabPay</option>
+            <option value="ShopeePay">ShopeePay</option>
+          </optgroup>
+          <optgroup label="Bank Transfer / QR Payments">
+            <option value="PayNow">PayNow</option>
+            <option value="SGQR">SGQR</option>
+          </optgroup>
+        </select>
+      </div>
+      <div class="field-group wide">
+        <label>Transaction Time *</label>
+        <input class="wide-input" data-field="txn_time" type="datetime-local" />
+      </div>
+      <div class="field-group">
+        <label>Terminal ID</label>
+        <input data-field="terminal_id" placeholder="Required for face_to_face" />
+      </div>
+      <div class="field-group">
+        <label>IP Address</label>
+        <input class="wide-input" data-field="ip_address" placeholder="Required for online" />
+      </div>
+      <div class="field-group">
+        <label>Country</label>
+        <select data-field="country">
+          <option value="">Default Singapore</option>
+          <option value="Singapore">Singapore</option>
+          <option value="China">China</option>
+          <option value="Malaysia">Malaysia</option>
+          <option value="Indonesia">Indonesia</option>
+          <option value="Hong Kong">Hong Kong</option>
+          <option value="Taiwan">Taiwan</option>
+        </select>
+      </div>
+      <div class="field-group wide">
+        <label>Masked Payment Ref</label>
+        <input data-field="masked_payment_ref" placeholder="Auto-generated if blank" />
+      </div>
+      <div class="field-group wide">
+        <label>Gateway Ref</label>
+        <input data-field="payment_gateway_ref" placeholder="Auto-generated if blank" />
+      </div>
+    </div>
+  </div>`;
 }
 
 function addColumnRow() {
   document.getElementById("columnRows").insertAdjacentHTML("beforeend", columnRowTemplate());
+  renumberColumnRows();
+}
+
+function renumberColumnRows() {
+  document.querySelectorAll("#columnRows .column-entry-row").forEach((row, index) => {
+    row.querySelector(".column-row-index").textContent = `Transaction row ${index + 1}`;
+  });
 }
 
 function updatePaymentColour(select) {
@@ -460,28 +657,49 @@ function updatePaymentColour(select) {
   if (["PayNow", "SGQR"].includes(select.value)) select.classList.add("payment-bankqr");
 }
 
+function updateTransactionType(select) {
+  const row = select.closest(".column-entry-row");
+  const terminalInput = row.querySelector('[data-field="terminal_id"]');
+  const ipInput = row.querySelector('[data-field="ip_address"]');
+  if (select.value === "face_to_face") {
+    terminalInput.placeholder = "Required for face_to_face";
+    ipInput.placeholder = "Optional for face_to_face";
+  } else if (select.value === "online") {
+    terminalInput.placeholder = "Optional for online";
+    ipInput.placeholder = "Required for online";
+  } else {
+    terminalInput.placeholder = "Required for face_to_face";
+    ipInput.placeholder = "Required for online";
+  }
+}
+
 function removeColumnRow(button) {
   const body = document.getElementById("columnRows");
-  if (body.rows.length === 1) {
+  const rows = body.querySelectorAll(".column-entry-row");
+  if (rows.length === 1) {
     body.querySelectorAll("input").forEach((input) => { input.value = ""; });
     body.querySelector('[data-field="payment_method"]').value = "";
+    body.querySelector('[data-field="transaction_type"]').value = "";
     updatePaymentColour(body.querySelector('[data-field="payment_method"]'));
-    body.querySelector('[data-field="country"]').value = "Singapore";
-    body.querySelector('[data-field="currency"]').value = "SGD";
-    body.querySelector('[data-field="merchant_average_amount"]').value = "1000";
+    updateTransactionType(body.querySelector('[data-field="transaction_type"]'));
+    body.querySelector('[data-field="country"]').value = "";
+    body.querySelector('[data-field="currency"]').value = "";
     return;
   }
-  button.closest("tr").remove();
+  button.closest(".column-entry-row").remove();
+  renumberColumnRows();
 }
 
 function prepareColumnRows() {
-  const rows = [...document.querySelectorAll("#columnRows tr")].map((row) =>
+  document.querySelectorAll('#columnRows [data-role="merchant-picker"]').forEach((input) => syncMerchantField(input, true));
+  const rows = [...document.querySelectorAll("#columnRows .column-entry-row")].map((row) =>
     Object.fromEntries([...row.querySelectorAll("[data-field]")].map((input) => [input.dataset.field, input.value.trim()]))
   ).filter((row) => [
-    row.transaction_id, row.merchant_id, row.masked_payment_ref,
-    row.amount, row.txn_time, row.payment_method,
+    row.transaction_id, row.merchant_id, row.amount, row.currency,
+    row.transaction_type, row.payment_method, row.txn_time,
+    row.terminal_id, row.ip_address, row.masked_payment_ref, row.payment_gateway_ref,
   ].some(Boolean));
-  prepareRows(rows, "column-entry");
+  prepareRows(rows, "column-entry", "manual");
 }
 
 function renderResult(data) {
@@ -512,7 +730,7 @@ async function processRows() {
   try {
     const response = await apiFetch("/api/transactions/upload", {
       method: "POST",
-      body: JSON.stringify({ file_name: sourceName, transactions: pendingRows }),
+      body: JSON.stringify({ file_name: sourceName, source_type: pendingSourceType, transactions: pendingRows }),
     });
     if (!response) return;
     renderResult(await response.json());
@@ -538,6 +756,7 @@ fileInput.addEventListener("change", () => prepareFile(fileInput.files[0]));
   dropZone.classList.remove("dragging");
 }));
 dropZone.addEventListener("drop", (event) => prepareFile(event.dataTransfer.files[0]));
+loadMerchantOptions();
 addColumnRow();
 </script>
 </body>

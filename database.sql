@@ -25,6 +25,7 @@ CREATE TABLE merchants (
     country VARCHAR(50) DEFAULT 'Singapore',
     has_physical_location TINYINT(1) DEFAULT 1,
     status VARCHAR(30),
+    terminals_seeded TINYINT(1) DEFAULT 0,
 
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -156,6 +157,38 @@ CREATE TABLE rfi_requests (
     FOREIGN KEY (requested_by) REFERENCES users(user_id)
 );
 
+CREATE TABLE mcc_codes (
+    mcc_code VARCHAR(20) PRIMARY KEY,
+    description VARCHAR(150) NOT NULL,
+    is_active TINYINT(1) DEFAULT 1,
+
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    created_by INT,
+    updated_by INT,
+
+    FOREIGN KEY (created_by) REFERENCES users(user_id),
+    FOREIGN KEY (updated_by) REFERENCES users(user_id)
+);
+
+CREATE TABLE terminals (
+    terminal_id VARCHAR(50) PRIMARY KEY,
+    merchant_id VARCHAR(50) NOT NULL,
+    label VARCHAR(100),
+    status VARCHAR(20) DEFAULT 'active',
+
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    created_by INT,
+    updated_by INT,
+
+    FOREIGN KEY (merchant_id) REFERENCES merchants(merchant_id),
+    FOREIGN KEY (created_by) REFERENCES users(user_id),
+    FOREIGN KEY (updated_by) REFERENCES users(user_id)
+);
+
 CREATE TABLE str_reports (
     str_id INT AUTO_INCREMENT PRIMARY KEY,
     alert_id INT NOT NULL,
@@ -200,3 +233,6 @@ ON rfi_requests(status, due_at);
 
 CREATE INDEX idx_str_status
 ON str_reports(status);
+
+CREATE INDEX idx_terminals_merchant
+ON terminals(merchant_id);

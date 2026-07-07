@@ -46,7 +46,12 @@ function normalizeBoolean(value, fallback) {
   return fallback;
 }
 
-function validateTransaction(payload) {
+function validateTransaction(payload, options = {}) {
+  const {
+    requirePaymentMethod = false,
+    requireTerminalForFaceToFace = false,
+    allowedSourceTypes = null,
+  } = options;
   const errors = [];
   const countryWasDefaulted = !payload.country;
 
@@ -95,7 +100,13 @@ function validateTransaction(payload) {
     errors.push("ip_address is required for online transactions");
   }
 
-  if (paymentMethod && !VALID_PAYMENT_METHODS.includes(paymentMethod)) {
+  if (requireTerminalForFaceToFace && transactionType === "face_to_face" && !normalizeText(payload.terminal_id)) {
+    errors.push("terminal_id is required for face_to_face transactions");
+  }
+
+  if (requirePaymentMethod && !paymentMethod) {
+    errors.push("payment_method is required");
+  } else if (paymentMethod && !VALID_PAYMENT_METHODS.includes(paymentMethod)) {
     errors.push(`payment_method must be one of: ${VALID_PAYMENT_METHODS.join(", ")}`);
   }
 
@@ -105,6 +116,11 @@ function validateTransaction(payload) {
 
   if (!Number.isInteger(merchantRiskScore)) {
     errors.push("merchant_risk_score must be an integer");
+  }
+
+  const sourceType = normalizeText(payload.source_type) || "text_input";
+  if (Array.isArray(allowedSourceTypes) && allowedSourceTypes.length && !allowedSourceTypes.includes(sourceType)) {
+    errors.push(`source_type must be one of: ${allowedSourceTypes.join(", ")}`);
   }
 
   if (errors.length) {
@@ -136,7 +152,7 @@ function validateTransaction(payload) {
       terminal_id: normalizeText(payload.terminal_id) || null,
       payment_gateway_ref: normalizeText(payload.payment_gateway_ref) || null,
       payment_method: paymentMethod || null,
-      source_type: normalizeText(payload.source_type) || "text_input",
+      source_type: sourceType,
     },
     metadata: { countryWasDefaulted },
   };

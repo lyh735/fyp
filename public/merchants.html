@@ -1,34 +1,784 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Merchants - Compliance Monitoring System</title>
   <link rel="stylesheet" href="/css/style.css">
   <style>
-    .page-heading{margin-bottom:22px}.page-heading h1{font-size:24px}.page-heading p{color:var(--text-muted);margin-top:5px}.merchant-link{color:var(--primary);font-weight:700;text-decoration:none}.merchant-link:hover{text-decoration:underline}.empty-cell{text-align:center;color:var(--text-muted);padding:36px}@media(max-width:760px){.sidebar{display:none}.main-content{margin-left:0}.content-area{padding:18px}}
+    [hidden]{display:none!important}
+    .page-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px}
+    .page-heading h1{font-size:24px}
+    .page-heading p{color:var(--text-muted);margin-top:5px}
+    .merchant-link,.back-link,.transaction-link{color:var(--primary);font-weight:700;text-decoration:none}
+    .merchant-link:hover,.back-link:hover,.transaction-link:hover{text-decoration:underline}
+    .empty-cell{text-align:center;color:var(--text-muted);padding:36px}
+    .profile-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+    .profile-field{padding:14px;border:1px solid var(--border);border-radius:10px;background:#f8fafc;min-width:0}
+    .profile-field dt{color:var(--text-muted);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px}
+    .profile-field dd{font-size:13.5px;font-weight:600;overflow-wrap:anywhere}
+    .profile-field.wide{grid-column:span 2}
+    .summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:22px}
+    .summary-item{background:white;border:1px solid var(--border);border-radius:12px;padding:17px;box-shadow:var(--shadow-sm)}
+    .summary-item span{display:block;color:var(--text-muted);font-size:11px;font-weight:700;text-transform:uppercase}
+    .summary-item strong{display:block;font-size:23px;margin-top:4px}
+    .merchant-card{margin-bottom:22px}
+    .admin-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 16px}
+    .admin-form .form-group{margin-bottom:16px}
+    .form-actions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:10px}
+    .form-actions .btn{width:auto}
+    .page-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .workspace-toggle{display:flex;gap:10px;flex-wrap:wrap}
+    .admin-tools-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:22px}
+    .helper-text{color:var(--text-muted);font-size:12px;line-height:1.6}
+    .import-drop-zone{border:2px dashed #94a3b8;border-radius:12px;padding:24px 16px;text-align:center;background:#f8fafc;cursor:pointer;transition:.18s}
+    .import-drop-zone:hover,.import-drop-zone.dragging{border-color:var(--primary);background:#eff6ff}
+    .import-drop-zone strong{display:block;font-size:14px;margin-bottom:6px}
+    .file-meta{display:none;margin-top:12px;padding:10px 12px;border-radius:8px;background:#f1f5f9;font-size:12.5px}
+    .import-tool-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+    .import-tool-row .btn{width:auto}
+    .column-guide{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}
+    .guide-item{padding:11px;border-radius:8px;background:#f8fafc;border:1px solid var(--border)}
+    .guide-item code{display:block;color:var(--primary);font-size:11.5px;font-weight:700;margin-bottom:4px}
+    .guide-item span{color:var(--text-muted);font-size:11px}
+    .validation-reminder{margin:16px 0 0;padding:13px 15px;border-radius:9px;font-size:12.5px;line-height:1.6}
+    .validation-reminder.warning{background:#fffbeb;border:1px solid #fcd34d;color:#92400e}
+    .validation-reminder.valid{background:#f0fdf4;border:1px solid #86efac;color:#166534}
+    .validation-reminder strong{display:block;margin-bottom:4px}
+    .validation-reminder ul{margin:5px 0 0;padding-left:20px;max-height:180px;overflow:auto}
+    .invalid-preview-row{background:#fff7ed}
+    .process-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0 0}
+    .process-bar .btn-primary{width:auto}
+    .result-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding-top:18px}
+    .result-stat{padding:16px;border:1px solid var(--border);border-radius:10px;background:#f8fafc;text-align:center}
+    .result-stat strong{display:block;font-size:24px;margin-bottom:4px}
+    .result-stat span{color:var(--text-muted);font-size:11px;text-transform:uppercase;font-weight:700}
+    .error-list{margin:0;padding:18px 0 0 20px;color:#b91c1c;font-size:12.5px;line-height:1.7;max-height:220px;overflow:auto}
+    @media(max-width:1000px){
+      .profile-grid,.admin-form,.admin-tools-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media(max-width:760px){
+      .sidebar{display:none}
+      .main-content{margin-left:0}
+      .content-area{padding:18px}
+      .profile-grid,.admin-form,.summary-grid,.admin-tools-grid,.column-guide,.result-stats{grid-template-columns:1fr}
+      .profile-field.wide{grid-column:auto}
+      .page-heading{align-items:flex-start;flex-direction:column}
+    }
   </style>
 </head>
-<body><div class="app-layout">
+<body>
+<div class="app-layout">
   <aside class="sidebar">
-    <div class="sidebar-brand"><div class="brand-logo"><svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg></div><div class="brand-text"><div class="brand-name">Compliance Monitor</div><div class="brand-sub">Transaction Surveillance</div></div></div>
-    <nav class="sidebar-nav"><div class="nav-section-label">Main</div><div class="nav-item" onclick="location.href='/dashboard.html'">Overview</div><div class="nav-item" onclick="location.href='/transactions.html'">Transactions</div><div class="nav-item active">Merchants</div><div class="nav-item" onclick="location.href='/alerts.html'">Alerts</div><div class="nav-item" onclick="location.href='/rules.html'">Rules</div><div class="nav-section-label">Account</div><div class="nav-item" onclick="location.href='/account.html'">My Account</div></nav>
-    <div class="sidebar-user"><div class="sidebar-user-info"><div class="sidebar-avatar" id="sidebarAvatar">-</div><div><div class="user-name" id="sidebarName">-</div><div class="user-role" id="sidebarRole">-</div></div></div><button class="btn-logout" onclick="logout()">Sign Out</button></div>
+    <div class="sidebar-brand">
+      <div class="brand-logo"><svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg></div>
+      <div class="brand-text"><div class="brand-name">Compliance Monitor</div><div class="brand-sub">Transaction Surveillance</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Main</div>
+      <div class="nav-item" onclick="location.href='/dashboard.html'">Overview</div>
+      <div class="nav-item" onclick="location.href='/transactions.html'">Transactions</div>
+      <div class="nav-item active">Merchants</div>
+      <div class="nav-item" onclick="location.href='/alerts.html'">Alerts</div>
+      <div class="nav-item" onclick="location.href='/rules.html'">Rules</div>
+      <div class="nav-section-label">Account</div>
+      <div class="nav-item" onclick="location.href='/account.html'">My Account</div>
+    </nav>
+    <div class="sidebar-user">
+      <div class="sidebar-user-info">
+        <div class="sidebar-avatar" id="sidebarAvatar">-</div>
+        <div><div class="user-name" id="sidebarName">-</div><div class="user-role" id="sidebarRole">-</div></div>
+      </div>
+      <button class="btn-logout" onclick="logout()">Sign Out</button>
+    </div>
   </aside>
+
   <main class="main-content">
-    <div class="topbar"><h2>Merchants</h2><div class="topbar-user"><span id="topbarRole" class="badge"></span><span class="user-name" id="topbarName">-</span></div></div>
+    <div class="topbar">
+      <h2 id="sectionTitle">Merchants</h2>
+      <div class="topbar-user"><span id="topbarRole" class="badge"></span><span class="user-name" id="topbarName">-</span></div>
+    </div>
+
     <div class="content-area">
-      <div class="page-heading"><h1>Merchant Directory</h1><p>Select a merchant to view its profile and related transactions.</p></div>
+      <div class="page-heading">
+        <div>
+          <h1 id="pageTitle">Merchant Directory</h1>
+          <p id="pageSubtitle">Select a merchant to view its profile, terminals, and related transactions.</p>
+        </div>
+        <div class="page-actions">
+          <div class="workspace-toggle">
+            <button id="directoryToggle" class="btn btn-secondary" type="button">Directory</button>
+            <button id="profileToggle" class="btn btn-secondary" type="button" hidden>Selected Merchant</button>
+          </div>
+          <a id="backToDirectory" class="back-link" href="/merchants.html" hidden>&larr; Back to merchants</a>
+        </div>
+      </div>
+
       <div id="pageMessage" class="message"></div>
-      <section class="card"><div class="card-header"><h3>All Merchants</h3><div class="search-wrap"><input id="merchantSearch" class="search-input" style="padding-left:12px" placeholder="Search by name, ID, category or country"></div></div>
-        <div class="table-wrap"><table><thead><tr><th>Merchant</th><th>ID</th><th>Category</th><th>Country</th><th>Risk</th><th>Status</th><th>Transactions</th><th>Total Volume</th><th>Last Transaction</th></tr></thead><tbody id="merchantBody"><tr><td colspan="9" class="empty-cell">Loading...</td></tr></tbody></table></div>
-      </section>
+
+      <div id="directoryView">
+        <div id="merchantAdminTools" class="admin-tools-grid" hidden>
+          <section class="card">
+            <div class="card-header"><h3>Create Merchant</h3></div>
+            <div class="card-body">
+              <p class="helper-text">Manual creation requires the same core fields as bulk upload. Overnight operating hours are not supported in this workflow.</p>
+              <form id="merchantCreateForm" class="admin-form">
+                <div class="form-group"><label for="createMerchantId">Merchant ID *</label><input id="createMerchantId" maxlength="50" required></div>
+                <div class="form-group"><label for="createMerchantName">Merchant name *</label><input id="createMerchantName" maxlength="100" required></div>
+                <div class="form-group"><label for="createBusinessCategory">Business category *</label><input id="createBusinessCategory" maxlength="100" required></div>
+                <div class="form-group"><label for="createMccCode">MCC code *</label><select id="createMccCode" required><option value="">Select MCC code</option></select></div>
+                <div class="form-group"><label for="createHoursStart">Operating start *</label><input id="createHoursStart" type="time" required></div>
+                <div class="form-group"><label for="createHoursEnd">Operating end *</label><input id="createHoursEnd" type="time" required></div>
+                <div class="form-group"><label for="createCountry">Country *</label><input id="createCountry" maxlength="50" required></div>
+                <div class="form-group"><label for="createPhysicalLocation">Has physical location *</label><select id="createPhysicalLocation" required><option value="1">Yes</option><option value="0">No</option></select></div>
+                <div class="form-group"><label for="createStatus">Status *</label><select id="createStatus" required><option value="active">active</option><option value="inactive">inactive</option></select></div>
+                <div class="form-actions"><button id="createMerchantButton" class="btn btn-primary" type="submit">Create merchant</button></div>
+              </form>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-header"><h3>Import Merchants</h3></div>
+            <div class="card-body">
+              <p class="helper-text">Upload an XLSX, XLS, CSV, TSV, or TXT file with the required merchant columns. The first worksheet and first row of headings will be used.</p>
+              <div class="import-tool-row">
+                <button id="downloadMerchantTemplateButton" class="btn btn-secondary" type="button">Download template</button>
+                <span class="helper-text">Downloads a header-only Excel file with the required merchant columns.</span>
+              </div>
+              <input id="merchantImportFileInput" type="file" accept=".xlsx,.xls,.csv,.tsv,.txt" hidden>
+              <div id="merchantImportDropZone" class="import-drop-zone" tabindex="0">
+                <strong>Drop a file here or click to browse</strong>
+                <span>Maximum 500 merchant rows</span>
+              </div>
+              <div id="merchantImportFileMeta" class="file-meta"></div>
+              <div class="column-guide">
+                <div class="guide-item"><code>merchant_id *</code><span>Unique merchant reference</span></div>
+                <div class="guide-item"><code>merchant_name *</code><span>Merchant name cannot be blank</span></div>
+                <div class="guide-item"><code>business_category *</code><span>Supported business label</span></div>
+                <div class="guide-item"><code>mcc_code *</code><span>Must exist in the active MCC catalog</span></div>
+                <div class="guide-item"><code>operating_hours_start *</code><span>HH:MM or HH:MM:SS</span></div>
+                <div class="guide-item"><code>operating_hours_end *</code><span>Must be later than start time</span></div>
+                <div class="guide-item"><code>country *</code><span>Cannot be blank</span></div>
+                <div class="guide-item"><code>has_physical_location *</code><span>Yes/No or 1/0</span></div>
+                <div class="guide-item"><code>status *</code><span><code>active</code> or <code>inactive</code></span></div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <section id="merchantImportPreviewCard" class="card" hidden>
+          <div class="card-header"><h3>Merchant import preview</h3><span id="merchantImportPreviewCount" class="helper-text"></span></div>
+          <div class="card-body">
+            <div id="merchantImportValidation" class="validation-reminder" hidden></div>
+            <div class="table-wrap">
+              <table>
+                <thead id="merchantImportPreviewHead"></thead>
+                <tbody id="merchantImportPreviewBody"></tbody>
+              </table>
+            </div>
+            <div class="process-bar">
+              <span class="helper-text">Rows are processed independently. Existing merchant IDs are rejected during processing.</span>
+              <button id="merchantImportProcessButton" class="btn btn-primary" type="button">Process merchant import</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="merchantImportResultCard" class="card" hidden>
+          <div class="card-header"><h3>Merchant import result</h3></div>
+          <div class="card-body">
+            <div id="merchantImportResultStats" class="result-stats"></div>
+            <ul id="merchantImportErrorList" class="error-list"></ul>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <h3>All Merchants</h3>
+            <div class="search-wrap"><input id="merchantSearch" class="search-input" style="padding-left:12px" placeholder="Search by name, ID, category or country"></div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Merchant</th><th>ID</th><th>Category</th><th>Country</th><th>Risk</th><th>Status</th><th>Transactions</th><th>Total Volume</th><th>Last Transaction</th></tr></thead>
+              <tbody id="merchantBody"><tr><td colspan="9" class="empty-cell">Loading...</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card" id="mccSection" hidden>
+          <div class="card-header"><h3>MCC Code Catalog</h3></div>
+          <div class="card-body">
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>MCC Code</th><th>Description</th><th>Active</th><th>Actions</th></tr></thead>
+                <tbody id="mccBody"><tr><td colspan="4" class="empty-cell">Loading...</td></tr></tbody>
+              </table>
+            </div>
+            <form id="mccForm" style="display:flex;gap:10px;align-items:flex-end;margin-top:14px;flex-wrap:wrap">
+              <div class="form-group" style="margin:0"><label for="mccCodeInput">MCC code</label><input id="mccCodeInput" maxlength="20" placeholder="e.g. 5812" required></div>
+              <div class="form-group" style="margin:0;flex:1;min-width:200px"><label for="mccDescInput">Description</label><input id="mccDescInput" maxlength="150" placeholder="e.g. Eating Places, Restaurants" required></div>
+              <button class="btn btn-secondary" type="submit">Add MCC code</button>
+            </form>
+          </div>
+        </section>
+      </div>
+
+      <div id="profileViewPage" hidden>
+        <section id="summary" class="summary-grid" hidden>
+          <div class="summary-item"><span>Transactions</span><strong id="totalTransactions">0</strong></div>
+          <div class="summary-item"><span>Total volume</span><strong id="totalVolume">$0.00</strong></div>
+          <div class="summary-item"><span>Average transaction</span><strong id="averageTransaction">$0.00</strong></div>
+          <div class="summary-item"><span>High-risk transactions</span><strong id="highRiskTransactions">0</strong></div>
+        </section>
+
+        <section class="card merchant-card">
+          <div class="card-header"><h3>Merchant Information</h3><button id="editButton" class="btn btn-secondary" type="button" hidden>Edit merchant</button></div>
+          <div class="card-body">
+            <dl id="profileView" class="profile-grid"><div class="empty-cell">Loading...</div></dl>
+            <form id="profileForm" class="admin-form" hidden>
+              <div class="form-group"><label for="merchantName">Merchant name *</label><input id="merchantName" maxlength="100" required></div>
+              <div class="form-group"><label for="businessCategory">Business category *</label><input id="businessCategory" maxlength="100" required></div>
+              <div class="form-group"><label for="mccCode">MCC code *</label><select id="mccCode" required><option value="">Select MCC code</option></select></div>
+              <div class="form-group"><label for="averageAmount">Merchant average amount</label><input id="averageAmount" type="number" min="0" step="0.01"></div>
+              <div class="form-group"><label for="riskScore">Merchant risk score</label><input id="riskScore" type="number" min="0" max="100" step="1"></div>
+              <div class="form-group"><label for="riskLevel">Risk level</label><select id="riskLevel"><option value="">Not set</option><option>Low</option><option>Medium</option><option>High</option></select></div>
+              <div class="form-group"><label for="hoursStart">Operating hours start *</label><input id="hoursStart" type="time" step="1" required></div>
+              <div class="form-group"><label for="hoursEnd">Operating hours end *</label><input id="hoursEnd" type="time" step="1" required></div>
+              <div class="form-group"><label for="country">Country *</label><input id="country" maxlength="50" required></div>
+              <div class="form-group"><label for="physicalLocation">Physical location *</label><select id="physicalLocation" required><option value="1">Yes</option><option value="0">No</option></select></div>
+              <div class="form-group"><label for="merchantStatus">Status *</label><select id="merchantStatus" required><option value="active">active</option><option value="inactive">inactive</option></select></div>
+              <div class="form-actions"><button id="cancelButton" class="btn btn-secondary" type="button">Cancel</button><button id="saveButton" class="btn btn-primary" type="submit">Save changes</button></div>
+            </form>
+          </div>
+        </section>
+
+        <section class="card merchant-card">
+          <div class="card-header"><h3>Terminals</h3></div>
+          <div class="card-body">
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Terminal ID</th><th>Label</th><th>Status</th><th>Created</th><th id="terminalActionsHead" hidden>Actions</th></tr></thead>
+                <tbody id="terminalBody"><tr><td colspan="5" class="empty-cell">Loading...</td></tr></tbody>
+              </table>
+            </div>
+            <form id="terminalForm" class="admin-form" hidden style="margin-top:14px">
+              <div class="form-group"><label for="terminalLabel">New terminal label</label><input id="terminalLabel" maxlength="100" placeholder="e.g. Counter 3"></div>
+              <div class="form-actions" style="grid-column:auto;justify-content:flex-start"><button class="btn btn-secondary" type="submit">Add terminal</button></div>
+            </form>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-header"><h3>Related Transactions</h3><div class="search-wrap"><input id="transactionSearch" class="search-input" style="padding-left:12px" placeholder="Search transactions"></div></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Transaction ID</th><th>Date / Time</th><th>Payment</th><th>Amount</th><th>Country</th><th>Risk</th><th>Status</th><th>Source</th></tr></thead>
+              <tbody id="transactionBody"><tr><td colspan="8" class="empty-cell">Loading...</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
     </div>
   </main>
 </div>
-<script src="/js/auth.js"></script><script>
-const user=requireAuth();if(!user)throw new Error("Authentication required");if(user.first_login)location.href="/change-password.html";let merchants=[];
-sidebarName.textContent=user.name;sidebarRole.textContent=user.role;sidebarAvatar.textContent=user.name.charAt(0).toUpperCase();topbarName.textContent=user.name;topbarRole.textContent=user.role;topbarRole.className=`badge badge-${["admin","compliance_manager"].includes(String(user.role).toLowerCase())?"admin":"user"}`;
-function display(v){return v===null||v===undefined||v===""?"-":String(v)}function money(v){return new Intl.NumberFormat("en-SG",{style:"currency",currency:"SGD"}).format(Number(v)||0)}function dateTime(v){return v?new Date(v).toLocaleString("en-SG"):"-"}
-function render(filter=""){merchantBody.replaceChildren();const q=filter.trim().toLowerCase(),rows=merchants.filter(m=>[m.merchant_id,m.merchant_name,m.business_category,m.country,m.risk_level,m.status].some(v=>String(v??"").toLowerCase().includes(q)));if(!rows.length){const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=9;td.className="empty-cell";td.textContent=q?"No merchants match your search.":"No merchants found.";tr.append(td);merchantBody.append(tr);return}rows.forEach(m=>{const tr=document.createElement("tr"),nameCell=document.createElement("td"),link=document.createElement("a");link.className="merchant-link";link.href=`/merchant-profile.html?id=${encodeURIComponent(m.merchant_id)}`;link.textContent=m.merchant_name;nameCell.append(link);tr.append(nameCell);[m.merchant_id,m.business_category,m.country,m.risk_level,m.status,m.transaction_count,money(m.total_transaction_amount),dateTime(m.last_transaction_at)].forEach(v=>{const td=document.createElement("td");td.textContent=display(v);tr.append(td)});merchantBody.append(tr)})}
-merchantSearch.addEventListener("input",e=>render(e.target.value));(async()=>{const res=await apiFetch("/api/merchants");if(!res)return;const data=await res.json();if(!res.ok){showMessage("pageMessage",data.message||"Unable to load merchants.");return}merchants=data;render()})().catch(()=>showMessage("pageMessage","Network error."));
-</script></body></html>
+
+<script src="/js/auth.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+const user=requireAuth();if(!user)throw new Error("Authentication required");if(user.first_login)location.href="/change-password.html";
+const canEdit=["admin","compliance_manager"].includes(String(user.role).toLowerCase());
+const pageParams=new URLSearchParams(location.search);
+let currentMerchantId=pageParams.get("id");
+let merchants=[],merchant=null,transactions=[],terminals=[],mccCodes=[],mccLoaded=false;
+let pendingMerchantRows=[],pendingMerchantValidation={issues:[],invalidIndexes:new Set(),defaults:[]},merchantImportSourceName="";
+const merchantImportTemplateHeaders=["merchant_id","merchant_name","business_category","mcc_code","operating_hours_start","operating_hours_end","country","has_physical_location","status"];
+
+sidebarName.textContent=user.name;sidebarRole.textContent=user.role;sidebarAvatar.textContent=user.name.charAt(0).toUpperCase();topbarName.textContent=user.name;topbarRole.textContent=user.role;topbarRole.className=`badge badge-${canEdit?"admin":"user"}`;
+mccSection.hidden=!canEdit;editButton.hidden=!canEdit;terminalForm.hidden=!canEdit;terminalActionsHead.hidden=!canEdit;merchantAdminTools.hidden=!canEdit;
+
+function display(v,f="-"){return v===null||v===undefined||v===""?f:String(v)}
+function money(v,c="SGD"){return new Intl.NumberFormat("en-SG",{style:"currency",currency:c||"SGD"}).format(Number(v)||0)}
+function dateTime(v){return v?new Date(v).toLocaleString("en-SG"):"-"}
+function setPageMessage(message,type){if(!message){hideMessage("pageMessage");return}showMessage("pageMessage",message,type)}
+function escapeHtml(value){return String(value??"").replace(/[&<>\"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[char]))}
+function normalizeFieldName(value){return String(value).trim().toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"")}
+function normalizePreviewValue(value){return value instanceof Date?value.toISOString():value}
+function normalizeMerchantRow(row){return Object.fromEntries(Object.entries(row||{}).map(([key,value])=>[normalizeFieldName(key),value]))}
+function normalizeMerchantTimeValue(value){
+  if(value instanceof Date&&!Number.isNaN(value.getTime()))return value.toTimeString().slice(0,8);
+  const raw=String(value??"").trim();
+  if(!raw)return"";
+  const isoMatch=raw.match(/T(\d{2}:\d{2}:\d{2})/);
+  if(isoMatch)return isoMatch[1];
+  if(/^\d{2}:\d{2}$/.test(raw))return`${raw}:00`;
+  if(/^\d{2}:\d{2}:\d{2}$/.test(raw))return raw;
+  return null;
+}
+function sanitizeMerchantImportRow(row){
+  const normalized=normalizeMerchantRow(row);
+  return {...normalized,operating_hours_start:normalizeMerchantTimeValue(normalized.operating_hours_start)??normalized.operating_hours_start,operating_hours_end:normalizeMerchantTimeValue(normalized.operating_hours_end)??normalized.operating_hours_end};
+}
+function activeMccSet(){return new Set(mccCodes.filter(m=>m.is_active).map(m=>String(m.mcc_code)))}
+function validateMerchantValues(row,{requireId=true}={}){
+  const issues=[],merchantId=String(row.merchant_id??"").trim(),merchantName=String(row.merchant_name??"").trim(),businessCategory=String(row.business_category??"").trim(),mccCode=String(row.mcc_code??"").trim(),countryValue=String(row.country??"").trim(),locationValue=String(row.has_physical_location??"").trim().toLowerCase(),statusValue=String(row.status??"").trim().toLowerCase(),rawStart=String(row.operating_hours_start??"").trim(),rawEnd=String(row.operating_hours_end??"").trim(),start=normalizeMerchantTimeValue(row.operating_hours_start),end=normalizeMerchantTimeValue(row.operating_hours_end),supportedMcc=activeMccSet();
+  if(requireId&&!merchantId)issues.push("merchant_id is required");else if(merchantId.length>50)issues.push("merchant_id exceeds 50 characters");
+  if(!merchantName)issues.push("merchant_name is required");else if(merchantName.length>100)issues.push("merchant_name exceeds 100 characters");
+  if(!businessCategory)issues.push("business_category is required");
+  if(!mccCode)issues.push("mcc_code is required");else if(supportedMcc.size&&!supportedMcc.has(mccCode))issues.push("mcc_code is not in the active MCC catalog");
+  if(!rawStart)issues.push("operating_hours_start is required");else if(!start)issues.push("operating_hours_start must be in HH:MM or HH:MM:SS format");
+  if(!rawEnd)issues.push("operating_hours_end is required");else if(!end)issues.push("operating_hours_end must be in HH:MM or HH:MM:SS format");
+  if(start&&end&&start>=end)issues.push("operating_hours_start must be before operating_hours_end");
+  if(!countryValue)issues.push("country is required");
+  if(!["1","0","yes","no","y","n","true","false"].includes(locationValue))issues.push("has_physical_location must be Yes/No or 1/0");
+  if(!["active","inactive"].includes(statusValue))issues.push("status must be active or inactive");
+  return issues;
+}
+
+function parseDelimitedLine(line,delimiter){
+  const values=[];let value="",quoted=false;
+  for(let index=0;index<line.length;index++){
+    const character=line[index];
+    if(character==='"'){
+      if(quoted&&line[index+1]==='"'){value+='"';index++;}else quoted=!quoted;
+    }else if(character===delimiter&&!quoted){values.push(value.trim());value="";}
+    else value+=character;
+  }
+  values.push(value.trim());
+  return values;
+}
+
+function parseTextRows(text){
+  const lines=text.split(/\r?\n/).filter(line=>line.trim());
+  if(lines.length<2)return[];
+  const delimiter=lines[0].includes("\t")?"\t":lines[0].includes("|")?"|":",";
+  const headers=parseDelimitedLine(lines[0],delimiter);
+  return lines.slice(1).map(line=>{
+    const values=parseDelimitedLine(line,delimiter);
+    return Object.fromEntries(headers.map((header,index)=>[header,values[index]??""]));
+  });
+}
+
+async function readMerchantFile(file){
+  const extension=file.name.split(".").pop().toLowerCase();
+  if(["txt","tsv","csv"].includes(extension))return parseTextRows(await file.text());
+  if(typeof XLSX==="undefined")throw new Error("The Excel reader could not load. Check the network connection and try again.");
+  const workbook=XLSX.read(await file.arrayBuffer(),{type:"array",cellDates:true});
+  const sheet=workbook.Sheets[workbook.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(sheet,{defval:"",raw:true});
+}
+
+function setView(view){
+  const profile=view==="profile";
+  directoryView.hidden=profile;
+  profileViewPage.hidden=!profile;
+  backToDirectory.hidden=!profile;
+  profileToggle.hidden=!currentMerchantId;
+  profileToggle.disabled=!currentMerchantId;
+  directoryToggle.className=`btn ${profile?"btn-secondary":"btn-primary"}`;
+  profileToggle.className=`btn ${profile?"btn-primary":"btn-secondary"}`;
+  sectionTitle.textContent=profile?"Merchant Details":"Merchants";
+  document.title=`${profile?"Merchant Details":"Merchants"} - Compliance Monitoring System`;
+  if(profile&&merchant){
+    pageTitle.textContent=merchant.merchant_name||"Merchant Details";
+    pageSubtitle.textContent=`Merchant ID: ${merchant.merchant_id}`;
+    profileToggle.textContent=merchant.merchant_name||"Selected Merchant";
+  }else if(profile){
+    pageTitle.textContent="Loading merchant...";
+    pageSubtitle.textContent=currentMerchantId?`Merchant ID: ${currentMerchantId}`:"Merchant information and transaction history";
+    profileToggle.textContent="Selected Merchant";
+  }else{
+    pageTitle.textContent="Merchant Directory";
+    pageSubtitle.textContent="Select a merchant to view its profile, terminals, and related transactions.";
+    profileToggle.textContent=merchant?.merchant_name||"Selected Merchant";
+  }
+}
+
+function updateHistoryForMerchant(id){
+  currentMerchantId=id||null;
+  const url=new URL(location.href);
+  if(currentMerchantId)url.searchParams.set("id",currentMerchantId);else url.searchParams.delete("id");
+  history.replaceState(null,"",`${url.pathname}${url.search}${url.hash}`);
+  setView(currentMerchantId?"profile":"directory");
+}
+
+function addField(label,value,wide=false){const box=document.createElement("div"),dt=document.createElement("dt"),dd=document.createElement("dd");box.className=`profile-field${wide?" wide":""}`;dt.textContent=label;dd.textContent=display(value);box.append(dt,dd);return box}
+
+function renderMerchantDirectory(filter=""){
+  merchantBody.replaceChildren();
+  const q=filter.trim().toLowerCase();
+  const rows=merchants.filter(m=>[m.merchant_id,m.merchant_name,m.business_category,m.country,m.risk_level,m.status].some(v=>String(v??"").toLowerCase().includes(q)));
+  if(!rows.length){
+    const tr=document.createElement("tr"),td=document.createElement("td");
+    td.colSpan=9;td.className="empty-cell";td.textContent=q?"No merchants match your search.":"No merchants found.";tr.append(td);merchantBody.append(tr);return;
+  }
+  rows.forEach(m=>{
+    const tr=document.createElement("tr"),nameCell=document.createElement("td"),link=document.createElement("a");
+    link.className="merchant-link";link.href=`/merchants.html?id=${encodeURIComponent(m.merchant_id)}`;link.textContent=m.merchant_name;
+    nameCell.append(link);tr.append(nameCell);
+    [m.merchant_id,m.business_category,m.country,m.risk_level,m.status,m.transaction_count,money(m.total_transaction_amount),dateTime(m.last_transaction_at)].forEach(v=>{const td=document.createElement("td");td.textContent=display(v);tr.append(td)});
+    merchantBody.append(tr);
+  });
+}
+
+function renderProfile(){
+  pageTitle.textContent=merchant.merchant_name;
+  pageSubtitle.textContent=`Merchant ID: ${merchant.merchant_id}`;
+  profileToggle.textContent=merchant.merchant_name;
+  profileView.replaceChildren(
+    addField("Merchant ID",merchant.merchant_id),
+    addField("Merchant name",merchant.merchant_name,true),
+    addField("Business category",merchant.business_category),
+    addField("MCC code",merchant.mcc_code),
+    addField("Merchant average amount",merchant.merchant_average_amount==null?null:money(merchant.merchant_average_amount)),
+    addField("Merchant risk score",merchant.merchant_risk_score),
+    addField("Risk level",merchant.risk_level),
+    addField("Operating hours",merchant.operating_hours_start||merchant.operating_hours_end?`${display(merchant.operating_hours_start)} - ${display(merchant.operating_hours_end)}`:null),
+    addField("Country",merchant.country),
+    addField("Physical location",Number(merchant.has_physical_location)?"Yes":"No"),
+    addField("Status",merchant.status),
+    addField("Created at",dateTime(merchant.created_at)),
+    addField("Created by",merchant.created_by_name||merchant.created_by),
+    addField("Updated at",dateTime(merchant.updated_at)),
+    addField("Updated by",merchant.updated_by_name||merchant.updated_by)
+  );
+}
+
+function renderSummary(){
+  const total=transactions.reduce((sum,txn)=>sum+Number(txn.amount||0),0);
+  totalTransactions.textContent=transactions.length;
+  totalVolume.textContent=money(total);
+  averageTransaction.textContent=money(transactions.length?total/transactions.length:0);
+  highRiskTransactions.textContent=transactions.filter(txn=>String(txn.risk_level).toLowerCase()==="high").length;
+  summary.hidden=false;
+}
+
+function renderTransactions(filter=""){
+  transactionBody.replaceChildren();
+  const q=filter.trim().toLowerCase();
+  const rows=transactions.filter(txn=>Object.values(txn).some(v=>String(v??"").toLowerCase().includes(q)));
+  if(!rows.length){
+    const tr=document.createElement("tr"),td=document.createElement("td");
+    td.colSpan=8;td.className="empty-cell";td.textContent=q?"No matching transactions.":"No transactions found for this merchant.";tr.append(td);transactionBody.append(tr);return;
+  }
+  rows.forEach(txn=>{
+    const tr=document.createElement("tr"),idCell=document.createElement("td"),link=document.createElement("a");
+    link.className="transaction-link";link.href=`/transaction/${encodeURIComponent(txn.transaction_id)}`;link.textContent=txn.transaction_id;
+    idCell.append(link);tr.append(idCell);
+    [dateTime(txn.txn_time||txn.created_at),display(txn.payment_method),money(txn.amount,txn.currency),display(txn.country),`${display(txn.risk_level)} (${display(txn.risk_score,"0")})`,display(txn.transaction_status),display(txn.source_type)].forEach(v=>{const td=document.createElement("td");td.textContent=v;tr.append(td)});
+    transactionBody.append(tr);
+  });
+}
+
+function populateSelectWithMccOptions(selectElement,currentValue="",placeholder="Select MCC code"){
+  const options=mccCodes.filter(m=>m.is_active||m.mcc_code===currentValue);
+  selectElement.replaceChildren(new Option(placeholder,""));
+  options.forEach(m=>selectElement.append(new Option(`${m.mcc_code} - ${m.description}`,m.mcc_code)));
+  if(currentValue&&!options.some(m=>m.mcc_code===currentValue))selectElement.append(new Option(currentValue,currentValue));
+  selectElement.value=currentValue||"";
+}
+
+function populateMccOptions(){
+  populateSelectWithMccOptions(mccCode,merchant?.mcc_code||"");
+  if(canEdit)populateSelectWithMccOptions(createMccCode,"","Select MCC code");
+}
+
+async function loadMccCatalog(){
+  if(!canEdit)return;
+  const res=await apiFetch("/api/mcc-codes");
+  if(!res)return;
+  const data=await res.json();
+  if(!res.ok){setPageMessage(data.message||"Unable to load MCC codes.");return;}
+  mccCodes=data;mccLoaded=true;renderMccCatalog();populateMccOptions();
+}
+
+function renderMccCatalog(){
+  mccBody.replaceChildren();
+  if(!mccCodes.length){
+    const tr=document.createElement("tr"),td=document.createElement("td");
+    td.colSpan=4;td.className="empty-cell";td.textContent="No MCC codes defined.";tr.append(td);mccBody.append(tr);return;
+  }
+  mccCodes.forEach(m=>{
+    const tr=document.createElement("tr");
+    [m.mcc_code,m.description,m.is_active?"Yes":"No"].forEach(v=>{const td=document.createElement("td");td.textContent=display(v);tr.append(td)});
+    const actionTd=document.createElement("td"),btn=document.createElement("button");
+    btn.className="btn btn-secondary";btn.type="button";btn.textContent="Delete";btn.addEventListener("click",()=>deleteMcc(m.mcc_code));actionTd.append(btn);tr.append(actionTd);mccBody.append(tr);
+  });
+}
+
+function validateMerchantImportRows(rows){
+  const normalizedRows=rows.map(sanitizeMerchantImportRow),headers=new Set(normalizedRows.flatMap(row=>Object.keys(row))),issues=[],invalidIndexes=new Set(),seenIds=new Set();
+  const requiredColumns=["merchant_id","merchant_name","business_category","mcc_code","operating_hours_start","operating_hours_end","country","has_physical_location","status"];
+  const missingRequired=requiredColumns.filter(column=>!headers.has(column));
+  if(missingRequired.length){
+    issues.push(`Missing required column(s): ${missingRequired.join(", ")}`);
+    normalizedRows.forEach((_,index)=>invalidIndexes.add(index));
+  }
+
+  normalizedRows.forEach((row,index)=>{
+    const rowIssues=validateMerchantValues(row,{requireId:true}),merchantId=String(row.merchant_id??"").trim();
+    if(merchantId){
+      if(seenIds.has(merchantId))rowIssues.push("duplicate merchant_id in this import");
+      else seenIds.add(merchantId);
+    }
+    if(rowIssues.length){
+      invalidIndexes.add(index);
+      issues.push(`Row ${index+2}: ${rowIssues.join("; ")}`);
+    }
+  });
+  return {issues,invalidIndexes,defaults:[]};
+}
+
+function renderMerchantImportPreview(){
+  const headers=[...new Set(pendingMerchantRows.slice(0,10).flatMap(row=>Object.keys(row)))].slice(0,9);
+  merchantImportPreviewHead.innerHTML=`<tr>${headers.map(header=>`<th>${escapeHtml(header)}</th>`).join("")}</tr>`;
+  merchantImportPreviewBody.innerHTML=pendingMerchantRows.slice(0,10).map((row,index)=>
+    `<tr class="${pendingMerchantValidation.invalidIndexes.has(index)?"invalid-preview-row":""}">${headers.map(header=>`<td>${escapeHtml(normalizePreviewValue(row[header]))}</td>`).join("")}</tr>`
+  ).join("");
+  merchantImportPreviewCount.textContent=`${pendingMerchantRows.length} rows ready; showing first ${Math.min(10,pendingMerchantRows.length)}`;
+  if(pendingMerchantValidation.issues.length){
+    merchantImportValidation.className="validation-reminder warning";
+    merchantImportValidation.innerHTML=`<strong>Check the import before processing</strong>${pendingMerchantValidation.invalidIndexes.size} row(s) contain invalid or missing data. Existing merchant IDs are checked during processing.<ul>${pendingMerchantValidation.issues.slice(0,25).map(issue=>`<li>${escapeHtml(issue)}</li>`).join("")}</ul>`;
+  }else{
+    merchantImportValidation.className="validation-reminder valid";
+    merchantImportValidation.innerHTML="<strong>Validation passed</strong>Required columns and row values look valid. Existing merchant IDs are checked during processing.";
+  }
+  merchantImportValidation.hidden=false;
+  merchantImportPreviewCard.hidden=false;
+  merchantImportResultCard.hidden=true;
+}
+
+function prepareMerchantImport(rows,name){
+  if(!rows.length){setPageMessage("No merchant rows were found.");return;}
+  if(rows.length>500){setPageMessage("A maximum of 500 merchants is allowed per import.");return;}
+  pendingMerchantRows=rows.map(sanitizeMerchantImportRow);
+  pendingMerchantValidation=validateMerchantImportRows(rows);
+  merchantImportSourceName=name;
+  renderMerchantImportPreview();
+}
+
+function renderMerchantImportResult(data){
+  if(!data.summary){setPageMessage(data.message||"Merchant import failed.");return;}
+  const stats=[[data.summary.total,"Total"],[data.summary.succeeded,"Processed"],[data.summary.failed,"Failed"]];
+  merchantImportResultStats.innerHTML=stats.map(([value,label])=>`<div class="result-stat"><strong>${value}</strong><span>${label}</span></div>`).join("");
+  const failures=(data.results||[]).filter(result=>result.status==="failed");
+  merchantImportErrorList.innerHTML=failures.map(failure=>`<li>Row ${failure.row}${failure.merchant_id?` (${escapeHtml(failure.merchant_id)})`:""}: ${escapeHtml((failure.errors||[]).join("; "))}</li>`).join("");
+  merchantImportErrorList.hidden=!failures.length;
+  merchantImportResultCard.hidden=false;
+}
+
+function populateForm(){
+  merchantName.value=merchant.merchant_name||"";
+  businessCategory.value=merchant.business_category||"";
+  if(!mccLoaded&&canEdit)loadMccCatalog();else populateMccOptions();
+  mccCode.value=merchant.mcc_code||"";
+  averageAmount.value=merchant.merchant_average_amount??"";
+  riskScore.value=merchant.merchant_risk_score??0;
+  const level=String(merchant.risk_level||"").toLowerCase();
+  riskLevel.value=level?level.charAt(0).toUpperCase()+level.slice(1):"";
+  hoursStart.value=String(merchant.operating_hours_start||"").slice(0,8);
+  hoursEnd.value=String(merchant.operating_hours_end||"").slice(0,8);
+  country.value=merchant.country||"Singapore";
+  physicalLocation.value=Number(merchant.has_physical_location)?"1":"0";
+  merchantStatus.value=String(merchant.status||"active").toLowerCase();
+}
+
+function setEditing(editing){
+  profileView.hidden=editing;
+  profileForm.hidden=!editing;
+  editButton.hidden=editing||!canEdit;
+  if(editing)populateForm();
+}
+
+function renderTerminals(){
+  terminalBody.replaceChildren();
+  if(!terminals.length){
+    const tr=document.createElement("tr"),td=document.createElement("td");
+    td.colSpan=5;td.className="empty-cell";td.textContent="No terminals registered for this merchant.";tr.append(td);terminalBody.append(tr);return;
+  }
+  terminals.forEach(t=>{
+    const tr=document.createElement("tr");
+    [t.terminal_id,t.label,t.status,dateTime(t.created_at)].forEach(v=>{const td=document.createElement("td");td.textContent=display(v);tr.append(td)});
+    const actionTd=document.createElement("td");
+    if(canEdit){
+      const btn=document.createElement("button");
+      btn.className="btn btn-secondary";btn.type="button";btn.textContent="Delete";btn.addEventListener("click",()=>deleteTerminal(t.terminal_id));actionTd.append(btn);
+    }
+    tr.append(actionTd);terminalBody.append(tr);
+  });
+}
+
+async function loadMerchantDirectory(){
+  const res=await apiFetch("/api/merchants");
+  if(!res)return;
+  const data=await res.json();
+  if(!res.ok){setPageMessage(data.message||"Unable to load merchants.");return;}
+  merchants=data;renderMerchantDirectory(merchantSearch.value||"");
+}
+
+async function loadMerchantProfile(){
+  if(!currentMerchantId){setPageMessage("No merchant ID was provided.");return;}
+  const res=await apiFetch(`/api/merchants/${encodeURIComponent(currentMerchantId)}`);
+  if(!res)return;
+  const data=await res.json();
+  if(!res.ok){setPageMessage(data.message||"Unable to load merchant.");return;}
+  merchant=data.merchant;transactions=data.transactions||[];
+  setPageMessage();renderProfile();renderSummary();renderTransactions(transactionSearch.value||"");setEditing(false);await loadTerminals();if(canEdit&&!mccLoaded)loadMccCatalog();
+}
+
+async function loadTerminals(){
+  if(!currentMerchantId)return;
+  const res=await apiFetch(`/api/merchants/${encodeURIComponent(currentMerchantId)}/terminals`);
+  if(!res)return;
+  terminals=res.ok?await res.json():[];
+  renderTerminals();
+}
+
+async function deleteTerminal(terminalId){
+  if(!confirm(`Delete terminal ${terminalId}?`))return;
+  const res=await apiFetch(`/api/merchants/${encodeURIComponent(currentMerchantId)}/terminals/${encodeURIComponent(terminalId)}`,{method:"DELETE"});
+  if(!res)return;
+  const data=await res.json();
+  if(!res.ok){setPageMessage(data.message||"Unable to delete terminal.");return;}
+  setPageMessage(data.message,"success");loadTerminals();
+}
+
+async function deleteMcc(code){
+  if(!confirm(`Delete MCC code ${code}?`))return;
+  const res=await apiFetch(`/api/mcc-codes/${encodeURIComponent(code)}`,{method:"DELETE"});
+  if(!res)return;
+  const data=await res.json();
+  if(!res.ok){setPageMessage(data.message||"Unable to delete MCC code.");return;}
+  setPageMessage(data.message,"success");loadMccCatalog();
+}
+
+async function prepareMerchantFile(file){
+  if(!file)return;
+  try{
+    const rows=await readMerchantFile(file);
+    merchantImportFileMeta.innerHTML=`<strong>${escapeHtml(file.name)}</strong> &middot; ${rows.length} rows`;
+    merchantImportFileMeta.style.display="block";
+    prepareMerchantImport(rows,file.name);
+  }catch(error){
+    setPageMessage(error.message||"Unable to read merchant import file.");
+  }
+}
+
+function downloadMerchantTemplate(){
+  if(typeof XLSX==="undefined"){
+    setPageMessage("The Excel template generator is unavailable right now.");
+    return;
+  }
+  const workbook=XLSX.utils.book_new();
+  const sheet=XLSX.utils.aoa_to_sheet([merchantImportTemplateHeaders]);
+  XLSX.utils.book_append_sheet(workbook,sheet,"Merchants");
+  XLSX.writeFile(workbook,"merchant-import-template.xlsx");
+}
+
+directoryToggle.addEventListener("click",()=>{location.href="/merchants.html";});
+profileToggle.addEventListener("click",()=>{if(currentMerchantId)location.href=`/merchants.html?id=${encodeURIComponent(currentMerchantId)}`;});
+merchantSearch.addEventListener("input",e=>renderMerchantDirectory(e.target.value));
+transactionSearch.addEventListener("input",e=>renderTransactions(e.target.value));
+editButton.addEventListener("click",()=>setEditing(true));
+cancelButton.addEventListener("click",()=>setEditing(false));
+downloadMerchantTemplateButton.addEventListener("click",downloadMerchantTemplate);
+merchantImportProcessButton.addEventListener("click",async()=>{
+  if(!pendingMerchantRows.length){setPageMessage("Choose a merchant file first.");return;}
+  merchantImportProcessButton.disabled=true;merchantImportProcessButton.textContent=`Processing ${pendingMerchantRows.length} rows...`;
+  try{
+    const res=await apiFetch("/api/merchants/upload",{method:"POST",body:JSON.stringify({file_name:merchantImportSourceName,merchants:pendingMerchantRows})});
+    if(!res)return;
+    const data=await res.json();
+    if(!res.ok&&data.summary==null){setPageMessage(data.message||"Merchant import failed.");return;}
+    renderMerchantImportResult(data);
+    setPageMessage(data.message,data.summary?.failed?"error":"success");
+    loadMerchantDirectory();
+  }catch{
+    setPageMessage("Unable to process the merchant import.");
+  }finally{
+    merchantImportProcessButton.disabled=false;merchantImportProcessButton.textContent="Process merchant import";
+  }
+});
+
+merchantImportDropZone.addEventListener("click",()=>merchantImportFileInput.click());
+merchantImportDropZone.addEventListener("keydown",event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();merchantImportFileInput.click();}});
+merchantImportFileInput.addEventListener("change",()=>prepareMerchantFile(merchantImportFileInput.files[0]));
+["dragenter","dragover"].forEach(eventName=>merchantImportDropZone.addEventListener(eventName,event=>{
+  event.preventDefault();
+  merchantImportDropZone.classList.add("dragging");
+}));
+["dragleave","drop"].forEach(eventName=>merchantImportDropZone.addEventListener(eventName,event=>{
+  event.preventDefault();
+  merchantImportDropZone.classList.remove("dragging");
+}));
+merchantImportDropZone.addEventListener("drop",event=>prepareMerchantFile(event.dataTransfer.files[0]));
+
+if(mccForm)mccForm.addEventListener("submit",async e=>{
+  e.preventDefault();
+  const btn=mccForm.querySelector("button[type=submit]");btn.disabled=true;
+  try{
+    const res=await apiFetch("/api/mcc-codes",{method:"POST",body:JSON.stringify({mcc_code:mccCodeInput.value,description:mccDescInput.value})});
+    if(!res)return;
+    const data=await res.json();
+    if(!res.ok){setPageMessage(data.message||"Unable to add MCC code.");return;}
+    mccCodeInput.value="";mccDescInput.value="";setPageMessage(data.message,"success");loadMccCatalog();
+  }finally{btn.disabled=false}
+});
+
+if(merchantCreateForm)merchantCreateForm.addEventListener("submit",async e=>{
+  e.preventDefault();
+  const payload={merchant_id:createMerchantId.value,merchant_name:createMerchantName.value,business_category:createBusinessCategory.value,mcc_code:createMccCode.value,operating_hours_start:createHoursStart.value,operating_hours_end:createHoursEnd.value,country:createCountry.value,has_physical_location:createPhysicalLocation.value,status:createStatus.value};
+  const issues=validateMerchantValues(payload,{requireId:true});
+  if(issues.length){setPageMessage(issues[0]);return;}
+  createMerchantButton.disabled=true;createMerchantButton.textContent="Creating...";
+  try{
+    const res=await apiFetch("/api/merchants",{method:"POST",body:JSON.stringify(payload)});
+    if(!res)return;
+    const data=await res.json();
+    if(!res.ok){setPageMessage(data.message||"Unable to create merchant.");return;}
+    merchantCreateForm.reset();
+    createPhysicalLocation.value="1";
+    createStatus.value="active";
+    setPageMessage(data.message,"success");
+    loadMerchantDirectory();
+  }catch{
+    setPageMessage("Unable to create merchant.");
+  }finally{
+    createMerchantButton.disabled=false;createMerchantButton.textContent="Create merchant";
+  }
+});
+
+if(terminalForm)terminalForm.addEventListener("submit",async e=>{
+  e.preventDefault();
+  const btn=terminalForm.querySelector("button[type=submit]");btn.disabled=true;
+  try{
+    const res=await apiFetch(`/api/merchants/${encodeURIComponent(currentMerchantId)}/terminals`,{method:"POST",body:JSON.stringify({label:terminalLabel.value})});
+    if(!res)return;
+    const data=await res.json();
+    if(!res.ok){setPageMessage(data.message||"Unable to add terminal.");return;}
+    terminalLabel.value="";setPageMessage(data.message,"success");loadTerminals();
+  }finally{btn.disabled=false}
+});
+
+profileForm.addEventListener("submit",async e=>{
+  e.preventDefault();
+  saveButton.disabled=true;saveButton.textContent="Saving...";hideMessage("pageMessage");
+  const payload={merchant_name:merchantName.value,business_category:businessCategory.value,mcc_code:mccCode.value,merchant_average_amount:averageAmount.value,merchant_risk_score:riskScore.value,operating_hours_start:hoursStart.value,operating_hours_end:hoursEnd.value,risk_level:riskLevel.value,country:country.value,has_physical_location:physicalLocation.value,status:merchantStatus.value};
+  const issues=validateMerchantValues(payload,{requireId:false});
+  if(issues.length){saveButton.disabled=false;saveButton.textContent="Save changes";setPageMessage(issues[0]);return;}
+  try{
+    const res=await apiFetch(`/api/merchants/${encodeURIComponent(currentMerchantId)}`,{method:"PUT",body:JSON.stringify(payload)});
+    if(!res)return;
+    const data=await res.json();
+    if(!res.ok){setPageMessage(data.message||"Update failed.");return;}
+    merchant={...merchant,...data.merchant};renderProfile();setEditing(false);setPageMessage(data.message,"success");loadMerchantDirectory();
+  }catch{setPageMessage("Network error.")}
+  finally{saveButton.disabled=false;saveButton.textContent="Save changes";}
+});
+
+setView(currentMerchantId?"profile":"directory");
+loadMerchantDirectory().catch(()=>setPageMessage("Network error."));
+if(canEdit)loadMccCatalog().catch(()=>setPageMessage("Network error."));
+if(currentMerchantId)loadMerchantProfile().catch(()=>setPageMessage("Network error."));
+</script>
+</body>
+</html>
