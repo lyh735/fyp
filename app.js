@@ -24,6 +24,7 @@ const authRoutes = require("./routes/authRoutes");
 const stroRoutes = require("./routes/stroRoutes");
 const rfiRoutes = require("./routes/rfiRoutes");
 const merchantRoutes = require("./routes/merchantRoutes");
+const mccCodeRoutes = require("./routes/mccCodeRoutes");
 const { ensureComplianceSchema } = require("./services/schema");
 const { showTransactionDetailsPage } = require("./controllers/transactionController");
 
@@ -32,6 +33,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/stro", stroRoutes);
 app.use("/api/rfis", rfiRoutes);
 app.use("/api/merchants", merchantRoutes);
+app.use("/api/mcc-codes", mccCodeRoutes);
 
 const officerRoutes = require("./routes/officerRoutes");
 app.use("/api/officer", officerRoutes);

@@ -54,6 +54,40 @@ const MERCHANT_AVERAGES = {
   retail: 120,
 };
 
+// MCC codes per business category (mirrors the default rows seeded into the mcc_codes table)
+const MCC_CODES = {
+  fine_dining:   "5812", // Eating Places, Restaurants
+  casual_dining: "5812", // Eating Places, Restaurants
+  food_court:    "5814", // Fast Food Restaurants
+  retail:        "5399", // Miscellaneous General Merchandise
+};
+
+// Per-merchant MCC overrides for stores that don't fit their category's default code
+const MCC_OVERRIDES = {
+  "BreadTalk Raffles City":       "5462", // Bakeries
+  "Chinatown Heritage Souvenir":  "5947", // Gift, Novelty & Souvenir Shops
+  "Resorts World Sentosa Shop":   "5947", // Gift, Novelty & Souvenir Shops
+  "Gardens by the Bay Gift Shop": "5947", // Gift, Novelty & Souvenir Shops
+  "Marina Bay Sands Boutique":    "5651", // Family Clothing Stores
+};
+
+const OPERATING_HOURS = {
+  fine_dining:   { start: "11:30:00", end: "22:30:00" },
+  casual_dining: { start: "10:00:00", end: "22:00:00" },
+  food_court:    { start: "07:00:00", end: "22:00:00" },
+  retail:        { start: "10:00:00", end: "21:30:00" },
+};
+
+function mccCode(merchant) {
+  return MCC_OVERRIDES[merchant.name] || MCC_CODES[merchant.category];
+}
+
+function merchantRiskLevel(score) {
+  if (score >= 70) return "High";
+  if (score >= 30) return "Medium";
+  return "Low";
+}
+
 const COUNTRIES = [
   { name: "Singapore", weight: 0.82 },
   { name: "China",     weight: 0.08 },
@@ -113,14 +147,20 @@ exports.generateTransaction = () => {
   const isCard = payment_method === "Visa" || payment_method === "Mastercard";
   const cardBin = isCard ? (payment_method === "Visa" ? "411111" : "555555") : null;
   const cardLast4 = isCard ? randomDigits(4) : null;
+  const merchantRiskScore = amount > 3000 ? 75 : randInt(5, 35);
+  const hours = OPERATING_HOURS[merchant.category];
 
   return {
     transaction_id: generateTxnId(),
     merchant_id:    merchantId(merchant.name),
     merchant_name:  merchant.name,
     business_category: merchant.category,
+    mcc_code: mccCode(merchant),
     merchant_average_amount: MERCHANT_AVERAGES[merchant.category],
-    merchant_risk_score: amount > 3000 ? 75 : randInt(5, 35),
+    operating_hours_start: hours.start,
+    operating_hours_end: hours.end,
+    merchant_risk_score: merchantRiskScore,
+    merchant_risk_level: merchantRiskLevel(merchantRiskScore),
     merchant_country: "Singapore",
     has_physical_location: true,
     payment_method,
@@ -133,7 +173,6 @@ exports.generateTransaction = () => {
     card_bin: cardBin,
     masked_card_number: isCard ? `${cardBin}******${cardLast4}` : null,
     card_presence: isCard ? (transaction_type === "online" ? "card_not_present" : "card_present") : null,
-    terminal_id: transaction_type === "face_to_face" ? `TERM-${randInt(1000, 9999)}` : null,
     payment_gateway_ref: `GW-${randomDigits(12)}`,
     txn_time:       new Date().toISOString().slice(0, 19).replace("T", " "),
   };

@@ -29,6 +29,7 @@ async function ensureComplianceSchema() {
       country VARCHAR(50) DEFAULT 'Singapore',
       has_physical_location TINYINT(1) DEFAULT 1,
       status VARCHAR(30),
+      terminals_seeded TINYINT(1) DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       created_by INT,
@@ -148,6 +149,36 @@ async function ensureComplianceSchema() {
   `);
 
   await query(`
+    CREATE TABLE IF NOT EXISTS mcc_codes (
+      mcc_code VARCHAR(20) PRIMARY KEY,
+      description VARCHAR(150) NOT NULL,
+      is_active TINYINT(1) DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      created_by INT,
+      updated_by INT,
+      FOREIGN KEY (created_by) REFERENCES users(user_id),
+      FOREIGN KEY (updated_by) REFERENCES users(user_id)
+    )
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS terminals (
+      terminal_id VARCHAR(50) PRIMARY KEY,
+      merchant_id VARCHAR(50) NOT NULL,
+      label VARCHAR(100),
+      status VARCHAR(20) DEFAULT 'active',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      created_by INT,
+      updated_by INT,
+      FOREIGN KEY (merchant_id) REFERENCES merchants(merchant_id),
+      FOREIGN KEY (created_by) REFERENCES users(user_id),
+      FOREIGN KEY (updated_by) REFERENCES users(user_id)
+    )
+  `);
+
+  await query(`
     CREATE TABLE IF NOT EXISTS str_reports (
       str_id INT AUTO_INCREMENT PRIMARY KEY,
       alert_id INT NOT NULL,
@@ -169,6 +200,7 @@ async function ensureComplianceSchema() {
   await ensureCurrentSchemaCompatibility();
 
   await ensureDefaultRules();
+  await ensureDefaultMccCodes();
 }
 
 async function columnExists(table, column) {
@@ -186,10 +218,26 @@ async function addColumnIfMissing(table, column, definition) {
   }
 }
 
+async function indexExists(table, indexName) {
+  const rows = await query(`
+    SELECT COUNT(*) AS count
+    FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?
+  `, [table, indexName]);
+  return rows[0].count > 0;
+}
+
+async function addIndexIfMissing(table, indexName, columns) {
+  if (!(await indexExists(table, indexName))) {
+    await query(`CREATE INDEX ${indexName} ON ${table}(${columns})`);
+  }
+}
+
 async function ensureCurrentSchemaCompatibility() {
   await addColumnIfMissing("merchants", "has_physical_location", "TINYINT(1) DEFAULT 1");
   await addColumnIfMissing("merchants", "created_by", "INT NULL");
   await addColumnIfMissing("merchants", "updated_by", "INT NULL");
+  await addColumnIfMissing("merchants", "terminals_seeded", "TINYINT(1) DEFAULT 0");
 
   await addColumnIfMissing("transactions", "card_bin", "VARCHAR(10) NULL");
   await addColumnIfMissing("transactions", "masked_card_number", "VARCHAR(30) NULL");
@@ -228,6 +276,8 @@ async function ensureCurrentSchemaCompatibility() {
   await addColumnIfMissing("rfi_requests", "response_attachment", "VARCHAR(255) NULL");
   await addColumnIfMissing("rfi_requests", "is_sent", "TINYINT(1) DEFAULT 0");
   await addColumnIfMissing("str_reports", "rejected_at", "DATETIME NULL");
+
+  await addIndexIfMissing("terminals", "idx_terminals_merchant", "merchant_id");
 
   await query(`
     UPDATE rfi_requests
@@ -385,4 +435,32 @@ async function ensureDefaultRules(createdBy = null) {
   }
 }
 
-module.exports = { ensureComplianceSchema, ensureDefaultRules };
+async function ensureDefaultMccCodes(createdBy = null) {
+  const existing = await query("SELECT COUNT(*) AS count FROM mcc_codes");
+  if (existing[0].count > 0) return;
+
+  let authorId = createdBy;
+  if (!authorId) {
+    const authors = await query("SELECT user_id FROM users ORDER BY user_id ASC LIMIT 1");
+    if (authors.length === 0) return;
+    authorId = authors[0].user_id;
+  }
+
+  const defaults = [
+    ["5812", "Eating Places, Restaurants"],
+    ["5814", "Fast Food Restaurants"],
+    ["5399", "Miscellaneous General Merchandise"],
+    ["5462", "Bakeries"],
+    ["5947", "Gift, Novelty & Souvenir Shops"],
+    ["5651", "Family Clothing Stores"],
+  ];
+
+  for (const [mccCode, description] of defaults) {
+    await query(
+      "INSERT IGNORE INTO mcc_codes (mcc_code, description, is_active, created_by, updated_by) VALUES (?, ?, 1, ?, ?)",
+      [mccCode, description, authorId, authorId]
+    );
+  }
+}
+
+module.exports = { ensureComplianceSchema, ensureDefaultRules, ensureDefaultMccCodes };
