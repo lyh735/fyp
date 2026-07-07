@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const { randomUUID } = require("crypto");
 const { query } = require("../services/dbQuery");
 const { evaluateTransaction } = require("../services/riskEngine");
 const { generateTransaction } = require("../services/simulator");
@@ -208,10 +209,10 @@ async function getRecentMerchantTransactionCount(merchantId, timestamp) {
   return rows[0].count;
 }
 
-async function processTransaction(payload, req) {
+async function processTransaction(payload, req, validationOptions = {}) {
   await logAudit("transaction_received", payload, "Transaction received");
 
-  const validation = validateTransaction(payload);
+  const validation = validateTransaction(payload, validationOptions);
   if (!validation.isValid) {
     await logAudit(
       "validation_failed",
@@ -507,6 +508,29 @@ function formatImportError(err) {
   return err?.message || "Unable to process transaction";
 }
 
+function generateMaskedReference(prefix) {
+  return `${prefix}-***${randomUUID().replace(/-/g, "").slice(0, 6).toUpperCase()}`;
+}
+
+function generateGatewayReference() {
+  return `GW-${randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase()}`;
+}
+
+async function getMerchantImportProfile(merchantId) {
+  const merchants = await query(
+    `
+      SELECT merchant_id, merchant_name, business_category, mcc_code,
+             merchant_average_amount, operating_hours_start, operating_hours_end,
+             risk_level, merchant_risk_score, country, has_physical_location
+      FROM merchants
+      WHERE merchant_id = ?
+      LIMIT 1
+    `,
+    [merchantId]
+  );
+  return merchants[0] || null;
+}
+
 exports.uploadTransactions = async (req, res) => {
   const rows = req.body?.transactions;
   if (!Array.isArray(rows) || rows.length === 0) {
@@ -516,7 +540,10 @@ exports.uploadTransactions = async (req, res) => {
     return res.status(400).json({ message: "A maximum of 500 transactions is allowed per upload" });
   }
 
-  const merchantAverageCache = new Map();
+  const importSourceType = String(req.body?.source_type || "").trim().toLowerCase() === "manual"
+    ? "manual"
+    : "excel_upload";
+  const merchantProfileCache = new Map();
   const results = [];
 
   for (let index = 0; index < rows.length; index++) {
@@ -524,32 +551,52 @@ exports.uploadTransactions = async (req, res) => {
     const transactionId = row.transaction_id || null;
 
     try {
-      if (!row.merchant_average_amount && row.merchant_id) {
-        if (!merchantAverageCache.has(row.merchant_id)) {
-          const merchants = await query(
-            "SELECT merchant_average_amount FROM merchants WHERE merchant_id = ? LIMIT 1",
-            [row.merchant_id]
-          );
-          merchantAverageCache.set(
-            row.merchant_id,
-            merchants[0]?.merchant_average_amount || 1000
-          );
+      let merchantProfile = null;
+      if (row.merchant_id) {
+        if (!merchantProfileCache.has(row.merchant_id)) {
+          merchantProfileCache.set(row.merchant_id, await getMerchantImportProfile(row.merchant_id));
         }
-        row.merchant_average_amount = merchantAverageCache.get(row.merchant_id);
+        merchantProfile = merchantProfileCache.get(row.merchant_id);
+        if (!merchantProfile) {
+          throw new Error("merchant_id does not exist");
+        }
       }
 
       const payload = {
         ...row,
         timestamp: row.timestamp || row.txn_time || row.transaction_time,
-        currency: row.currency || "SGD",
-        transaction_type: row.transaction_type || (row.ip_address ? "online" : "face_to_face"),
+        currency: row.currency,
+        transaction_type: row.transaction_type,
         customer_risk_profile: row.customer_risk_profile || "low",
-        merchant_average_amount: row.merchant_average_amount || 1000,
-        merchant_name: row.merchant_name || row.merchant_id,
-        source_type: "excel_upload",
+        merchant_average_amount:
+          Number(merchantProfile?.merchant_average_amount) > 0
+            ? Number(merchantProfile.merchant_average_amount)
+            : 1000,
+        merchant_risk_score: Number.isInteger(Number(merchantProfile?.merchant_risk_score))
+          ? Number(merchantProfile.merchant_risk_score)
+          : 0,
+        merchant_name: merchantProfile?.merchant_name || row.merchant_name || row.merchant_id,
+        business_category: merchantProfile?.business_category || null,
+        mcc_code: merchantProfile?.mcc_code || null,
+        operating_hours_start: merchantProfile?.operating_hours_start || null,
+        operating_hours_end: merchantProfile?.operating_hours_end || null,
+        merchant_risk_level: merchantProfile?.risk_level || null,
+        merchant_country: merchantProfile?.country || "Singapore",
+        has_physical_location: merchantProfile?.has_physical_location,
+        country: row.country || merchantProfile?.country || "Singapore",
+        masked_payment_ref: row.masked_payment_ref || generateMaskedReference("PAY"),
+        payment_gateway_ref: row.payment_gateway_ref || generateGatewayReference(),
+        card_bin: row.card_bin || null,
+        masked_card_number: row.masked_card_number || null,
+        card_presence: row.card_presence || null,
+        source_type: importSourceType,
       };
 
-      const processed = await processTransaction(payload, req);
+      const processed = await processTransaction(payload, req, {
+        requirePaymentMethod: true,
+        requireTerminalForFaceToFace: true,
+        allowedSourceTypes: ["excel_upload", "manual"],
+      });
       if (!processed.validation.isValid) {
         results.push({
           row: index + 2,

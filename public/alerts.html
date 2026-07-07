@@ -6,13 +6,11 @@
   <title>Alerts - Compliance Monitoring System</title>
   <link rel="stylesheet" href="/css/style.css" />
   <style>
-    .unread-row { background: rgba(254,243,199,0.7); }
+    .unread-row { background: rgba(254, 243, 199, 0.7); }
   </style>
 </head>
 <body data-page="alerts">
-
 <div class="app-layout">
-  <!-- Sidebar -->
   <aside class="sidebar">
     <div class="sidebar-brand">
       <div class="brand-logo">
@@ -57,14 +55,6 @@
         </svg>
         Rules
       </div>
-      <div class="nav-item" onclick="window.location.href='/flagged-transactions.html'">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M9 17H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-          <path d="M17 7l5 5-5 5"/>
-          <line x1="12" y1="12" x2="22" y2="12"/>
-        </svg>
-        Flagged Transactions
-      </div>
 
       <div id="adminNav" style="display:none">
         <div class="nav-section-label">Administration</div>
@@ -73,7 +63,6 @@
             <polygon points="5 3 19 12 5 21 5 3"/>
           </svg>
           Simulator
-          <span id="simRunBadge" style="margin-left:auto;display:none;width:8px;height:8px;border-radius:50%;background:#22c55e;animation:simPulse 1.5s infinite"></span>
         </div>
         <div class="nav-item" onclick="window.location.href='/create-user.html'">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -98,10 +87,10 @@
 
     <div class="sidebar-user">
       <div class="sidebar-user-info">
-        <div class="sidebar-avatar" id="sidebarAvatar">—</div>
+        <div class="sidebar-avatar" id="sidebarAvatar">-</div>
         <div>
-          <div class="user-name" id="sidebarName">—</div>
-          <div class="user-role" id="sidebarRole">—</div>
+          <div class="user-name" id="sidebarName">-</div>
+          <div class="user-role" id="sidebarRole">-</div>
         </div>
       </div>
       <button class="btn-logout" onclick="logout()">
@@ -115,170 +104,135 @@
     </div>
   </aside>
 
-  <!-- Main -->
   <div class="main-content">
     <div class="topbar">
       <h2 id="sectionTitle">Alerts</h2>
       <div class="topbar-right">
         <div class="topbar-user">
           <span id="topbarRole" class="badge"></span>
-          <span class="user-name" id="topbarName">—</span>
+          <span class="user-name" id="topbarName">-</span>
         </div>
       </div>
     </div>
 
     <div class="content-area">
-
-      <!-- ALERTS SECTION -->
-      <div class="section active" id="section-alerts">
-        <div class="card">
-          <div class="card-header">
-            <h3><span class="alert-dot"></span>Compliance Alerts</h3>
-            <div class="search-wrap">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              </svg>
-              <input class="search-input" id="alertSearch" type="text"
-                placeholder="Search by transaction ID or reason…" oninput="filterTable('alertBody','alertSearch','alertNoResults')" />
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header" style="gap:16px;justify-content:space-between;flex-wrap:wrap;">
+          <div>
+            <h3>Compliance Alerts</h3>
+            <div style="color:var(--text-muted);font-size:13px;margin-top:6px;">
+              Review flagged transactions across statuses, risk levels, and read state from one alerts page.
             </div>
-            <div id="alertFilterLabel" style="margin-left:16px;color:var(--text-muted);font-size:13px;display:none"></div>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr><th>Transaction ID</th><th>Reason</th><th>Risk Level</th><th>Status</th><th>Read</th><th>Raised At</th></tr>
-              </thead>
-              <tbody id="alertBody">
-                <tr><td colspan="6"><div class="empty-state"><p>Loading…</p></div></td></tr>
-              </tbody>
-              <tbody>
-                <tr id="alertNoResults" style="display:none">
-                  <td colspan="6"><div class="no-results">No alerts match your search.</div></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div class="card" id="alertDetailCard" style="display:none; margin-top: 20px;">
-          <div class="card-header">
-            <h3>Alert Review</h3>
-          </div>
-          <div class="card-body">
-            <div class="alert-detail-grid">
-              <div><strong>Transaction ID</strong><div id="detailTxnId">—</div></div>
-              <div><strong>Merchant</strong><div id="detailMerchant">—</div></div>
-              <div><strong>Amount</strong><div id="detailAmount">—</div></div>
-              <div><strong>Risk Level</strong><div id="detailRiskLevel">—</div></div>
-              <div><strong>Status</strong><div id="detailAlertStatus">—</div></div>
-              <div><strong>Read Status</strong><div id="detailReadStatus">—</div></div>
-              <div><strong>Read At</strong><div id="detailReadAt">—</div></div>
-              <div><strong>Raised At</strong><div id="detailRaisedAt">—</div></div>
-              <div style="grid-column: span 3;"><strong>Triggered Rules</strong><div id="detailTriggeredRules">—</div></div>
-              <div style="grid-column: span 3;"><strong>Escalation Report</strong><div id="detailEscalationReport">—</div></div>
-            </div>
-            <div id="detailActions" style="margin-top:16px; display:flex; gap:12px;"></div>
           </div>
         </div>
       </div>
 
-      </div><!-- /content-area -->
-  </div><!-- /main-content -->
+      <div class="card">
+        <div class="card-header">
+          <h3><span class="alert-dot"></span>Alert Queue</h3>
+          <div class="search-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input class="search-input" id="alertSearch" type="text" placeholder="Search by transaction ID, merchant, reason, or risk..." oninput="filterTable('alertBody','alertSearch','alertNoResults')" />
+          </div>
+          <div class="risk-filter-group">
+            <button id="statusPending" type="button" class="filter-chip" onclick="setAlertStatusFilter('Pending')">Pending</button>
+            <button id="statusAll" type="button" class="filter-chip" onclick="setAlertStatusFilter('all')">All</button>
+          </div>
+          <div class="risk-filter-group">
+            <button id="riskAll" type="button" class="filter-chip" onclick="setAlertRiskFilter(null)">All Risks</button>
+            <button id="riskHigh" type="button" class="filter-chip" onclick="setAlertRiskFilter('High')">High</button>
+            <button id="riskMedium" type="button" class="filter-chip" onclick="setAlertRiskFilter('Medium')">Medium</button>
+            <button id="riskLow" type="button" class="filter-chip" onclick="setAlertRiskFilter('Low')">Low</button>
+          </div>
+          <div class="risk-filter-group">
+            <button id="readAll" type="button" class="filter-chip" onclick="setAlertReadFilter('all')">All Read States</button>
+            <button id="readUnread" type="button" class="filter-chip" onclick="setAlertReadFilter('unread')">Unread Only</button>
+          </div>
+          <div id="alertFilterLabel" class="filter-label" style="display:none">Filters: <span id="alertFilterValue"></span></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Transaction ID</th><th>Merchant</th><th>Reason</th><th>Amount</th><th>Risk Level</th><th>Status</th><th>Read</th><th>Raised At</th></tr>
+            </thead>
+            <tbody id="alertBody">
+              <tr><td colspan="8"><div class="empty-state"><p>Loading...</p></div></td></tr>
+            </tbody>
+            <tbody>
+              <tr id="alertNoResults" style="display:none">
+                <td colspan="8"><div class="no-results">No alerts match your search.</div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" id="alertDetailCard" style="display:none; margin-top:20px;">
+        <div class="card-header">
+          <h3>Alert Review</h3>
+        </div>
+        <div class="card-body">
+          <div class="alert-detail-grid">
+            <div><strong>Transaction ID</strong><div id="detailTxnId">-</div></div>
+            <div><strong>Merchant</strong><div id="detailMerchant">-</div></div>
+            <div><strong>Amount</strong><div id="detailAmount">-</div></div>
+            <div><strong>Risk Level</strong><div id="detailRiskLevel">-</div></div>
+            <div><strong>Status</strong><div id="detailAlertStatus">-</div></div>
+            <div><strong>Read Status</strong><div id="detailReadStatus">-</div></div>
+            <div><strong>Read At</strong><div id="detailReadAt">-</div></div>
+            <div><strong>Raised At</strong><div id="detailRaisedAt">-</div></div>
+            <div style="grid-column: span 3;"><strong>Triggered Rules</strong><div id="detailTriggeredRules">-</div></div>
+            <div style="grid-column: span 3;"><strong>Escalation Report</strong><div id="detailEscalationReport">-</div></div>
+          </div>
+          <div id="detailActions" style="margin-top:16px; display:flex; gap:12px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
-<!-- Toast container -->
 <div class="toast-container" id="toastContainer"></div>
 
 <script src="/js/auth.js"></script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
 const user = requireAuth();
-if (!user) throw new Error("not authenticated");
+if (!user) throw new Error("Authentication required");
 if (user.first_login) window.location.href = "/change-password.html";
-const currentPage = document.body.dataset.page || "overview";
-if (currentPage === "simulator" && !["admin", "compliance_manager"].includes(user.role)) {
-  window.location.href = "/dashboard.html";
-  throw new Error("admin required");
-}
 
-// Populate sidebar/topbar
-document.getElementById("sidebarName").textContent   = user.name;
-document.getElementById("sidebarRole").textContent   = user.role;
+document.getElementById("sidebarName").textContent = user.name;
+document.getElementById("sidebarRole").textContent = user.role;
 document.getElementById("sidebarAvatar").textContent = user.name.charAt(0).toUpperCase();
-document.getElementById("topbarName").textContent    = user.name;
-const roleEl = document.getElementById("topbarRole");
-roleEl.textContent = user.role;
-roleEl.className   = `badge badge-${user.role}`;
+document.getElementById("topbarName").textContent = user.name;
+const topbarRole = document.getElementById("topbarRole");
+topbarRole.textContent = user.role;
+topbarRole.className = `badge badge-${user.role}`;
 
-if (["admin", "compliance_manager"].includes(user.role)) {
-  const adminNav = document.getElementById("adminNav");
-  const statUsersCard = document.getElementById("statUsersCard");
-  if (adminNav) adminNav.style.display = "block";
-  if (statUsersCard) statUsersCard.style.display = "";
+if (["admin", "compliance_manager"].includes(String(user.role).toLowerCase())) {
+  document.getElementById("adminNav").style.display = "block";
 }
 
-// ── SECTION NAVIGATION ──
-const navItems = document.querySelectorAll(".nav-item[data-section]");
-const sections = document.querySelectorAll(".section");
-const titleEl  = document.getElementById("sectionTitle");
-const sectionLabels = { overview: "Overview", transactions: "Transactions", alerts: "Alerts", simulator: "Transaction Simulator", account: "My Account" };
-let currentAlertFilter = null;
+const pageParams = new URLSearchParams(window.location.search);
+let currentAlertStatusFilter = pageParams.get("status") === "all" ? "all" : "Pending";
+let currentAlertRiskFilter = ["High", "Medium", "Low"].includes(pageParams.get("risk")) ? pageParams.get("risk") : null;
+let currentAlertReadFilter = pageParams.get("filter") === "unread" ? "unread" : "all";
+let allAlerts = [];
 
-navItems.forEach((item) => {
-  item.addEventListener("click", () => {
-    const target = item.dataset.section;
-    if (!document.getElementById(`section-${target}`)) return;
-    navItems.forEach(n => n.classList.remove("active"));
-    sections.forEach(s => s.classList.remove("active"));
-    item.classList.add("active");
-    document.getElementById(`section-${target}`).classList.add("active");
-    titleEl.textContent = sectionLabels[target] || target;
-    if (target === "account") loadProfile();
+function formatDate(value) {
+  if (!value) return "-";
+  return new Date(value).toLocaleString("en-SG", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
   });
-});
-
-const dashboardCards = document.querySelectorAll(".stat-card[data-target], .stat-card[data-href]");
-dashboardCards.forEach((card) => {
-  card.classList.add("clickable");
-  card.addEventListener("click", () => {
-    const href = card.dataset.href;
-    if (href) {
-      window.location.href = href;
-      return;
-    }
-
-    const target = card.dataset.target;
-    if (!target) return;
-    const cardFilter = card.dataset.filter;
-    const targetUrl = target === "overview" ? "/dashboard.html" : `/${target}.html`;
-    const params = cardFilter ? `?filter=${encodeURIComponent(cardFilter)}` : "";
-    window.location.href = `${targetUrl}${params}`;
-  });
-});
-
-function setAlertFilter(filter) {
-  currentAlertFilter = filter || null;
-  const label = document.getElementById("alertFilterLabel");
-  if (label) {
-    if (filter === "unread") {
-      label.textContent = "Showing unread alerts only";
-      label.style.display = "inline-block";
-    } else {
-      label.textContent = "";
-      label.style.display = "none";
-    }
-  }
-  loadAlerts();
 }
 
-// ── HELPERS ──
-function toggleInput(id) {
-  const inp = document.getElementById(id);
-  inp.type = inp.type === "password" ? "text" : "password";
-}
-
-function statusPill(s) {
-  const labels = { normal: "Normal", review: "Review", suspicious: "Suspicious" };
-  return `<span class="pill pill-${s}">${labels[s] || s}</span>`;
+function formatMoney(value, currency = "SGD") {
+  return new Intl.NumberFormat("en-SG", { style: "currency", currency: currency || "SGD" }).format(Number(value) || 0);
 }
 
 function riskPill(level) {
@@ -287,542 +241,19 @@ function riskPill(level) {
   return `<span class="pill pill-${safe}">${labels[safe] || level}</span>`;
 }
 
-function formatDate(d) {
-  if (!d) return "—";
-  return new Date(d).toLocaleString("en-SG", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
-}
-
-function pmBadge(method) {
-  if (!method) return "—";
-  const map = {
-    "Visa":       "pm-badge pm-card",
-    "Mastercard": "pm-badge pm-card",
-    "Alipay":     "pm-badge pm-wallet",
-    "WeChat Pay": "pm-badge pm-wallet",
-    "GrabPay":    "pm-badge pm-wallet",
-    "ShopeePay":  "pm-badge pm-wallet",
-    "PayNow":     "pm-badge pm-bankqr",
-    "SGQR":       "pm-badge pm-bankqr",
-  };
-  return `<span class="${map[method] || 'pm-badge'}">${method}</span>`;
-}
-
-function riskBar(score) {
-  const clr = score >= 50 ? "#ef4444" : score >= 25 ? "#f59e0b" : "#22c55e";
-  return `<div style="display:flex;align-items:center;gap:6px">
-    <div style="flex:1;background:#e2e8f0;border-radius:99px;height:5px;max-width:64px">
-      <div style="width:${Math.min(score,100)}%;background:${clr};height:100%;border-radius:99px"></div>
-    </div>
-    <span style="font-size:12px;font-weight:700;color:${clr}">${score}</span>
-  </div>`;
-}
-
-let allTransactions = [];
-let currentTransactionFilter = null;
-
-function txnRow(t) {
-  const searchable = `${t.transaction_id} ${t.merchant_name||''} ${t.payment_method||''} ${t.country} ${t.status} ${t.risk_level}`.toLowerCase();
-  const txnId = encodeURIComponent(t.transaction_id || "");
-  return `<tr data-searchable="${searchable}" onclick="navigateToTransactionDetail('${txnId}')" style="cursor:pointer">
-    <td style="font-family:monospace;font-size:11.5px;color:var(--text-muted)">${t.transaction_id || "—"}</td>
-    <td style="font-weight:600;max-width:160px">${t.merchant_name || t.merchant_id || "—"}</td>
-    <td>${pmBadge(t.payment_method)}</td>
-    <td style="font-weight:700">$${parseFloat(t.amount||0).toLocaleString("en-SG",{minimumFractionDigits:2})}</td>
-    <td>${t.country || "—"}</td>
-    <td>${riskBar(t.risk_score||0)}</td>
-    <td>${statusPill(t.status||"normal")}</td>
-    <td style="color:var(--text-muted);font-size:12px">${formatDate(t.txn_time)}</td>
-  </tr>`;
-}
-
-function navigateToTransactionDetail(transactionId) {
-  if (!transactionId) return;
-  window.location.href = `/transaction/${transactionId}`;
-}
-
-function navigateToAlertDetails(alertId) {
-  if (!alertId) return;
-  showAlertDetails(alertId);
-}
-
-async function markAlertAsRead(alertId) {
-  if (!alertId) return;
-  const res = await apiFetch(`/api/alerts/${alertId}/read`, { method: "POST" });
-  if (!res) return;
-  await res.json();
-}
-
-function renderTransactions() {
-  const body = document.getElementById("txnBody");
-  if (!body) return;
-
-  const data = currentTransactionFilter === "attention"
-    ? allTransactions.filter(t => t.risk_level === "High" || t.risk_level === "Medium")
-    : currentTransactionFilter
-      ? allTransactions.filter(t => t.risk_level === currentTransactionFilter)
-      : allTransactions;
-  const empty = `<tr><td colspan="8"><div class="empty-state"><p>No transactions found</p></div></td></tr>`;
-  body.innerHTML = data.length ? data.map(txnRow).join("") : empty;
-
-  const filterLabel = document.getElementById("txnFilterLabel");
-  const filterValue = document.getElementById("txnFilterValue");
-  if (filterLabel) filterLabel.style.display = currentTransactionFilter ? "" : "none";
-  if (filterValue) {
-    filterValue.textContent = currentTransactionFilter
-      ? currentTransactionFilter === "attention"
-        ? "Medium / High Risk"
-        : `${currentTransactionFilter} Risk`
-      : "";
-  }
-}
-
-function setTransactionFilter(filter) {
-  currentTransactionFilter = filter || null;
-  renderTransactions();
-  filterTable('txnBody', 'txnSearch', 'txnNoResults');
-}
-
-function highlightTxnFilter(button) {
-  const group = button.closest('.risk-filter-group');
-  if (!group) return;
-  group.querySelectorAll('.filter-chip').forEach(el => el.classList.remove('active'));
-  button.classList.add('active');
-}
-
 function filterTable(bodyId, searchId, noResultsId) {
   const search = document.getElementById(searchId);
   if (!search) return;
-  const q = search.value.trim().toLowerCase();
+  const query = search.value.trim().toLowerCase();
   const rows = document.querySelectorAll(`#${bodyId} tr[data-searchable]`);
   let visible = 0;
-  rows.forEach(row => {
-    const match = row.dataset.searchable.includes(q);
+  rows.forEach((row) => {
+    const match = row.dataset.searchable.includes(query);
     row.style.display = match ? "" : "none";
     if (match) visible++;
   });
-  const noRes = document.getElementById(noResultsId);
-  if (noRes) noRes.style.display = visible === 0 && rows.length > 0 ? "" : "none";
-}
-
-// DATA LOADING
-async function loadTransactions() {
-  const res = await apiFetch("/api/transactions");
-  if (!res) return;
-  const data = await res.json();
-  const priority = { High: 3, Medium: 2, Low: 1 };
-  data.sort((a, b) => {
-    const scoreA = parseFloat(a.risk_score) || 0;
-    const scoreB = parseFloat(b.risk_score) || 0;
-    if (scoreA !== scoreB) return scoreB - scoreA;
-    const levelA = priority[a.risk_level] || 1;
-    const levelB = priority[b.risk_level] || 1;
-    if (levelA !== levelB) return levelB - levelA;
-    return new Date(b.txn_time || b.created_at) - new Date(a.txn_time || a.created_at);
-  });
-  allTransactions = data;
-  renderTransactions();
-
-  const overviewBody = document.getElementById("overviewTxnBody");
-  if (overviewBody) {
-    overviewBody.innerHTML = data.length ? data.slice(0,5).map(txnRow).join("") : `<tr><td colspan="8"><div class="empty-state"><p>No transactions found</p></div></td></tr>`;
-  }
-
-  const lowCount = data.filter(t => t.risk_level === "Low").length;
-  const mediumCount = data.filter(t => t.risk_level === "Medium").length;
-  const highCount = data.filter(t => t.risk_level === "High").length;
-  const setText = (id, value) => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = value;
-  };
-
-  setText("statTxnTotal", data.length);
-  setText("statLow", lowCount);
-  setText("statMedium", mediumCount);
-  setText("statAttention", highCount + mediumCount);
-  setText("statHigh", highCount);
-  setText("statSuspicious", data.filter(t => t.status === "suspicious").length);
-}
-
-async function loadAlerts() {
-  const res = await apiFetch("/api/alerts");
-  if (!res) return;
-  const data = await res.json();
-  const priority = { High: 3, Medium: 2, Low: 1 };
-  data.sort((a, b) => {
-    if (!!a.read_at !== !!b.read_at) return a.read_at ? 1 : -1;
-    const levelA = priority[a.risk_level] || 1;
-    const levelB = priority[b.risk_level] || 1;
-    if (levelA !== levelB) return levelB - levelA;
-    const scoreA = parseFloat(a.risk_score) || 0;
-    const scoreB = parseFloat(b.risk_score) || 0;
-    if (scoreA !== scoreB) return scoreB - scoreA;
-    return new Date(b.created_at) - new Date(a.created_at);
-  });
-  // Only show pending alerts (exclude dismissed/escalated)
-  const pendingAlerts = data.filter(a => a.status === "Pending");
-  const filtered = currentAlertFilter === "unread" ? pendingAlerts.filter(a => !a.read_at) : pendingAlerts;
-  const body = document.getElementById("alertBody");
-  if (body) {
-    body.innerHTML = filtered.length
-      ? filtered.map(a => {
-          const unread = !a.read_at;
-          const searchable = `${a.transaction_id} ${a.message} ${a.risk_level} ${a.status}`.toLowerCase();
-          return `<tr class="${unread ? 'unread-row' : ''}" data-alert-id="${a.alert_id}" onclick="showAlertDetails(${a.id})" style="cursor:pointer" data-searchable="${searchable}">
-            <td style="font-family:monospace;font-size:12px">${a.transaction_id}</td>
-            <td>${a.message}</td>
-            <td>${riskPill(a.risk_level)}</td>
-            <td>${a.status || "Pending"}</td>
-            <td>${a.read_at ? '<span class="pill pill-normal">Read</span>' : '<span class="pill pill-pending">Unread</span>'}</td>
-            <td style="color:var(--text-muted);font-size:12px">${formatDate(a.created_at)}</td>
-          </tr>`;
-        }).join("")
-      : `<tr><td colspan="6"><div class="empty-state"><p>No alerts ??? all clear!</p></div></td></tr>`;
-  }
-  const unreadCount = pendingAlerts.filter(a => !a.read_at).length;
-  const statAlerts = document.getElementById("statAlerts");
-  if (statAlerts) statAlerts.textContent = unreadCount;
-  const badge = document.getElementById("alertCount");
-  if (!badge) return;
-  if (unreadCount > 0) {
-    badge.textContent = unreadCount;
-    badge.style.display = "";
-  } else {
-    badge.style.display = "none";
-  }
-}
-
-let currentAlertId = null;
-
-async function showAlertDetails(alertId) {
-  const res = await apiFetch(`/api/alerts/${alertId}`);
-  if (!res) return;
-  if (!res.ok) {
-    showToast("Alert Detail", "Unable to load alert details. Please try again.");
-    return;
-  }
-
-  let alert = await res.json();
-  if (!alert.read_at) {
-    await markAlertAsRead(alert.alert_id);
-    await loadAlerts();
-    const res2 = await apiFetch(`/api/alerts/${alertId}`);
-    if (res2 && res2.ok) {
-      alert = await res2.json();
-    }
-  }
-
-  currentAlertId = alert.alert_id;
-  document.getElementById("alertDetailCard").style.display = "";
-  document.getElementById("detailTxnId").textContent = alert.transaction_id || "—";
-  document.getElementById("detailMerchant").textContent = alert.merchant_name || "—";
-  document.getElementById("detailAmount").textContent = alert.amount ? `$${parseFloat(alert.amount).toLocaleString("en-SG", { minimumFractionDigits: 2 })}` : "—";
-  document.getElementById("detailRiskLevel").textContent = alert.risk_level || "—";
-  document.getElementById("detailAlertStatus").textContent = alert.status || "Pending";
-  document.getElementById("detailReadStatus").textContent = alert.read_at ? "Read" : "Unread";
-  document.getElementById("detailReadAt").textContent = alert.read_at ? formatDate(alert.read_at) : "—";
-  document.getElementById("detailRaisedAt").textContent = formatDate(alert.created_at);
-
-  let triggered = alert.triggered_rules;
-  try { const parsed = JSON.parse(alert.triggered_rules); if (Array.isArray(parsed)) triggered = parsed.join("; "); } catch {}
-  document.getElementById("detailTriggeredRules").textContent = triggered || "—";
-  document.getElementById("detailEscalationReport").textContent = alert.escalation_report || "—";
-
-  const actions = document.getElementById("detailActions");
-  actions.innerHTML = "";
-  if (alert.status === "Pending") {
-    actions.innerHTML = `
-      <button class="btn btn-danger" onclick="goToAlertAction(${alert.id})">Take Action</button>
-    `;
-  }
-}
-
-function goToAlertAction(alertId) {
-  window.location.href = `/api/officer/alerts/${alertId}/action`;
-}
-
-async function dismissCurrentAlert() {
-  if (!currentAlertId || !confirm("Dismiss this alert?")) return;
-  const res = await apiFetch(`/api/alerts/${currentAlertId}/dismiss`, { method: "POST" });
-  if (!res) return;
-  const data = await res.json();
-  if (!res.ok) { showToast("Dismiss Alert", data.message || "Failed to dismiss Alert."); return; }
-  showToast("Dismiss Alert", data.message || "Alert successfully dismissed.");
-  loadAlerts();
-  showAlertDetails(currentAlertId);
-}
-
-async function escalateCurrentAlert() {
-  if (!currentAlertId || !confirm("Escalate this alert?")) return;
-  const res = await apiFetch(`/api/alerts/${currentAlertId}/escalate`, { method: "POST" });
-  if (!res) return;
-  const data = await res.json();
-  if (!res.ok) { showToast("Escalate Alert", data.message || "Failed to escalate Alert."); return; }
-  showToast("Escalate Alert", data.message || "Alert successfully escalated.");
-  loadAlerts();
-  showAlertDetails(currentAlertId);
-}
-
-async function loadUsers() {
-  if (!["admin", "compliance_manager"].includes(user.role)) return;
-  const statUsers = document.getElementById("statUsers");
-  if (!statUsers) return;
-  const res = await apiFetch("/api/auth/users");
-  if (!res) return;
-  const data = await res.json();
-  statUsers.textContent = data.length;
-}
-
-// MY ACCOUNT
-async function loadProfile() {
-  const res = await apiFetch("/api/auth/profile");
-  if (!res) return;
-  const data = await res.json();
-
-  // Always populate the read-only view
-  document.getElementById("viewName").textContent  = data.name  || "—";
-  document.getElementById("viewEmail").textContent = data.email || "—";
-  document.getElementById("viewRole").textContent  = data.role ? (data.role.charAt(0).toUpperCase() + data.role.slice(1)) : "—";
-
-  // Admin also gets the editable form
-  if (["admin", "compliance_manager"].includes(user.role)) {
-    document.getElementById("profileView").style.display  = "none";
-    document.getElementById("profileForm").style.display  = "";
-    document.getElementById("profName").value  = data.name  || "";
-    document.getElementById("profEmail").value = data.email || "";
-    document.getElementById("profRole").value  = data.role  || "";
-  }
-}
-
-const profileForm = document.getElementById("profileForm");
-if (profileForm) profileForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  hideMessage("profileMsg");
-  const name  = document.getElementById("profName").value.trim();
-  const email = document.getElementById("profEmail").value.trim();
-
-  if (!name || !email) { showMessage("profileMsg", "Name and email are required.", "error"); return; }
-
-  const btn = document.getElementById("profileBtn");
-  btn.disabled = true; btn.textContent = "Saving…";
-
-  try {
-    const res = await apiFetch("/api/auth/profile", {
-      method: "PUT",
-      body: JSON.stringify({ name, email })
-    });
-    if (!res) return;
-    const data = await res.json();
-    if (!res.ok) { showMessage("profileMsg", data.message, "error"); return; }
-
-    // Update sidebar and token cache
-    const cached = getUser();
-    cached.name  = data.name;
-    cached.email = data.email;
-    localStorage.setItem("cms_user", JSON.stringify(cached));
-    document.getElementById("sidebarName").textContent = data.name;
-    document.getElementById("topbarName").textContent  = data.name;
-
-    showMessage("profileMsg", "Profile updated successfully.", "success");
-  } catch { showMessage("profileMsg", "Network error.", "error"); }
-  finally { btn.disabled = false; btn.textContent = "Save Changes"; }
-});
-
-const pwForm = document.getElementById("pwForm");
-if (pwForm) pwForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  hideMessage("pwMsg");
-  const currentPw = document.getElementById("currentPw").value;
-  const newPw     = document.getElementById("newPw").value;
-  const confirmPw = document.getElementById("confirmPw").value;
-
-  if (!currentPw) { showMessage("pwMsg", "Please enter your current password.", "error"); return; }
-  if (newPw.length < 8) { showMessage("pwMsg", "New password must be at least 8 characters.", "error"); return; }
-  if (newPw !== confirmPw) { showMessage("pwMsg", "New passwords do not match.", "error"); return; }
-
-  // Verify current password by attempting login first
-  const verifyRes = await fetch("/api/auth/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: getUser().email, password: currentPw })
-  });
-  if (!verifyRes.ok) { showMessage("pwMsg", "Current password is incorrect.", "error"); return; }
-
-  const btn = document.getElementById("pwBtn");
-  btn.disabled = true; btn.textContent = "Updating…";
-
-  try {
-    const res = await apiFetch("/api/auth/change-password", {
-      method: "POST",
-      body: JSON.stringify({ newPassword: newPw })
-    });
-    if (!res) return;
-    const data = await res.json();
-    if (!res.ok) { showMessage("pwMsg", data.message, "error"); return; }
-    showMessage("pwMsg", "Password updated successfully.", "success");
-    document.getElementById("pwForm").reset();
-  } catch { showMessage("pwMsg", "Network error.", "error"); }
-  finally { btn.disabled = false; btn.textContent = "Update Password"; }
-});
-
-const initialPageFilter = new URLSearchParams(window.location.search).get("filter");
-if (currentPage === "transactions" && initialPageFilter) {
-  currentTransactionFilter = initialPageFilter;
-  const label = initialPageFilter === "attention" ? "Needs Action" : initialPageFilter;
-  const button = Array.from(document.querySelectorAll(".risk-filter-group .filter-chip"))
-    .find((btn) => btn.textContent.trim() === label || btn.dataset.filter === initialPageFilter);
-  if (button) highlightTxnFilter(button);
-}
-if (currentPage === "alerts" && initialPageFilter) {
-  currentAlertFilter = initialPageFilter;
-  const label = document.getElementById("alertFilterLabel");
-  if (label && initialPageFilter === "unread") {
-    label.textContent = "Showing unread alerts only";
-    label.style.display = "inline-block";
-  }
-}
-
-const shouldLoadTransactions = currentPage === "overview" || currentPage === "transactions";
-const shouldLoadAlerts = true;
-
-if (shouldLoadTransactions) loadTransactions();
-if (shouldLoadAlerts) loadAlerts();
-if (currentPage === "overview") loadUsers();
-if (currentPage === "account") loadProfile();
-
-// ══════════════════════════════════════════
-// SIMULATOR
-// ══════════════════════════════════════════
-let simInterval  = null;
-let simCounts    = { total: 0, normal: 0, review: 0, suspicious: 0 };
-let lastSimTxnId = null;
-const MAX_FEED   = 20;
-
-function toggleSimulator() {
-  if (simInterval) stopSimulator();
-  else             startSimulator();
-}
-
-function startSimulator() {
-  const speed = parseInt(document.getElementById("simSpeed").value);
-  simInterval = setInterval(runOneTxn, speed);
-
-  document.getElementById("simDot").classList.add("running");
-  document.getElementById("simStatusText").textContent = "Running";
-  document.getElementById("simToggleBtn").textContent  = "⏹ Stop";
-  document.getElementById("simToggleBtn").classList.add("running");
-  document.getElementById("simRunBadge").style.display = "";
-  document.getElementById("feedDot").style.display     = "";
-  runOneTxn(); // fire immediately
-}
-
-function stopSimulator() {
-  clearInterval(simInterval);
-  simInterval = null;
-  document.getElementById("simDot").classList.remove("running");
-  document.getElementById("simStatusText").textContent = "Stopped";
-  document.getElementById("simToggleBtn").textContent  = "▶ Start";
-  document.getElementById("simToggleBtn").classList.remove("running");
-  document.getElementById("simRunBadge").style.display = "none";
-  document.getElementById("feedDot").style.display     = "none";
-}
-
-function resetSimulator() {
-  stopSimulator();
-  simCounts = { total: 0, normal: 0, review: 0, suspicious: 0 };
-  updateSimStats();
-  document.getElementById("liveFeed").innerHTML =
-    `<div style="padding:40px;text-align:center;color:var(--text-muted);font-size:13px">Start the simulator to see live transactions.</div>`;
-}
-
-async function runOneTxn() {
-  const res = await apiFetch("/api/simulate", { method: "POST" });
-  if (!res) return;
-  const data = await res.json();
-  if (!data.transaction) return;
-
-  const t = data.transaction;
-  lastSimTxnId = t.transaction_id || null;
-  simCounts.total++;
-  if (t.risk_level === "High") simCounts.suspicious++;
-  else if (t.risk_level === "Medium") simCounts.review++;
-  else simCounts.normal++;
-
-  updateSimStats();
-  prependFeedItem(t);
-  loadTransactions();
-  loadAlerts();
-}
-
-function updateSimStats() {
-  const simTotal = document.getElementById("simTotal");
-  if (!simTotal) return;
-  simTotal.textContent = simCounts.total;
-  document.getElementById("simNormal").textContent = simCounts.normal;
-  document.getElementById("simReview").textContent = simCounts.review;
-  document.getElementById("simSusp").textContent   = simCounts.suspicious;
-}
-
-function prependFeedItem(t) {
-  const feed = document.getElementById("liveFeed");
-  if (feed.querySelector("[data-placeholder]")) feed.innerHTML = "";
-
-  const pmCls = {
-    Visa:"pm-card", Mastercard:"pm-card", Alipay:"pm-wallet",
-    "WeChat Pay":"pm-wallet", GrabPay:"pm-wallet", ShopeePay:"pm-wallet",
-    PayNow:"pm-bankqr", SGQR:"pm-bankqr"
-  };
-  const item = document.createElement("div");
-  item.className = "live-feed-item";
-  item.innerHTML = `
-    <div>
-      <div class="feed-merchant">${t.merchant_name || "—"}</div>
-      <div class="feed-sub">${t.masked_payment_ref || "—"} &nbsp;·&nbsp; ${t.country}</div>
-    </div>
-    <span class="pm-badge ${pmCls[t.payment_method]||''}">${t.payment_method||"—"}</span>
-    <div class="feed-amount">$${parseFloat(t.amount).toLocaleString("en-SG",{minimumFractionDigits:2})}</div>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-      ${statusPill(t.status)}
-      <span class="feed-time">${new Date().toLocaleTimeString("en-SG")}</span>
-    </div>`;
-  feed.insertBefore(item, feed.firstChild);
-
-  // Keep max 20 items
-  while (feed.children.length > MAX_FEED) feed.removeChild(feed.lastChild);
-}
-
-// Also update simulator speed on change without restart
-document.getElementById("simSpeed")?.addEventListener("change", () => {
-  if (simInterval) { stopSimulator(); startSimulator(); }
-});
-
-// ── REAL-TIME ALERTS ──
-const socket = io();
-socket.on("newAlert", (alert) => {
-  showToast("Suspicious Transaction", `ID: ${alert.transaction_id} — Risk: ${alert.risk_score}`);
-  updateSimCountsFromAlert(alert);
-  loadTransactions();
-  loadAlerts();
-});
-
-function updateSimCountsFromAlert(alert) {
-  if (!alert) return;
-  if (alert.transaction_id && alert.transaction_id === lastSimTxnId) {
-    lastSimTxnId = null;
-    return;
-  }
-
-  const alertRiskLevel = String(alert.risk_level || alert.status || "").toLowerCase();
-  if (alertRiskLevel === "high") {
-    simCounts.total++;
-    simCounts.suspicious++;
-  } else if (alertRiskLevel === "medium") {
-    simCounts.total++;
-    simCounts.review++;
-  } else {
-    return;
-  }
-
-  updateSimStats();
+  const noResults = document.getElementById(noResultsId);
+  if (noResults) noResults.style.display = visible === 0 && rows.length > 0 ? "" : "none";
 }
 
 function showToast(title, body) {
@@ -838,6 +269,194 @@ function showToast(title, body) {
   container.appendChild(toast);
   setTimeout(() => toast.remove(), 5000);
 }
+
+function setActiveChip(buttonId, active) {
+  const button = document.getElementById(buttonId);
+  if (button) button.classList.toggle("active", active);
+}
+
+function updateFilterControls() {
+  setActiveChip("statusPending", currentAlertStatusFilter !== "all");
+  setActiveChip("statusAll", currentAlertStatusFilter === "all");
+  setActiveChip("riskAll", !currentAlertRiskFilter);
+  setActiveChip("riskHigh", currentAlertRiskFilter === "High");
+  setActiveChip("riskMedium", currentAlertRiskFilter === "Medium");
+  setActiveChip("riskLow", currentAlertRiskFilter === "Low");
+  setActiveChip("readAll", currentAlertReadFilter === "all");
+  setActiveChip("readUnread", currentAlertReadFilter === "unread");
+}
+
+function syncAlertUrl() {
+  const params = new URLSearchParams(window.location.search);
+  params.delete("view");
+  if (currentAlertStatusFilter === "all") params.set("status", "all");
+  else params.delete("status");
+  if (currentAlertRiskFilter) params.set("risk", currentAlertRiskFilter);
+  else params.delete("risk");
+  if (currentAlertReadFilter === "unread") params.set("filter", "unread");
+  else params.delete("filter");
+  const query = params.toString();
+  history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+}
+
+function updateFilterLabel() {
+  const label = document.getElementById("alertFilterLabel");
+  const value = document.getElementById("alertFilterValue");
+  if (!label || !value) return;
+
+  const filters = [];
+  if (currentAlertStatusFilter === "all") filters.push("All statuses");
+  if (currentAlertRiskFilter) filters.push(`${currentAlertRiskFilter} risk`);
+  if (currentAlertReadFilter === "unread") filters.push("Unread only");
+
+  if (filters.length) {
+    label.style.display = "";
+    value.textContent = filters.join(" | ");
+  } else {
+    label.style.display = "none";
+    value.textContent = "";
+  }
+}
+
+function renderAlerts() {
+  const filteredAlerts = allAlerts.filter((alert) => {
+    if (currentAlertRiskFilter && alert.risk_level !== currentAlertRiskFilter) return false;
+    if (currentAlertReadFilter === "unread" && alert.read_at) return false;
+    return true;
+  });
+
+  const body = document.getElementById("alertBody");
+  body.innerHTML = filteredAlerts.length
+    ? filteredAlerts.map((alert) => {
+        const unread = !alert.read_at;
+        const merchant = alert.merchant_name || alert.merchant_id || "-";
+        const reason = alert.message || alert.reason || "-";
+        const searchable = `${alert.transaction_id || ""} ${merchant} ${reason} ${alert.risk_level || ""} ${alert.status || ""} ${alert.amount || ""}`.toLowerCase();
+        return `<tr class="${unread ? "unread-row" : ""}" data-searchable="${searchable}" onclick="showAlertDetails(${alert.id})" style="cursor:pointer">
+          <td style="font-family:monospace;font-size:12px">${alert.transaction_id || "-"}</td>
+          <td>${merchant}</td>
+          <td>${reason}</td>
+          <td>${alert.amount != null ? formatMoney(alert.amount, alert.currency) : "-"}</td>
+          <td>${riskPill(alert.risk_level)}</td>
+          <td>${alert.status || "Pending"}</td>
+          <td>${alert.read_at ? '<span class="pill pill-normal">Read</span>' : '<span class="pill pill-pending">Unread</span>'}</td>
+          <td style="color:var(--text-muted);font-size:12px">${formatDate(alert.created_at)}</td>
+        </tr>`;
+      }).join("")
+    : `<tr><td colspan="8"><div class="empty-state"><p>No alerts found.</p></div></td></tr>`;
+
+  const unreadPendingCount = currentAlertStatusFilter === "all"
+    ? allAlerts.filter((alert) => alert.status === "Pending" && !alert.read_at).length
+    : allAlerts.filter((alert) => !alert.read_at).length;
+  const badge = document.getElementById("alertCount");
+  badge.style.display = unreadPendingCount > 0 ? "" : "none";
+  badge.textContent = unreadPendingCount > 0 ? unreadPendingCount : "";
+
+  updateFilterControls();
+  updateFilterLabel();
+  filterTable("alertBody", "alertSearch", "alertNoResults");
+}
+
+async function markAlertAsRead(alertId) {
+  if (!alertId) return null;
+  const res = await apiFetch(`/api/alerts/${alertId}/read`, { method: "POST" });
+  if (!res) return null;
+  const data = await res.json();
+  return res.ok ? data.alert : null;
+}
+
+async function loadAlerts() {
+  const query = currentAlertStatusFilter === "all" ? "?status=all" : "";
+  const res = await apiFetch(`/api/alerts${query}`);
+  if (!res) return;
+  const data = await res.json();
+  const priority = { High: 3, Medium: 2, Low: 1 };
+  data.sort((a, b) => {
+    if (!!a.read_at !== !!b.read_at) return a.read_at ? 1 : -1;
+    const levelA = priority[a.risk_level] || 1;
+    const levelB = priority[b.risk_level] || 1;
+    if (levelA !== levelB) return levelB - levelA;
+    const scoreA = parseFloat(a.risk_score) || 0;
+    const scoreB = parseFloat(b.risk_score) || 0;
+    if (scoreA !== scoreB) return scoreB - scoreA;
+    return new Date(b.created_at) - new Date(a.created_at);
+  });
+  allAlerts = data;
+  renderAlerts();
+}
+
+async function showAlertDetails(alertId) {
+  const res = await apiFetch(`/api/alerts/${alertId}`);
+  if (!res) return;
+  if (!res.ok) {
+    showToast("Alert Detail", "Unable to load alert details. Please try again.");
+    return;
+  }
+
+  let alert = await res.json();
+  if (!alert.read_at) {
+    await markAlertAsRead(alert.alert_id);
+    await loadAlerts();
+    const refreshed = await apiFetch(`/api/alerts/${alertId}`);
+    if (refreshed && refreshed.ok) {
+      alert = await refreshed.json();
+    }
+  }
+
+  document.getElementById("alertDetailCard").style.display = "";
+  document.getElementById("detailTxnId").textContent = alert.transaction_id || "-";
+  document.getElementById("detailMerchant").textContent = alert.merchant_name || alert.merchant_id || "-";
+  document.getElementById("detailAmount").textContent = alert.amount != null ? formatMoney(alert.amount, alert.currency) : "-";
+  document.getElementById("detailRiskLevel").textContent = alert.risk_level || "-";
+  document.getElementById("detailAlertStatus").textContent = alert.status || "Pending";
+  document.getElementById("detailReadStatus").textContent = alert.read_at ? "Read" : "Unread";
+  document.getElementById("detailReadAt").textContent = alert.read_at ? formatDate(alert.read_at) : "-";
+  document.getElementById("detailRaisedAt").textContent = formatDate(alert.created_at);
+
+  let triggered = alert.triggered_rules;
+  try {
+    const parsed = JSON.parse(alert.triggered_rules);
+    if (Array.isArray(parsed)) triggered = parsed.join("; ");
+  } catch {}
+  document.getElementById("detailTriggeredRules").textContent = triggered || "-";
+  document.getElementById("detailEscalationReport").textContent = alert.escalation_report || "-";
+  document.getElementById("detailActions").innerHTML = alert.status === "Pending"
+    ? `<button class="btn btn-danger" onclick="goToAlertAction(${alert.id})">Take Action</button>`
+    : "";
+}
+
+function setAlertStatusFilter(filter) {
+  currentAlertStatusFilter = filter === "all" ? "all" : "Pending";
+  syncAlertUrl();
+  loadAlerts();
+}
+
+function setAlertRiskFilter(filter) {
+  currentAlertRiskFilter = filter || null;
+  syncAlertUrl();
+  renderAlerts();
+}
+
+function setAlertReadFilter(filter) {
+  currentAlertReadFilter = filter === "unread" ? "unread" : "all";
+  syncAlertUrl();
+  renderAlerts();
+}
+
+function goToAlertAction(alertId) {
+  if (!alertId) return;
+  window.location.href = `/api/officer/alerts/${alertId}/action`;
+}
+
+const socket = io();
+socket.on("newAlert", (alert) => {
+  showToast("Suspicious Transaction", `ID: ${alert.transaction_id} - Risk: ${alert.risk_score}`);
+  loadAlerts();
+});
+
+updateFilterControls();
+syncAlertUrl();
+loadAlerts();
 </script>
 </body>
 </html>
