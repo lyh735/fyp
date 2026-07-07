@@ -1,70 +1,19 @@
 const net = require("net");
 const { getRiskLevel, getTransactionStatus } = require("./riskScoring");
 
-const MCC_RISK_PROFILE = {
-  "4511": { points: 20, category: "Airlines / travel" },
-  "4722": { points: 20, category: "Travel agencies / tourism" },
-  "4789": { points: 20, category: "Transportation / travel services" },
-  "4812": { points: 30, category: "Financial / telecom payment services" },
-  "4829": { points: 30, category: "Money transfer / remittance" },
-  "5311": { points: 10, category: "Retail / department stores" },
-  "5411": { points: 5, category: "Grocery stores" },
-  "5541": { points: 10, category: "Retail / service stations" },
-  "5611": { points: 10, category: "Retail / apparel" },
-  "5621": { points: 10, category: "Retail / apparel" },
-  "5631": { points: 10, category: "Retail / accessories" },
-  "5641": { points: 10, category: "Retail / children clothing" },
-  "5651": { points: 10, category: "Retail / clothing" },
-  "5661": { points: 10, category: "Retail / shoes" },
-  "5691": { points: 10, category: "Retail / clothing" },
-  "5712": { points: 10, category: "Retail / furniture" },
-  "5732": { points: 15, category: "Electronics" },
-  "5812": { points: 5, category: "Restaurants" },
-  "5813": { points: 5, category: "Bars / food and beverage" },
-  "5814": { points: 5, category: "Fast food" },
-  "5942": { points: 10, category: "Retail / bookstores" },
-  "5964": { points: 10, category: "Retail / direct marketing" },
-  "5999": { points: 10, category: "Miscellaneous retail" },
-  "6012": { points: 30, category: "Financial institutions" },
-  "6051": { points: 30, category: "Money services / money orders" },
-  "7011": { points: 20, category: "Hotel / lodging" },
-  "7512": { points: 20, category: "Vehicle rental / travel" },
-  "7995": { points: 30, category: "Gambling / betting" },
-};
+const FAILED_ATTEMPT_STATUSES = Object.freeze(["failed", "declined"]);
+const SUCCESS_STATUSES = Object.freeze(["success", "completed"]);
 
-const CATEGORY_RISK_PROFILE = [
-  { pattern: /\b(f&b|food|restaurant|fast food|cafe|coffee|dining|beverage)\b/i, points: 5, category: "F&B / restaurant / fast food" },
-  { pattern: /\b(retail|shop|store|fashion|apparel|clothing|grocery|supermarket)\b/i, points: 10, category: "Retail" },
-  { pattern: /\b(electronic|electronics|computer|mobile|phone|gadget)\b/i, points: 15, category: "Electronics" },
-  { pattern: /\b(travel|tourism|hotel|lodging|airline|ticket|tour)\b/i, points: 20, category: "Travel / tourism / hotel" },
-  { pattern: /\b(money service|money services|remittance|financial|finance|payment service|gambling|betting|casino)\b/i, points: 30, category: "Money service / remittance / financial service / gambling" },
-];
+function normalizeStatus(value) {
+  return String(value || "").trim().toLowerCase();
+}
 
-function getMerchantMccRisk(txn, merchant = {}) {
-  const mcc = String(merchant?.mcc_code || txn.mcc_code || "").trim();
-  const profile = MCC_RISK_PROFILE[mcc];
+function isFailedAttemptStatus(value) {
+  return FAILED_ATTEMPT_STATUSES.includes(normalizeStatus(value));
+}
 
-  if (profile) {
-    return {
-      points: profile.points,
-      rule: `Merchant MCC ${mcc} - ${profile.category}`,
-    };
-  }
-
-  const categoryText = String(merchant?.business_category || txn.business_category || "").trim();
-  const categoryProfile = CATEGORY_RISK_PROFILE.find((item) => item.pattern.test(categoryText));
-  if (categoryProfile) {
-    return {
-      points: categoryProfile.points,
-      rule: `Merchant category base risk - ${categoryProfile.category}`,
-    };
-  }
-
-  const points = Number(merchant?.merchant_risk_score || txn.merchant_risk_score || 0);
-  return {
-    points,
-    rule: "Merchant profile base risk score applied",
-  };
+function isSuccessStatus(value) {
+  return SUCCESS_STATUSES.includes(normalizeStatus(value));
 }
 
 function hasInvalidIp(txn) {
@@ -72,28 +21,37 @@ function hasInvalidIp(txn) {
   return !txn.ip_address || net.isIP(txn.ip_address) === 0;
 }
 
-function isOutsideMerchantOperatingHours(timestamp, merchant = {}) {
-  if (!merchant?.operating_hours_start || !merchant?.operating_hours_end) {
-    return false;
-  }
+function normalizeCountry(value) {
+  return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function hasIpCountryMismatch(txn, context = {}) {
+  if (txn.transaction_type !== "online") return false;
+  if (!context.ipCountryVerified) return false;
+
+  const submittedCountry = normalizeCountry(txn.country);
+  const ipCountry = normalizeCountry(txn.ip_country);
+  return Boolean(submittedCountry && ipCountry && submittedCountry !== ipCountry);
+}
+
+function parseTimeToMinutes(value) {
+  const [hour, minute] = String(value || "").split(":").map(Number);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  return hour * 60 + minute;
+}
+
+function isOutsideMerchantOperatingHours(timestamp, merchant = {}, transactionType) {
+  if (transactionType !== "face_to_face") return false;
+  if (Number(merchant.has_physical_location) !== 1) return false;
+  if (!merchant.operating_hours_start || !merchant.operating_hours_end) return false;
 
   const txnTime = new Date(timestamp);
+  if (Number.isNaN(txnTime.getTime())) return false;
+
   const txnMinutes = txnTime.getHours() * 60 + txnTime.getMinutes();
-
-  const [startHour, startMin] = String(merchant.operating_hours_start)
-    .split(":")
-    .map(Number);
-
-  const [endHour, endMin] = String(merchant.operating_hours_end)
-    .split(":")
-    .map(Number);
-
-  const startMinutes = startHour * 60 + startMin;
-  const endMinutes = endHour * 60 + endMin;
-
-  if (Number.isNaN(startMinutes) || Number.isNaN(endMinutes)) {
-    return false;
-  }
+  const startMinutes = parseTimeToMinutes(merchant.operating_hours_start);
+  const endMinutes = parseTimeToMinutes(merchant.operating_hours_end);
+  if (startMinutes === null || endMinutes === null) return false;
 
   if (startMinutes <= endMinutes) {
     return txnMinutes < startMinutes || txnMinutes > endMinutes;
@@ -102,60 +60,195 @@ function isOutsideMerchantOperatingHours(timestamp, merchant = {}) {
   return txnMinutes > endMinutes && txnMinutes < startMinutes;
 }
 
+function addTriggeredRule(triggeredRules, rule, message, evidence = {}, pointsOverride = null) {
+  if (!rule) return 0;
+  const points = Math.max(0, Number(pointsOverride === null ? rule.points : pointsOverride) || 0);
+
+  triggeredRules.push({
+    rule_id: rule.rule_id,
+    rule_type: rule.rule_type,
+    rule_name: rule.rule_name,
+    points,
+    message,
+    evidence,
+  });
+
+  return points;
+}
+
+function configuredNumber(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
 function evaluateTransaction(txn, context = {}) {
   let risk_score = 0;
   const triggered_rules = [];
   const merchant = context.merchant || {};
+  const rules = context.rules || {};
+  const paymentIdentifier = context.paymentIdentifier || null;
 
-  function trigger(rule, points) {
-    risk_score += points;
-    triggered_rules.push(`+${points} ${rule}`);
+  const merchantRule = rules.merchant_profile;
+  const merchantCategoryRisk = context.merchantCategoryRisk;
+  if (merchantRule && merchantCategoryRisk && Number(merchantCategoryRisk.points) > 0) {
+    risk_score += addTriggeredRule(
+      triggered_rules,
+      merchantRule,
+      `Merchant category risk matched: ${merchantCategoryRisk.category_name}`,
+      {
+        merchant_mcc: merchant.mcc_code || null,
+        matched_mcc: merchantCategoryRisk.mcc_code || null,
+        matched_business_category: merchantCategoryRisk.category_name || null,
+        category_keyword: merchantCategoryRisk.category_keyword || null,
+      },
+      Number(merchantCategoryRisk.points)
+    );
   }
 
-  const merchantMccRisk = getMerchantMccRisk(txn, merchant);
-  if (merchantMccRisk.points > 0) {
-    trigger(merchantMccRisk.rule, merchantMccRisk.points);
+  const merchantAverageAmount = Number(merchant.merchant_average_amount) || 0;
+  const amountRule = rules.amount_multiplier;
+  const amountMultiplier = configuredNumber(amountRule?.threshold_value, 0);
+  if (
+    amountRule &&
+    merchantAverageAmount > 0 &&
+    amountMultiplier > 0 &&
+    Number(txn.amount) > merchantAverageAmount * amountMultiplier
+  ) {
+    risk_score += addTriggeredRule(
+      triggered_rules,
+      amountRule,
+      "Transaction amount exceeded the configured merchant-average multiplier",
+      {
+        actual_amount: Number(txn.amount),
+        merchant_average_amount: merchantAverageAmount,
+        configured_multiplier: amountMultiplier,
+        trigger_amount: merchantAverageAmount * amountMultiplier,
+      }
+    );
   }
 
-  const merchantAverageAmount =
-    Number(merchant.merchant_average_amount) ||
-    Number(txn.merchant_average_amount) ||
-    0;
-
-  if (merchantAverageAmount > 0 && Number(txn.amount) > 3 * merchantAverageAmount) {
-    trigger("Significant amount compared to merchant average", 30);
+  const velocityRule = rules.velocity;
+  const velocityThreshold = Number(velocityRule?.threshold_count || 0);
+  if (velocityRule && velocityThreshold > 0 && Number(context.velocityCount || 0) >= velocityThreshold) {
+    risk_score += addTriggeredRule(triggered_rules, velocityRule, "High transaction velocity for the same payment identifier", {
+      actual_count: Number(context.velocityCount || 0),
+      required_count: velocityThreshold,
+      window_seconds: Number(velocityRule.time_window_seconds || 0),
+      payment_identifier_type: paymentIdentifier?.type || null,
+    });
   }
 
-  if ((context.velocity30SecCount || 0) >= 10) {
-    trigger("High transaction velocity detected: 10 transactions within 30 seconds.", 35);
+  const smallRule = rules.velocity_small_amount;
+  const smallThreshold = Number(smallRule?.threshold_count || 0);
+  if (smallRule && smallThreshold > 0 && Number(context.smallTransactionCount || 0) >= smallThreshold) {
+    risk_score += addTriggeredRule(triggered_rules, smallRule, "Repeated small-value payment-testing pattern detected", {
+      actual_count: Number(context.smallTransactionCount || 0),
+      required_count: smallThreshold,
+      amount_below: Number(smallRule.threshold_value || 0),
+      window_seconds: Number(smallRule.time_window_seconds || 0),
+      payment_identifier_type: paymentIdentifier?.type || null,
+    });
   }
 
-  if ((context.smallTxn5MinCount || 0) >= 5) {
-    trigger("Repeated small transactions detected: 5 transactions below SGD 10 within 5 minutes.", 25);
+  const largeRule = rules.large_amount_frequency;
+  const largeThreshold = Number(largeRule?.threshold_count || 0);
+  if (largeRule && largeThreshold > 0 && Number(context.largeTransactionCount || 0) >= largeThreshold) {
+    risk_score += addTriggeredRule(triggered_rules, largeRule, "Repeated unusually large transactions detected", {
+      actual_count: Number(context.largeTransactionCount || 0),
+      required_count: largeThreshold,
+      configured_multiplier: Number(largeRule.threshold_value || 0),
+      merchant_average_amount: merchantAverageAmount || null,
+      window_seconds: Number(largeRule.time_window_seconds || 0),
+      payment_identifier_type: paymentIdentifier?.type || null,
+    });
   }
 
-  if ((context.largeTxn30MinCount || 0) >= 3) {
-    trigger("Frequent large amount transactions detected within 30 minutes.", 35);
+  const failedRule = rules.failed_attempt_velocity;
+  const failedThreshold = Number(failedRule?.threshold_count || 0);
+  if (
+    failedRule &&
+    failedThreshold > 0 &&
+    isFailedAttemptStatus(txn.status) &&
+    Number(context.failedAttemptCount || 0) >= failedThreshold
+  ) {
+    risk_score += addTriggeredRule(triggered_rules, failedRule, "Repeated failed or declined payment attempts detected", {
+      actual_count: Number(context.failedAttemptCount || 0),
+      required_count: failedThreshold,
+      window_seconds: Number(failedRule.time_window_seconds || 0),
+      current_status: normalizeStatus(txn.status),
+      counted_statuses: FAILED_ATTEMPT_STATUSES,
+      payment_identifier_type: paymentIdentifier?.type || null,
+    });
   }
 
-  if ((context.cancelledTxn10MinCount || 0) >= 3) {
-    trigger("Repeated cancelled or failed transactions detected within 10 minutes.", 25);
+  const failureThenSuccessRule = rules.failure_then_success;
+  const failureThenSuccessThreshold = Number(failureThenSuccessRule?.threshold_count || 0);
+  if (
+    failureThenSuccessRule &&
+    failureThenSuccessThreshold > 0 &&
+    isSuccessStatus(txn.status) &&
+    Number(context.previousFailureCount || 0) >= failureThenSuccessThreshold
+  ) {
+    risk_score += addTriggeredRule(triggered_rules, failureThenSuccessRule, "Failed attempts were followed by a successful payment", {
+      previous_failure_count: Number(context.previousFailureCount || 0),
+      required_failure_count: failureThenSuccessThreshold,
+      window_seconds: Number(failureThenSuccessRule.time_window_seconds || 0),
+      payment_identifier_type: paymentIdentifier?.type || null,
+    });
   }
 
-  if (isOutsideMerchantOperatingHours(txn.timestamp, merchant)) {
-    trigger("Transaction outside merchant operating hours", 15);
+  const duplicateRule = rules.duplicate_transaction;
+  if (duplicateRule && Number(context.duplicatePatternCount || 0) > 0) {
+    risk_score += addTriggeredRule(triggered_rules, duplicateRule, "Possible duplicate successful transaction detected", {
+      matching_previous_transactions: Number(context.duplicatePatternCount || 0),
+      previous_transaction_id: context.previousDuplicateTransaction?.transaction_id || null,
+      previous_transaction_time: context.previousDuplicateTransaction?.txn_time || null,
+      actual_amount: Number(txn.amount),
+      currency: txn.currency,
+      window_seconds: Number(duplicateRule.time_window_seconds || 0),
+      payment_identifier_type: paymentIdentifier?.type || null,
+    });
   }
 
-  if (txn.customer_risk_profile === "high") {
-    trigger("High-risk customer profile", 25);
+  const timeRule = rules.time;
+  if (timeRule && isOutsideMerchantOperatingHours(txn.timestamp, merchant, txn.transaction_type)) {
+    risk_score += addTriggeredRule(triggered_rules, timeRule, "Face-to-face transaction occurred outside merchant operating hours", {
+      transaction_time: txn.timestamp,
+      operating_hours_start: merchant.operating_hours_start,
+      operating_hours_end: merchant.operating_hours_end,
+      timezone_assumption: "Asia/Singapore",
+    });
   }
 
-  if (context.missingRequiredInfo) {
-    trigger("Missing or insufficient transaction information", 20);
+  const customerRule = rules.customer_risk;
+  if (customerRule && txn.customer_risk_profile === "high") {
+    risk_score += addTriggeredRule(triggered_rules, customerRule, "Customer profile is marked as high risk", {
+      customer_risk_profile: txn.customer_risk_profile,
+    });
   }
 
-  if (hasInvalidIp(txn)) {
-    trigger("Online transaction with missing/invalid IP", 20);
+  const dataQualityRule = rules.data_quality;
+  if (dataQualityRule && context.missingRequiredInfo) {
+    risk_score += addTriggeredRule(triggered_rules, dataQualityRule, "Transaction is missing useful monitoring references", {
+      missing_monitoring_identifiers: ["masked_card_number", "masked_payment_ref", "terminal_id", "payment_gateway_ref"],
+    });
+  }
+
+  const ipRule = rules.ip_validation;
+  if (ipRule && hasInvalidIp(txn)) {
+    risk_score += addTriggeredRule(triggered_rules, ipRule, "Online transaction has missing or invalid IP information", {
+      ip_address: txn.ip_address || null,
+      transaction_type: txn.transaction_type,
+    });
+  }
+
+  const mismatchRule = rules.ip_country_mismatch;
+  if (mismatchRule && hasIpCountryMismatch(txn, context)) {
+    risk_score += addTriggeredRule(triggered_rules, mismatchRule, "Verified IP country does not match transaction country", {
+      transaction_country: txn.country,
+      ip_country: txn.ip_country,
+      ip_country_verified: Boolean(context.ipCountryVerified),
+    });
   }
 
   const risk_level = getRiskLevel(risk_score);
@@ -171,4 +264,11 @@ function evaluateTransaction(txn, context = {}) {
   };
 }
 
-module.exports = { evaluateTransaction };
+module.exports = {
+  evaluateTransaction,
+  hasInvalidIp,
+  hasIpCountryMismatch,
+  isOutsideMerchantOperatingHours,
+  isFailedAttemptStatus,
+  isSuccessStatus,
+};

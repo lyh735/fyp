@@ -10,7 +10,7 @@ const VALID_PAYMENT_METHODS = [
   "PayNow",
   "SGQR",
 ];
-const VALID_TRANSACTION_STATUSES = ["success", "completed", "cancelled", "canceled", "failed", "voided"];
+const VALID_TRANSACTION_STATUSES = ["success", "completed", "cancelled", "canceled", "failed", "declined", "voided"];
 
 function toMysqlDateTime(value) {
   const textValue = String(value || "").trim();
@@ -109,10 +109,6 @@ function validateTransaction(payload, options = {}) {
     errors.push("transaction_type must be online or face_to_face");
   }
 
-  if (transactionType === "online" && !normalizeText(payload.ip_address)) {
-    errors.push("ip_address is required for online transactions");
-  }
-
   if (requireTerminalForFaceToFace && transactionType === "face_to_face" && !normalizeText(payload.terminal_id)) {
     errors.push("terminal_id is required for face_to_face transactions");
   }
@@ -154,6 +150,7 @@ function validateTransaction(payload, options = {}) {
       transaction_type: transactionType,
       ip_address: normalizeText(payload.ip_address) || null,
       country: normalizeText(payload.country) || "Singapore",
+      ip_country: normalizeText(payload.ip_country) || null,
       timestamp,
       customer_risk_profile: customerRiskProfile,
       merchant_average_amount: Number.isFinite(merchantAverageAmount)
@@ -177,7 +174,15 @@ function validateTransaction(payload, options = {}) {
       status: transactionStatus || "success",
       source_type: sourceType,
     },
-    metadata: { missingRequiredInfo },
+    metadata: {
+      missingRequiredInfo,
+      ipCountryVerified: Boolean(
+        payload.ip_country_verified === true ||
+        payload.ip_country_verified === 1 ||
+        payload.ip_country_verified === "1" ||
+        payload.ip_country_verified === "true"
+      ),
+    },
   };
 }
 

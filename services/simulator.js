@@ -88,6 +88,14 @@ function merchantRiskLevel(score) {
   return "Low";
 }
 
+function generateCustomerRiskProfile() {
+  return weightedPick(["low", "medium", "high"], [0.78, 0.17, 0.05]);
+}
+
+function generateTransactionStatus() {
+  return weightedPick(["success", "completed", "failed", "declined"], [0.86, 0.08, 0.04, 0.02]);
+}
+
 const COUNTRIES = [
   { name: "Singapore", weight: 0.82 },
   { name: "China",     weight: 0.08 },
@@ -147,8 +155,9 @@ exports.generateTransaction = () => {
   const isCard = payment_method === "Visa" || payment_method === "Mastercard";
   const cardBin = isCard ? (payment_method === "Visa" ? "411111" : "555555") : null;
   const cardLast4 = isCard ? randomDigits(4) : null;
-  const merchantRiskScore = amount > 3000 ? 75 : randInt(5, 35);
+  const merchantRiskScore = randInt(5, 35);
   const hours = OPERATING_HOURS[merchant.category];
+  const transactionStatus = generateTransactionStatus();
 
   return {
     transaction_id: generateTxnId(),
@@ -168,7 +177,11 @@ exports.generateTransaction = () => {
     amount,
     currency:       "SGD",
     country,
+    ip_country: transaction_type === "online" && Math.random() < 0.08 ? "Malaysia" : null,
+    ip_country_verified: false,
     ip_address:     transaction_type === "online" ? `103.18.${randInt(1, 254)}.${randInt(1, 254)}` : null,
+    customer_risk_profile: generateCustomerRiskProfile(),
+    transaction_status: transactionStatus,
     masked_payment_ref: `PAY-***${randomDigits(6)}`,
     card_bin: cardBin,
     masked_card_number: isCard ? `${cardBin}******${cardLast4}` : null,

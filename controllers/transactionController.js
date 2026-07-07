@@ -4,7 +4,12 @@ const { query } = require("../services/dbQuery");
 const { evaluateTransaction } = require("../services/riskEngine");
 const { generateTransaction } = require("../services/simulator");
 const { validateTransaction } = require("../services/validation");
-const { ensureDefaultRules } = require("../services/schema");
+const {
+  SUPPORTED_RULE_TYPES,
+  isSupportedRuleType,
+  getActiveRulesByType,
+  getMerchantCategoryRisk,
+} = require("../services/complianceRuleService");
 
 async function withRetries(operation, attempts = 3) {
   let lastError;
@@ -66,6 +71,9 @@ async function getMerchantProfile(merchantId) {
 }
 
 async function ensureMerchantRecord(txn, payload = {}, userId) {
+  const existingMerchant = await getMerchantProfile(txn.merchant_id);
+  if (existingMerchant) return existingMerchant;
+
   const merchantName = payload.merchant_name || txn.merchant_name || txn.merchant_id;
 
   await query(
@@ -78,20 +86,6 @@ async function ensureMerchantRecord(txn, payload = {}, userId) {
           status, created_by, updated_by
         )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        merchant_name = VALUES(merchant_name),
-        business_category = COALESCE(VALUES(business_category), business_category),
-        mcc_code = COALESCE(VALUES(mcc_code), mcc_code),
-        merchant_average_amount = COALESCE(VALUES(merchant_average_amount), merchant_average_amount),
-        operating_hours_start = COALESCE(VALUES(operating_hours_start), operating_hours_start),
-        operating_hours_end = COALESCE(VALUES(operating_hours_end), operating_hours_end),
-        risk_level = COALESCE(VALUES(risk_level), risk_level),
-        merchant_risk_score = COALESCE(VALUES(merchant_risk_score), merchant_risk_score),
-        country = COALESCE(VALUES(country), country),
-        has_physical_location = VALUES(has_physical_location),
-        status = VALUES(status),
-        updated_by = VALUES(updated_by),
-        updated_at = NOW()
     `,
     [
       txn.merchant_id,
@@ -110,6 +104,8 @@ async function ensureMerchantRecord(txn, payload = {}, userId) {
       userId,
     ]
   );
+
+  return getMerchantProfile(txn.merchant_id);
 }
 
 async function ensureMerchantTerminals(merchantId, userId) {
@@ -165,7 +161,7 @@ async function createAlertRecord(txn, result) {
         JSON.stringify(result.triggered_rules),
         "Pending",
         priority,
-        result.triggered_rules.join(", "),
+        formatTriggeredRules(result.triggered_rules),
       ]
     )
   );
@@ -173,12 +169,29 @@ async function createAlertRecord(txn, result) {
   return insertResult.insertId;
 }
 
+function formatTriggeredRules(triggeredRules) {
+  if (!Array.isArray(triggeredRules) || triggeredRules.length === 0) {
+    return "No rules triggered";
+  }
+
+  return triggeredRules
+    .map((item) => {
+      if (item && typeof item === "object") {
+        const label = item.rule_name || item.message || "Risk rule";
+        const detail = item.message && item.message !== label ? `: ${item.message}` : "";
+        return `+${Number(item.points || 0)} ${label}${detail}`;
+      }
+      return String(item);
+    })
+    .join(", ");
+}
+
 async function getAlertById(alertId) {
   const rows = await query(
     `
       SELECT a.*, a.alert_id AS id, m.merchant_name,
              t.payment_method, t.amount, t.currency,
-             t.transaction_type, t.ip_address, t.country, NULL AS customer_risk_profile,
+             t.transaction_type, t.ip_address, t.country, t.ip_country, t.customer_risk_profile,
              m.merchant_average_amount, m.risk_level AS merchant_risk_level,
              m.mcc_code, m.merchant_risk_score, m.has_physical_location,
              t.source_type, t.txn_time AS transaction_time,
@@ -223,116 +236,157 @@ async function updateAlertStatus(alertId, status, userId, report = null, actionT
   }
 }
 
-async function getVelocity30SecCount(txn) {
+const ACTIVITY_IDENTIFIER_COLUMNS = Object.freeze([
+  ["masked_card_number", "masked_card_number"],
+  ["masked_payment_ref", "masked_payment_ref"],
+  ["payment_gateway_ref", "payment_gateway_ref"],
+]);
+
+function getPaymentActivityIdentifier(txn) {
+  for (const [type, column] of ACTIVITY_IDENTIFIER_COLUMNS) {
+    const value = String(txn[type] || "").trim();
+    if (value) return { type, column, value };
+  }
+  return null;
+}
+
+function getRuleWindowSeconds(rule, fallbackSeconds) {
+  const configured = Number(rule?.time_window_seconds);
+  return Number.isInteger(configured) && configured > 0 ? configured : fallbackSeconds;
+}
+
+async function getVelocityCount(txn, rule, identity) {
+  if (!rule || !identity) return 0;
+  const windowSeconds = getRuleWindowSeconds(rule, 60);
   const rows = await query(
     `
       SELECT COUNT(*) AS count
       FROM transactions
-      WHERE txn_time >= DATE_SUB(?, INTERVAL 30 SECOND)
+      WHERE txn_time >= TIMESTAMPADD(SECOND, ?, ?)
         AND txn_time <= ?
-        AND (
-          merchant_id = ?
-          OR (? IS NOT NULL AND ? <> '' AND masked_card_number = ?)
-          OR (? IS NOT NULL AND ? <> '' AND terminal_id = ?)
-        )
+        AND ${identity.column} = ?
     `,
-    [
-      txn.timestamp,
-      txn.timestamp,
-      txn.merchant_id,
-      txn.masked_card_number || "",
-      txn.masked_card_number || "",
-      txn.masked_card_number || "",
-      txn.terminal_id || "",
-      txn.terminal_id || "",
-      txn.terminal_id || "",
-    ]
+    [-windowSeconds, txn.timestamp, txn.timestamp, identity.value]
   );
 
   return Number(rows[0]?.count || 0) + 1;
 }
 
-async function getSmallTxn5MinCount(txn) {
+async function getSmallTransactionCount(txn, rule, identity) {
+  if (!rule || !identity) return 0;
+  const windowSeconds = getRuleWindowSeconds(rule, 300);
+  const amountLimit = Number(rule.threshold_value || 10);
   const rows = await query(
     `
       SELECT COUNT(*) AS count
       FROM transactions
-      WHERE txn_time >= DATE_SUB(?, INTERVAL 5 MINUTE)
+      WHERE txn_time >= TIMESTAMPADD(SECOND, ?, ?)
         AND txn_time <= ?
-        AND amount < 10
-        AND (
-          merchant_id = ?
-          OR (? IS NOT NULL AND ? <> '' AND masked_card_number = ?)
-        )
+        AND amount < ?
+        AND ${identity.column} = ?
     `,
-    [
-      txn.timestamp,
-      txn.timestamp,
-      txn.merchant_id,
-      txn.masked_card_number || "",
-      txn.masked_card_number || "",
-      txn.masked_card_number || "",
-    ]
+    [-windowSeconds, txn.timestamp, txn.timestamp, amountLimit, identity.value]
   );
 
-  return Number(rows[0]?.count || 0) + (Number(txn.amount) < 10 ? 1 : 0);
+  return Number(rows[0]?.count || 0) + (Number(txn.amount) < amountLimit ? 1 : 0);
 }
 
-async function getLargeTxn30MinCount(txn, merchant) {
-  const merchantAverage =
-    Number(merchant?.merchant_average_amount) ||
-    Number(txn.merchant_average_amount) ||
-    0;
+async function getLargeTransactionCount(txn, merchant, rule, identity) {
+  if (!rule || !identity) return 0;
 
-  if (merchantAverage <= 0) return 0;
-  const largeAmountThreshold = merchantAverage * 3;
+  const merchantAverage = Number(merchant?.merchant_average_amount || 0);
+  const multiplier = Number(rule.threshold_value || 3);
+  if (merchantAverage <= 0 || multiplier <= 0) return 0;
 
+  const windowSeconds = getRuleWindowSeconds(rule, 1800);
+  const largeAmountThreshold = merchantAverage * multiplier;
   const rows = await query(
     `
       SELECT COUNT(*) AS count
       FROM transactions
-      WHERE merchant_id = ?
-        AND txn_time >= DATE_SUB(?, INTERVAL 30 MINUTE)
+      WHERE txn_time >= TIMESTAMPADD(SECOND, ?, ?)
         AND txn_time <= ?
         AND amount > ?
+        AND ${identity.column} = ?
     `,
-    [
-      txn.merchant_id,
-      txn.timestamp,
-      txn.timestamp,
-      largeAmountThreshold,
-    ]
+    [-windowSeconds, txn.timestamp, txn.timestamp, largeAmountThreshold, identity.value]
   );
 
   return Number(rows[0]?.count || 0) + (Number(txn.amount) > largeAmountThreshold ? 1 : 0);
 }
 
-async function getCancelledTxn10MinCount(txn) {
+async function getFailedAttemptCount(txn, rule, identity) {
+  if (!rule || !identity) return 0;
+  const windowSeconds = getRuleWindowSeconds(rule, 600);
   const rows = await query(
     `
       SELECT COUNT(*) AS count
       FROM transactions
-      WHERE txn_time >= DATE_SUB(?, INTERVAL 10 MINUTE)
+      WHERE txn_time >= TIMESTAMPADD(SECOND, ?, ?)
         AND txn_time <= ?
-        AND LOWER(transaction_status) IN ('cancelled', 'canceled', 'failed', 'voided')
-        AND (
-          merchant_id = ?
-          OR (? IS NOT NULL AND ? <> '' AND masked_card_number = ?)
-        )
+        AND LOWER(transaction_status) IN ('failed', 'declined')
+        AND ${identity.column} = ?
     `,
-    [
-      txn.timestamp,
-      txn.timestamp,
-      txn.merchant_id,
-      txn.masked_card_number || "",
-      txn.masked_card_number || "",
-      txn.masked_card_number || "",
-    ]
+    [-windowSeconds, txn.timestamp, txn.timestamp, identity.value]
   );
 
   const currentStatus = String(txn.status || "").toLowerCase();
-  const currentIsCancelled = ["cancelled", "canceled", "failed", "voided"].includes(currentStatus);
-  return Number(rows[0]?.count || 0) + (currentIsCancelled ? 1 : 0);
+  const currentIsFailedAttempt = ["failed", "declined"].includes(currentStatus);
+  return Number(rows[0]?.count || 0) + (currentIsFailedAttempt ? 1 : 0);
+}
+
+async function getPreviousFailureCount(txn, rule, identity) {
+  if (!rule || !identity) return 0;
+  const windowSeconds = getRuleWindowSeconds(rule, 600);
+  const rows = await query(
+    `
+      SELECT COUNT(*) AS count
+      FROM transactions
+      WHERE txn_time >= TIMESTAMPADD(SECOND, ?, ?)
+        AND txn_time <= ?
+        AND LOWER(transaction_status) IN ('failed', 'declined')
+        AND ${identity.column} = ?
+    `,
+    [-windowSeconds, txn.timestamp, txn.timestamp, identity.value]
+  );
+
+  return Number(rows[0]?.count || 0);
+}
+
+async function getDuplicatePattern(txn, rule, identity) {
+  if (!rule || !identity || !["success", "completed"].includes(String(txn.status || "").toLowerCase())) {
+    return { count: 0, previous: null };
+  }
+
+  const windowSeconds = getRuleWindowSeconds(rule, 60);
+  const rows = await query(
+    `
+      SELECT transaction_id, txn_time
+      FROM transactions
+      WHERE txn_time >= TIMESTAMPADD(SECOND, ?, ?)
+        AND txn_time <= ?
+        AND transaction_id <> ?
+        AND merchant_id = ?
+        AND amount = ?
+        AND currency = ?
+        AND LOWER(transaction_status) IN ('success', 'completed')
+        AND ${identity.column} = ?
+      ORDER BY txn_time DESC
+      LIMIT 5
+    `,
+    [
+      -windowSeconds,
+      txn.timestamp,
+      txn.timestamp,
+      txn.transaction_id,
+      txn.merchant_id,
+      txn.amount,
+      txn.currency,
+      identity.value,
+    ]
+  );
+
+  return { count: rows.length, previous: rows[0] || null };
 }
 
 async function processTransaction(payload, req, validationOptions = {}) {
@@ -351,27 +405,58 @@ async function processTransaction(payload, req, validationOptions = {}) {
 
   const txn = validation.transaction;
 
-  const merchant = await getMerchantProfile(txn.merchant_id);
+  const merchant = await ensureMerchantRecord(txn, payload, req.user.id);
+  await ensureMerchantTerminals(txn.merchant_id, req.user.id);
 
-  const velocity30SecCount = await getVelocity30SecCount(txn);
-  const smallTxn5MinCount = await getSmallTxn5MinCount(txn);
-  const largeTxn30MinCount = await getLargeTxn30MinCount(txn, merchant);
-  const cancelledTxn10MinCount = await getCancelledTxn10MinCount(txn);
+  if (txn.source_type === "simulator") {
+    txn.terminal_id = txn.transaction_type === "face_to_face"
+      ? await pickActiveTerminalId(txn.merchant_id)
+      : null;
+  }
+
+  const rules = await getActiveRulesByType();
+  const paymentIdentifier = getPaymentActivityIdentifier(txn);
+  const [
+    merchantCategoryRisk,
+    velocityCount,
+    smallTransactionCount,
+    largeTransactionCount,
+    failedAttemptCount,
+    previousFailureCount,
+    duplicatePattern,
+  ] = await Promise.all([
+    rules.merchant_profile ? getMerchantCategoryRisk(merchant) : null,
+    getVelocityCount(txn, rules.velocity, paymentIdentifier),
+    getSmallTransactionCount(txn, rules.velocity_small_amount, paymentIdentifier),
+    getLargeTransactionCount(txn, merchant, rules.large_amount_frequency, paymentIdentifier),
+    getFailedAttemptCount(txn, rules.failed_attempt_velocity, paymentIdentifier),
+    getPreviousFailureCount(txn, rules.failure_then_success, paymentIdentifier),
+    getDuplicatePattern(txn, rules.duplicate_transaction, paymentIdentifier),
+  ]);
 
   const result = evaluateTransaction(txn, {
     merchant,
-    velocity30SecCount,
-    smallTxn5MinCount,
-    largeTxn30MinCount,
-    cancelledTxn10MinCount,
+    rules,
+    merchantCategoryRisk,
+    paymentIdentifier,
+    velocityCount,
+    smallTransactionCount,
+    largeTransactionCount,
+    failedAttemptCount,
+    previousFailureCount,
+    duplicatePatternCount: duplicatePattern.count,
+    previousDuplicateTransaction: duplicatePattern.previous,
     missingRequiredInfo: validation.metadata.missingRequiredInfo,
+    ipCountryVerified: validation.metadata.ipCountryVerified,
   });
+
+  const ruleSummary = formatTriggeredRules(result.triggered_rules);
 
   await logAudit(
     "rules_triggered",
     txn,
     result.triggered_rules.length
-      ? `Rules triggered: ${result.triggered_rules.join("; ")}`
+      ? `Rules triggered: ${ruleSummary}`
       : "No rules triggered"
   );
 
@@ -381,15 +466,6 @@ async function processTransaction(payload, req, validationOptions = {}) {
     `Risk score calculated: ${result.risk_score} (${result.risk_level})`
   );
 
-  await ensureMerchantRecord(txn, payload, req.user.id);
-  await ensureMerchantTerminals(txn.merchant_id, req.user.id);
-
-  if (txn.source_type === "simulator") {
-    txn.terminal_id = txn.transaction_type === "face_to_face"
-      ? await pickActiveTerminalId(txn.merchant_id)
-      : null;
-  }
-
   await query(
     `
       INSERT INTO transactions
@@ -398,10 +474,10 @@ async function processTransaction(payload, req, validationOptions = {}) {
           card_bin, masked_card_number, card_presence,
           terminal_id, payment_gateway_ref,
           payment_method, transaction_type, amount, currency, ip_address,
-          country, txn_time, transaction_status, risk_score, risk_level,
+          country, ip_country, customer_risk_profile, txn_time, transaction_status, risk_score, risk_level,
           triggered_rules, processing_status, source_type
         )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       txn.transaction_id,
@@ -418,6 +494,8 @@ async function processTransaction(payload, req, validationOptions = {}) {
       txn.currency,
       txn.ip_address,
       txn.country,
+      txn.ip_country,
+      txn.customer_risk_profile,
       txn.timestamp,
       txn.status || "success",
       result.risk_score,
@@ -451,7 +529,7 @@ async function processTransaction(payload, req, validationOptions = {}) {
           [
             alertId,
             req.user.id,
-            result.triggered_rules.join(", ") || "Alert created by risk engine",
+            ruleSummary || "Alert created by risk engine",
           ]
         );
       } catch (actionErr) {
@@ -543,7 +621,7 @@ exports.simulate = async (req, res) => {
     const txn = {
       ...generated,
       timestamp: generated.txn_time,
-      customer_risk_profile: generated.amount > 3000 ? "high" : "low",
+      customer_risk_profile: generated.customer_risk_profile || "low",
       source_type: "simulator",
     };
 
@@ -756,7 +834,7 @@ exports.uploadTransactions = async (req, res) => {
         merchant_average_amount:
           Number(merchantProfile?.merchant_average_amount) > 0
             ? Number(merchantProfile.merchant_average_amount)
-            : 1000,
+            : null,
         merchant_risk_score: Number.isInteger(Number(merchantProfile?.merchant_risk_score))
           ? Number(merchantProfile.merchant_risk_score)
           : 0,
@@ -828,14 +906,17 @@ exports.uploadTransactions = async (req, res) => {
 
 exports.getComplianceRules = async (req, res) => {
   try {
+    const placeholders = SUPPORTED_RULE_TYPES.map(() => "?").join(", ");
     const rules = await query(
       `
         SELECT rule_id, rule_name, rule_type, description, threshold_value,
-               threshold_count, time_window_minutes, points, is_active,
+               threshold_count, time_window_minutes, time_window_seconds, points, is_active,
                created_at, updated_at
         FROM compliance_rules
+        WHERE rule_type IN (${placeholders})
         ORDER BY is_active DESC, rule_type ASC, rule_name ASC
-      `
+      `,
+      SUPPORTED_RULE_TYPES
     );
 
     res.json(rules);
@@ -849,7 +930,7 @@ function optionalDecimal(value, fieldName) {
   if (value === "" || value === null || value === undefined) return null;
   const number = Number(value);
   if (!Number.isFinite(number) || number < 0) {
-    throw new Error(`${fieldName} must be a positive number`);
+    throw new Error(`${fieldName} must be a non-negative number`);
   }
   return number;
 }
@@ -858,7 +939,7 @@ function optionalInteger(value, fieldName) {
   if (value === "" || value === null || value === undefined) return null;
   const number = Number(value);
   if (!Number.isInteger(number) || number < 0) {
-    throw new Error(`${fieldName} must be a positive whole number`);
+    throw new Error(`${fieldName} must be a non-negative whole number`);
   }
   return number;
 }
@@ -867,10 +948,13 @@ function normalizeRulePayload(body = {}) {
   const ruleName = String(body.rule_name || "").trim();
   const ruleType = String(body.rule_type || "").trim();
   const description = String(body.description || "").trim();
+  const timeWindowSeconds = optionalInteger(body.time_window_seconds, "Time window in seconds");
 
   if (!ruleName) throw new Error("Rule name is required");
   if (ruleName.length > 100) throw new Error("Rule name must be 100 characters or fewer");
-  if (ruleType.length > 50) throw new Error("Rule type must be 50 characters or fewer");
+  if (!isSupportedRuleType(ruleType)) {
+    throw new Error(`Unsupported rule type. Supported types: ${SUPPORTED_RULE_TYPES.join(", ")}`);
+  }
 
   return {
     rule_name: ruleName,
@@ -878,25 +962,42 @@ function normalizeRulePayload(body = {}) {
     description: description || null,
     threshold_value: optionalDecimal(body.threshold_value, "Threshold value"),
     threshold_count: optionalInteger(body.threshold_count, "Threshold count"),
-    time_window_minutes: optionalInteger(body.time_window_minutes, "Time window"),
+    time_window_seconds: timeWindowSeconds,
+    time_window_minutes: timeWindowSeconds === null ? null : Math.ceil(timeWindowSeconds / 60),
     points: optionalInteger(body.points ?? 0, "Points") ?? 0,
     is_active: body.is_active ? 1 : 0,
   };
 }
 
+async function ensureUniqueRuleType(ruleType, excludingRuleId = null) {
+  const values = [ruleType];
+  let sql = "SELECT rule_id FROM compliance_rules WHERE rule_type = ?";
+  if (excludingRuleId !== null) {
+    sql += " AND rule_id <> ?";
+    values.push(excludingRuleId);
+  }
+  sql += " LIMIT 1";
+
+  const rows = await query(sql, values);
+  if (rows.length) {
+    throw new Error("A rule with this rule type already exists. Edit the existing rule instead.");
+  }
+}
+
 exports.createComplianceRule = async (req, res) => {
   try {
     const rule = normalizeRulePayload(req.body);
+    await ensureUniqueRuleType(rule.rule_type);
 
     const result = await query(
       `
         INSERT INTO compliance_rules
           (
             rule_name, rule_type, description, threshold_value,
-            threshold_count, time_window_minutes, points, is_active,
+            threshold_count, time_window_minutes, time_window_seconds, points, is_active,
             created_by, updated_by
           )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         rule.rule_name,
@@ -905,6 +1006,7 @@ exports.createComplianceRule = async (req, res) => {
         rule.threshold_value,
         rule.threshold_count,
         rule.time_window_minutes,
+        rule.time_window_seconds,
         rule.points,
         rule.is_active,
         req.user.id,
@@ -927,13 +1029,14 @@ exports.updateComplianceRule = async (req, res) => {
     }
 
     const rule = normalizeRulePayload(req.body);
+    await ensureUniqueRuleType(rule.rule_type, ruleId);
 
     const result = await query(
       `
         UPDATE compliance_rules
         SET rule_name = ?, rule_type = ?, description = ?,
             threshold_value = ?, threshold_count = ?, time_window_minutes = ?,
-            points = ?, is_active = ?, updated_by = ?, updated_at = NOW()
+            time_window_seconds = ?, points = ?, is_active = ?, updated_by = ?, updated_at = NOW()
         WHERE rule_id = ?
       `,
       [
@@ -943,6 +1046,7 @@ exports.updateComplianceRule = async (req, res) => {
         rule.threshold_value,
         rule.threshold_count,
         rule.time_window_minutes,
+        rule.time_window_seconds,
         rule.points,
         rule.is_active,
         req.user.id,
@@ -968,16 +1072,23 @@ exports.deleteComplianceRule = async (req, res) => {
       return res.status(400).json({ message: "Invalid rule ID" });
     }
 
-    const result = await query("DELETE FROM compliance_rules WHERE rule_id = ?", [ruleId]);
+    const result = await query(
+      `
+        UPDATE compliance_rules
+        SET is_active = 0, updated_by = ?, updated_at = NOW()
+        WHERE rule_id = ?
+      `,
+      [req.user.id, ruleId]
+    );
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: "Rule not found" });
     }
 
-    res.json({ message: "Rule deleted successfully" });
+    res.json({ message: "Rule deactivated successfully" });
   } catch (err) {
     console.error("deleteComplianceRule error:", err);
-    res.status(500).json({ message: "Unable to delete rule" });
+    res.status(500).json({ message: "Unable to deactivate rule" });
   }
 };
 
@@ -1044,8 +1155,10 @@ function formatEscalationReport(alert) {
   let triggeredRules = alert.triggered_rules;
 
   try {
-    const parsed = JSON.parse(alert.triggered_rules);
-    if (Array.isArray(parsed)) triggeredRules = parsed.join("; ");
+    const parsed = typeof alert.triggered_rules === "string"
+      ? JSON.parse(alert.triggered_rules)
+      : alert.triggered_rules;
+    if (Array.isArray(parsed)) triggeredRules = formatTriggeredRules(parsed);
   } catch {}
 
   return `Escalation report for ${alert.transaction_id}: merchant=${

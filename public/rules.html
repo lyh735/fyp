@@ -117,7 +117,22 @@
             </div>
             <div class="form-group">
               <label for="ruleType">Rule Type</label>
-              <input id="ruleType" name="rule_type" type="text" maxlength="50" placeholder="amount, velocity, time" />
+              <select id="ruleType" name="rule_type" required>
+                <option value="">Select rule type</option>
+                <option value="merchant_profile">Merchant MCC / industry risk</option>
+                <option value="amount_multiplier">Unusual amount</option>
+                <option value="velocity">High transaction velocity</option>
+                <option value="velocity_small_amount">Repeated small-value transactions</option>
+                <option value="large_amount_frequency">Repeated unusually large transactions</option>
+                <option value="failed_attempt_velocity">Failed-attempt velocity</option>
+                <option value="failure_then_success">Failure followed by success</option>
+                <option value="duplicate_transaction">Duplicate successful transaction</option>
+                <option value="time">Outside operating hours</option>
+                <option value="customer_risk">High-risk customer</option>
+                <option value="data_quality">Missing monitoring references</option>
+                <option value="ip_validation">Missing or invalid online IP</option>
+                <option value="ip_country_mismatch">Verified IP-country mismatch</option>
+              </select>
             </div>
             <div class="form-group">
               <label for="thresholdValue">Threshold Value</label>
@@ -128,8 +143,8 @@
               <input id="thresholdCount" name="threshold_count" type="number" min="0" step="1" />
             </div>
             <div class="form-group">
-              <label for="timeWindow">Time Window (minutes)</label>
-              <input id="timeWindow" name="time_window_minutes" type="number" min="0" step="1" />
+              <label for="timeWindow">Time Window (seconds)</label>
+              <input id="timeWindow" name="time_window_seconds" type="number" min="0" step="1" />
             </div>
             <div class="form-group">
               <label for="rulePoints">Points</label>
@@ -271,6 +286,16 @@ function formatThreshold(rule) {
   return parts.length ? parts.join(" / ") : "-";
 }
 
+function formatWindow(seconds) {
+  const value = Number(seconds || 0);
+  if (!value) return "-";
+  if (value === 60) return "60 seconds (1 minute)";
+  if (value === 300) return "300 seconds (5 minutes)";
+  if (value === 1800) return "1800 seconds (30 minutes)";
+  if (value % 60 === 0) return `${value} seconds (${value / 60} minutes)`;
+  return `${value} seconds`;
+}
+
 function statusPill(isActive) {
   return isActive
     ? '<span class="pill pill-normal">Active</span>'
@@ -311,7 +336,7 @@ function renderRules() {
       </td>
       <td>${escapeHtml(rule.rule_type || "-")}</td>
       <td>${formatThreshold(rule)}</td>
-      <td>${rule.time_window_minutes ? `${rule.time_window_minutes} min` : "-"}</td>
+      <td>${formatWindow(rule.time_window_seconds)}</td>
       <td style="font-weight:700">${rule.points || 0}</td>
       <td>${statusPill(Number(rule.is_active) === 1)}</td>
       <td style="color:var(--text-muted);font-size:12px">${formatDate(rule.updated_at || rule.created_at)}</td>
@@ -319,7 +344,7 @@ function renderRules() {
         <td>
           <div class="table-actions">
             <button type="button" class="btn btn-secondary" onclick="editRule(${Number(rule.rule_id)})">Edit</button>
-            <button type="button" class="btn btn-danger" onclick="deleteRule(${Number(rule.rule_id)})">Delete</button>
+            <button type="button" class="btn btn-danger" onclick="deleteRule(${Number(rule.rule_id)})">Deactivate</button>
           </div>
         </td>` : ""}
     </tr>
@@ -332,7 +357,7 @@ function getRulePayload() {
     rule_type: document.getElementById("ruleType").value.trim(),
     threshold_value: document.getElementById("thresholdValue").value,
     threshold_count: document.getElementById("thresholdCount").value,
-    time_window_minutes: document.getElementById("timeWindow").value,
+    time_window_seconds: document.getElementById("timeWindow").value,
     points: document.getElementById("rulePoints").value,
     is_active: document.getElementById("ruleStatus").value === "1",
     description: document.getElementById("ruleDescription").value.trim(),
@@ -344,6 +369,7 @@ function resetRuleForm() {
   document.getElementById("ruleForm").reset();
   document.getElementById("rulePoints").value = "0";
   document.getElementById("ruleStatus").value = "1";
+  document.getElementById("ruleType").disabled = false;
   document.getElementById("ruleFormTitle").textContent = "Create Rule";
   document.getElementById("saveRuleBtn").textContent = "Save Rule";
   document.getElementById("cancelEditBtn").style.display = "none";
@@ -358,7 +384,7 @@ function editRule(ruleId) {
   document.getElementById("ruleType").value = rule.rule_type || "";
   document.getElementById("thresholdValue").value = rule.threshold_value ?? "";
   document.getElementById("thresholdCount").value = rule.threshold_count ?? "";
-  document.getElementById("timeWindow").value = rule.time_window_minutes ?? "";
+  document.getElementById("timeWindow").value = rule.time_window_seconds ?? "";
   document.getElementById("rulePoints").value = rule.points ?? 0;
   document.getElementById("ruleStatus").value = Number(rule.is_active) === 1 ? "1" : "0";
   document.getElementById("ruleDescription").value = rule.description || "";
@@ -369,17 +395,17 @@ function editRule(ruleId) {
 }
 
 async function deleteRule(ruleId) {
-  if (!confirm("Delete this rule from the rules library?")) return;
+  if (!confirm("Deactivate this rule? It will stop affecting new transactions but can be reactivated later.")) return;
 
   const res = await apiFetch(`/api/rules/${ruleId}`, { method: "DELETE" });
   if (!res) return;
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    showToast("Rule Delete", data.message || "Unable to delete rule.");
+    showToast("Rule Status", data.message || "Unable to deactivate rule.");
     return;
   }
 
-  showToast("Rule Delete", data.message || "Rule deleted successfully.");
+  showToast("Rule Status", data.message || "Rule deactivated successfully.");
   if (Number(editingRuleId) === Number(ruleId)) resetRuleForm();
   await loadRules();
 }

@@ -48,6 +48,7 @@ async function ensureComplianceSchema() {
       threshold_value DECIMAL(12,2),
       threshold_count INT,
       time_window_minutes INT,
+      time_window_seconds INT,
       points INT DEFAULT 0,
       is_active TINYINT DEFAULT 1,
       created_by INT,
@@ -56,6 +57,21 @@ async function ensureComplianceSchema() {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (created_by) REFERENCES users(user_id),
       FOREIGN KEY (updated_by) REFERENCES users(user_id)
+    )
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS merchant_category_risk (
+      risk_id INT AUTO_INCREMENT PRIMARY KEY,
+      mcc_code VARCHAR(20) NULL,
+      category_name VARCHAR(100) NOT NULL,
+      category_keyword VARCHAR(100) NULL,
+      points INT NOT NULL DEFAULT 0,
+      is_active TINYINT(1) DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_merchant_category_mcc (mcc_code),
+      UNIQUE KEY uq_merchant_category_keyword (category_keyword)
     )
   `);
 
@@ -75,6 +91,8 @@ async function ensureComplianceSchema() {
       currency VARCHAR(10) DEFAULT 'SGD',
       ip_address VARCHAR(45),
       country VARCHAR(50) DEFAULT 'Singapore',
+      ip_country VARCHAR(50),
+      customer_risk_profile VARCHAR(20),
       txn_time DATETIME,
       transaction_status VARCHAR(30),
       risk_score INT DEFAULT 0,
@@ -199,6 +217,7 @@ async function ensureComplianceSchema() {
 
   await ensureCurrentSchemaCompatibility();
 
+  await ensureReferenceData();
   await ensureDefaultRules();
   await ensureDefaultMccCodes();
 }
@@ -233,17 +252,38 @@ async function addIndexIfMissing(table, indexName, columns) {
   }
 }
 
+async function addUniqueIndexIfNoDuplicates(table, indexName, column) {
+  if (await indexExists(table, indexName)) return;
+
+  const duplicates = await query(`
+    SELECT ${column}, COUNT(*) AS count
+    FROM ${table}
+    WHERE ${column} IS NOT NULL AND ${column} <> ''
+    GROUP BY ${column}
+    HAVING COUNT(*) > 1
+    LIMIT 1
+  `);
+
+  if (!duplicates.length) {
+    await query(`CREATE UNIQUE INDEX ${indexName} ON ${table}(${column})`);
+  }
+}
+
 async function ensureCurrentSchemaCompatibility() {
   await addColumnIfMissing("merchants", "has_physical_location", "TINYINT(1) DEFAULT 1");
   await addColumnIfMissing("merchants", "created_by", "INT NULL");
   await addColumnIfMissing("merchants", "updated_by", "INT NULL");
   await addColumnIfMissing("merchants", "terminals_seeded", "TINYINT(1) DEFAULT 0");
 
+  await addColumnIfMissing("compliance_rules", "time_window_seconds", "INT NULL");
+
   await addColumnIfMissing("transactions", "card_bin", "VARCHAR(10) NULL");
   await addColumnIfMissing("transactions", "masked_card_number", "VARCHAR(30) NULL");
   await addColumnIfMissing("transactions", "card_presence", "VARCHAR(20) NULL");
   await addColumnIfMissing("transactions", "terminal_id", "VARCHAR(50) NULL");
   await addColumnIfMissing("transactions", "payment_gateway_ref", "VARCHAR(100) NULL");
+  await addColumnIfMissing("transactions", "ip_country", "VARCHAR(50) NULL");
+  await addColumnIfMissing("transactions", "customer_risk_profile", "VARCHAR(20) NULL");
 
   await addColumnIfMissing("alerts", "priority", "VARCHAR(20) NULL");
   await addColumnIfMissing("alerts", "assigned_to", "INT NULL");
@@ -278,6 +318,60 @@ async function ensureCurrentSchemaCompatibility() {
   await addColumnIfMissing("str_reports", "rejected_at", "DATETIME NULL");
 
   await addIndexIfMissing("terminals", "idx_terminals_merchant", "merchant_id");
+  await addUniqueIndexIfNoDuplicates("compliance_rules", "uq_compliance_rules_rule_type", "rule_type");
+
+  await query(`
+    UPDATE compliance_rules
+    SET rule_type = 'failed_attempt_velocity',
+        rule_name = CASE
+          WHEN rule_name IS NULL OR rule_name = '' OR LOWER(rule_name) LIKE '%cancel%'
+          THEN 'Repeated failed or declined payment attempts'
+          ELSE rule_name
+        END,
+        description = 'Flags repeated failed or declined payment attempts using the same payment identifier.',
+        time_window_seconds = COALESCE(time_window_seconds, time_window_minutes * 60, 600),
+        updated_at = NOW()
+    WHERE rule_type = 'cancellation_velocity'
+      AND NOT EXISTS (
+        SELECT 1 FROM (
+          SELECT rule_id FROM compliance_rules WHERE rule_type = 'failed_attempt_velocity'
+        ) AS existing_failed_rule
+      )
+  `);
+
+  await query(`
+    UPDATE compliance_rules
+    SET is_active = 0, updated_at = NOW()
+    WHERE rule_type = 'cancellation_velocity'
+  `);
+
+  await query(`
+    UPDATE compliance_rules
+    SET is_active = 0, updated_at = NOW()
+    WHERE rule_type = 'high_risk_jurisdiction'
+       OR rule_type IN ('country', 'country_risk', 'jurisdiction', 'cross_border')
+       OR LOWER(COALESCE(rule_name, '')) LIKE '%high-risk jurisdiction%'
+       OR LOWER(COALESCE(rule_name, '')) LIKE '%high risk jurisdiction%'
+       OR LOWER(COALESCE(rule_name, '')) LIKE '%high-risk country%'
+       OR LOWER(COALESCE(rule_name, '')) LIKE '%cross-border%'
+       OR LOWER(COALESCE(rule_name, '')) LIKE '%cross border%'
+       OR LOWER(COALESCE(rule_name, '')) LIKE '%jurisdiction%'
+  `);
+
+  await query(`
+    UPDATE compliance_rules
+    SET time_window_seconds = CASE
+      WHEN time_window_seconds IS NOT NULL THEN time_window_seconds
+      WHEN time_window_minutes IS NOT NULL THEN time_window_minutes * 60
+      WHEN rule_type = 'velocity' THEN 60
+      WHEN rule_type = 'velocity_small_amount' THEN 300
+      WHEN rule_type = 'large_amount_frequency' THEN 1800
+      WHEN rule_type = 'failed_attempt_velocity' THEN 600
+      WHEN rule_type = 'failure_then_success' THEN 600
+      WHEN rule_type = 'duplicate_transaction' THEN 60
+      ELSE NULL
+    END
+  `);
 
   await query(`
     UPDATE rfi_requests
@@ -287,6 +381,51 @@ async function ensureCurrentSchemaCompatibility() {
   await query("UPDATE rfi_requests SET requested_documents = '[]' WHERE requested_documents IS NULL");
   await query("UPDATE rfi_requests SET status = 'Pending Merchant Response' WHERE status = 'Pending'");
   await query("UPDATE rfi_requests SET is_sent = 1 WHERE sent_at IS NOT NULL");
+}
+
+async function ensureReferenceData() {
+  const rows = [
+    ["4511", "Airlines / travel", null, 15],
+    ["4722", "Travel agencies / tourism", null, 15],
+    ["4789", "Transportation / travel services", null, 15],
+    ["4812", "Financial / telecom payment services", null, 15],
+    ["4829", "Money transfer / remittance", null, 15],
+    ["5311", "Retail / department stores", null, 5],
+    ["5411", "Grocery stores", null, 5],
+    ["5541", "Retail / service stations", null, 5],
+    ["5651", "Retail / clothing", null, 5],
+    ["5732", "Electronics", null, 10],
+    ["5812", "Restaurants", null, 5],
+    ["5813", "Bars / food and beverage", null, 5],
+    ["5814", "Fast food", null, 5],
+    ["6012", "Financial institutions", null, 15],
+    ["6051", "Money services / money orders", null, 15],
+    ["7011", "Hotel / lodging", null, 15],
+    ["7995", "Gambling / betting", null, 15],
+    [null, "Food and beverage", "food", 5],
+    [null, "Food and beverage", "restaurant", 5],
+    [null, "Retail", "retail", 5],
+    [null, "Electronics", "electronic", 10],
+    [null, "Travel / tourism", "travel", 15],
+    [null, "Money transfer / remittance", "remittance", 15],
+    [null, "Financial services", "financial", 15],
+    [null, "Gambling / betting", "gambling", 15],
+  ];
+
+  for (const [mccCode, categoryName, categoryKeyword, points] of rows) {
+    await query(
+      `
+        INSERT INTO merchant_category_risk
+          (mcc_code, category_name, category_keyword, points, is_active)
+        VALUES (?, ?, ?, ?, 1)
+        ON DUPLICATE KEY UPDATE
+          category_name = VALUES(category_name),
+          points = VALUES(points),
+          updated_at = NOW()
+      `,
+      [mccCode, categoryName, categoryKeyword, points]
+    );
+  }
 }
 
 async function ensureDefaultRules(createdBy = null) {
@@ -300,98 +439,127 @@ async function ensureDefaultRules(createdBy = null) {
     authorId = authors[0].user_id;
   }
 
-  await query(`
-    UPDATE compliance_rules
-    SET is_active = 0, updated_at = NOW()
-    WHERE LOWER(rule_name) LIKE '%high-risk country%'
-       OR LOWER(rule_name) LIKE '%high risk country%'
-       OR LOWER(rule_name) LIKE '%jurisdiction%'
-       OR LOWER(rule_name) LIKE '%cross-border%'
-       OR LOWER(rule_name) LIKE '%cross border%'
-       OR rule_type IN ('country', 'country_risk', 'jurisdiction', 'cross_border')
-  `);
-
   const currentRules = [
     {
-      rule_name: "Merchant MCC/base industry risk score",
+      rule_name: "Merchant MCC or industry risk",
       rule_type: "merchant_profile",
-      description: "Adds base risk using merchant MCC or business category: F&B +5, retail +10, electronics +15, travel/tourism/hotel +20, money service/remittance/financial/gambling +30.",
+      description: "Adds configured merchant profile risk points from the merchant_category_risk database table.",
       threshold_value: null,
       threshold_count: null,
       time_window_minutes: null,
-      points: 30,
+      time_window_seconds: null,
+      points: 0,
+      is_active: 1,
     },
     {
       rule_name: "Significant amount compared to merchant average",
       rule_type: "amount_multiplier",
-      description: "Flags transactions greater than three times the merchant average amount.",
-      threshold_value: 3.00,
+      description: "Flags transactions above a configurable multiple of the trusted merchant average amount.",
+      threshold_value: 3,
       threshold_count: null,
       time_window_minutes: null,
-      points: 30,
+      time_window_seconds: null,
+      points: 25,
+      is_active: 1,
     },
     {
       rule_name: "High transaction velocity",
       rule_type: "velocity",
-      description: "High transaction velocity detected: 10 transactions within 30 seconds.",
+      description: "Flags repeated transactions using the same payment identifier within the configured time window.",
       threshold_value: null,
-      threshold_count: 10,
-      time_window_minutes: 0,
-      points: 35,
+      threshold_count: 6,
+      time_window_minutes: 1,
+      time_window_seconds: 60,
+      points: 25,
+      is_active: 1,
     },
     {
       rule_name: "Repeated small transactions",
       rule_type: "velocity_small_amount",
-      description: "Repeated small transactions detected: 5 transactions below SGD 10 within 5 minutes.",
-      threshold_value: 10.00,
+      description: "Flags repeated small-value transactions using the same payment identifier.",
+      threshold_value: 10,
       threshold_count: 5,
       time_window_minutes: 5,
-      points: 25,
+      time_window_seconds: 300,
+      points: 20,
+      is_active: 1,
     },
     {
-      rule_name: "Frequent large amount transactions",
+      rule_name: "Frequent unusually large transactions",
       rule_type: "large_amount_frequency",
-      description: "Frequent large amount transactions detected within 30 minutes.",
-      threshold_value: 3.00,
+      description: "Flags repeated transactions above a configurable multiple of the merchant average.",
+      threshold_value: 3,
       threshold_count: 3,
       time_window_minutes: 30,
-      points: 35,
+      time_window_seconds: 1800,
+      points: 30,
+      is_active: 1,
     },
     {
-      rule_name: "Repeated cancelled or failed transactions",
-      rule_type: "cancellation_velocity",
-      description: "Repeated cancelled or failed transactions detected within 10 minutes.",
+      rule_name: "Repeated failed or declined payment attempts",
+      rule_type: "failed_attempt_velocity",
+      description: "Flags repeated failed or declined payment attempts using the same payment identifier.",
       threshold_value: null,
       threshold_count: 3,
       time_window_minutes: 10,
+      time_window_seconds: 600,
+      points: 15,
+      is_active: 1,
+    },
+    {
+      rule_name: "Failed attempts followed by success",
+      rule_type: "failure_then_success",
+      description: "Flags a successful transaction following several recent failed or declined attempts using the same payment identifier.",
+      threshold_value: null,
+      threshold_count: 3,
+      time_window_minutes: 10,
+      time_window_seconds: 600,
+      points: 30,
+      is_active: 1,
+    },
+    {
+      rule_name: "Possible duplicate successful transaction",
+      rule_type: "duplicate_transaction",
+      description: "Flags a successful transaction that repeats merchant, amount, currency, and payment identifier within a short window.",
+      threshold_value: null,
+      threshold_count: 1,
+      time_window_minutes: 1,
+      time_window_seconds: 60,
       points: 25,
+      is_active: 1,
     },
     {
       rule_name: "Transaction outside merchant operating hours",
       rule_type: "time",
-      description: "Flags transactions made outside the merchant operating_hours_start and operating_hours_end values. The rule is skipped when operating hours are missing.",
+      description: "Applies only to face-to-face transactions for merchants with a physical location and recorded operating hours.",
       threshold_value: null,
       threshold_count: null,
       time_window_minutes: null,
-      points: 15,
+      time_window_seconds: null,
+      points: 10,
+      is_active: 1,
     },
     {
       rule_name: "High-risk customer profile",
       rule_type: "customer_risk",
-      description: "Adds risk points when the customer profile is marked high risk.",
+      description: "Adds supporting risk points when the customer profile is independently marked high risk.",
       threshold_value: null,
       threshold_count: null,
       time_window_minutes: null,
-      points: 25,
+      time_window_seconds: null,
+      points: 15,
+      is_active: 1,
     },
     {
-      rule_name: "Missing or insufficient transaction information",
+      rule_name: "Missing useful identifying information",
       rule_type: "data_quality",
-      description: "Flags transactions missing useful identifying references such as masked card, masked payment reference, terminal ID, or gateway reference.",
+      description: "Flags transactions missing useful monitoring references such as masked card, payment reference, terminal ID, or gateway reference.",
       threshold_value: null,
       threshold_count: null,
       time_window_minutes: null,
-      points: 20,
+      time_window_seconds: null,
+      points: 10,
+      is_active: 1,
     },
     {
       rule_name: "Online transaction with missing/invalid IP",
@@ -400,14 +568,27 @@ async function ensureDefaultRules(createdBy = null) {
       threshold_value: null,
       threshold_count: null,
       time_window_minutes: null,
+      time_window_seconds: null,
+      points: 10,
+      is_active: 1,
+    },
+    {
+      rule_name: "IP country mismatch",
+      rule_type: "ip_country_mismatch",
+      description: "Flags online transactions when verified IP-derived country differs from transaction country.",
+      threshold_value: null,
+      threshold_count: null,
+      time_window_minutes: null,
+      time_window_seconds: null,
       points: 20,
+      is_active: 0,
     },
   ];
 
   for (const rule of currentRules) {
     const existing = await query(
-      "SELECT rule_id FROM compliance_rules WHERE rule_type = ? OR rule_name = ? ORDER BY rule_id ASC LIMIT 1",
-      [rule.rule_type, rule.rule_name]
+      "SELECT rule_id FROM compliance_rules WHERE rule_type = ? ORDER BY rule_id ASC LIMIT 1",
+      [rule.rule_type]
     );
 
     if (!existing.length) {
@@ -416,9 +597,9 @@ async function ensureDefaultRules(createdBy = null) {
           INSERT INTO compliance_rules
             (
               rule_name, rule_type, description, threshold_value, threshold_count,
-              time_window_minutes, points, is_active, created_by
+              time_window_minutes, time_window_seconds, points, is_active, created_by, updated_by
             )
-          VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         [
           rule.rule_name,
@@ -427,7 +608,10 @@ async function ensureDefaultRules(createdBy = null) {
           rule.threshold_value,
           rule.threshold_count,
           rule.time_window_minutes,
+          rule.time_window_seconds,
           rule.points,
+          rule.is_active,
+          authorId,
           authorId,
         ]
       );
@@ -463,4 +647,4 @@ async function ensureDefaultMccCodes(createdBy = null) {
   }
 }
 
-module.exports = { ensureComplianceSchema, ensureDefaultRules, ensureDefaultMccCodes };
+module.exports = { ensureComplianceSchema, ensureDefaultRules, ensureDefaultMccCodes, ensureReferenceData };
