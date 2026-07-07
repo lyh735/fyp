@@ -49,8 +49,25 @@ async function getPersistedTransactionRisk(transactionId, txn) {
   return rows[0];
 }
 
+async function getMerchantProfile(merchantId) {
+  if (!merchantId) return null;
+
+  const rows = await query(
+    `
+      SELECT *
+      FROM merchants
+      WHERE merchant_id = ?
+      LIMIT 1
+    `,
+    [merchantId]
+  );
+
+  return rows[0] || null;
+}
+
 async function ensureMerchantRecord(txn, payload = {}, userId) {
   const merchantName = payload.merchant_name || txn.merchant_name || txn.merchant_id;
+
   await query(
     `
       INSERT INTO merchants
@@ -69,7 +86,7 @@ async function ensureMerchantRecord(txn, payload = {}, userId) {
         operating_hours_start = COALESCE(VALUES(operating_hours_start), operating_hours_start),
         operating_hours_end = COALESCE(VALUES(operating_hours_end), operating_hours_end),
         risk_level = COALESCE(VALUES(risk_level), risk_level),
-        merchant_risk_score = VALUES(merchant_risk_score),
+        merchant_risk_score = COALESCE(VALUES(merchant_risk_score), merchant_risk_score),
         country = COALESCE(VALUES(country), country),
         has_physical_location = VALUES(has_physical_location),
         status = VALUES(status),
@@ -79,13 +96,13 @@ async function ensureMerchantRecord(txn, payload = {}, userId) {
     [
       txn.merchant_id,
       merchantName,
-      payload.business_category || null,
-      payload.mcc_code || null,
+      txn.business_category || payload.business_category || null,
+      txn.mcc_code || payload.mcc_code || null,
       txn.merchant_average_amount || payload.merchant_average_amount || null,
       payload.operating_hours_start || null,
       payload.operating_hours_end || null,
       payload.merchant_risk_level || txn.customer_risk_profile || null,
-      txn.merchant_risk_score,
+      txn.merchant_risk_score_provided ? txn.merchant_risk_score : null,
       payload.merchant_country || txn.country || "Singapore",
       txn.has_physical_location,
       "active",
@@ -123,26 +140,35 @@ async function pickActiveTerminalId(merchantId) {
 }
 
 async function createAlertRecord(txn, result) {
-  const insertResult = await withRetries(() => query(
-    `
-      INSERT INTO alerts
-        (
-          transaction_id, merchant_id, risk_score, risk_level,
-          triggered_rules, status, priority, message
-        )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `,
-    [
-      txn.transaction_id,
-      txn.merchant_id,
-      result.risk_score,
-      result.risk_level,
-      JSON.stringify(result.triggered_rules),
-      "Pending",
-      result.risk_level === "High" ? "High" : "Medium",
-      result.triggered_rules.join(", "),
-    ]
-  ));
+  const priority =
+    result.risk_level === "Critical"
+      ? "Critical"
+      : result.risk_level === "High"
+        ? "High"
+        : "Medium";
+
+  const insertResult = await withRetries(() =>
+    query(
+      `
+        INSERT INTO alerts
+          (
+            transaction_id, merchant_id, risk_score, risk_level,
+            triggered_rules, status, priority, message
+          )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        txn.transaction_id,
+        txn.merchant_id,
+        result.risk_score,
+        result.risk_level,
+        JSON.stringify(result.triggered_rules),
+        "Pending",
+        priority,
+        result.triggered_rules.join(", "),
+      ]
+    )
+  );
 
   return insertResult.insertId;
 }
@@ -154,7 +180,7 @@ async function getAlertById(alertId) {
              t.payment_method, t.amount, t.currency,
              t.transaction_type, t.ip_address, t.country, NULL AS customer_risk_profile,
              m.merchant_average_amount, m.risk_level AS merchant_risk_level,
-             m.merchant_risk_score, m.has_physical_location,
+             m.mcc_code, m.merchant_risk_score, m.has_physical_location,
              t.source_type, t.txn_time AS transaction_time,
              u.name AS officer_name, NULL AS escalation_report
       FROM alerts a
@@ -166,6 +192,7 @@ async function getAlertById(alertId) {
     `,
     [alertId]
   );
+
   return rows[0] || null;
 }
 
@@ -182,9 +209,11 @@ async function updateAlertStatus(alertId, status, userId, report = null, actionT
 
   if (actionType) {
     await query(
-      `INSERT INTO case_actions
-         (alert_id, user_id, action_type, status_after_action, remarks)
-       VALUES (?, ?, ?, ?, ?)`,
+      `
+        INSERT INTO case_actions
+          (alert_id, user_id, action_type, status_after_action, remarks)
+        VALUES (?, ?, ?, ?, ?)
+      `,
       [alertId, userId, actionType, status, report]
     );
   }
@@ -194,19 +223,116 @@ async function updateAlertStatus(alertId, status, userId, report = null, actionT
   }
 }
 
-async function getRecentMerchantTransactionCount(merchantId, timestamp) {
+async function getVelocity30SecCount(txn) {
+  const rows = await query(
+    `
+      SELECT COUNT(*) AS count
+      FROM transactions
+      WHERE txn_time >= DATE_SUB(?, INTERVAL 30 SECOND)
+        AND txn_time <= ?
+        AND (
+          merchant_id = ?
+          OR (? IS NOT NULL AND ? <> '' AND masked_card_number = ?)
+          OR (? IS NOT NULL AND ? <> '' AND terminal_id = ?)
+        )
+    `,
+    [
+      txn.timestamp,
+      txn.timestamp,
+      txn.merchant_id,
+      txn.masked_card_number || "",
+      txn.masked_card_number || "",
+      txn.masked_card_number || "",
+      txn.terminal_id || "",
+      txn.terminal_id || "",
+      txn.terminal_id || "",
+    ]
+  );
+
+  return Number(rows[0]?.count || 0) + 1;
+}
+
+async function getSmallTxn5MinCount(txn) {
+  const rows = await query(
+    `
+      SELECT COUNT(*) AS count
+      FROM transactions
+      WHERE txn_time >= DATE_SUB(?, INTERVAL 5 MINUTE)
+        AND txn_time <= ?
+        AND amount < 10
+        AND (
+          merchant_id = ?
+          OR (? IS NOT NULL AND ? <> '' AND masked_card_number = ?)
+        )
+    `,
+    [
+      txn.timestamp,
+      txn.timestamp,
+      txn.merchant_id,
+      txn.masked_card_number || "",
+      txn.masked_card_number || "",
+      txn.masked_card_number || "",
+    ]
+  );
+
+  return Number(rows[0]?.count || 0) + (Number(txn.amount) < 10 ? 1 : 0);
+}
+
+async function getLargeTxn30MinCount(txn, merchant) {
+  const merchantAverage =
+    Number(merchant?.merchant_average_amount) ||
+    Number(txn.merchant_average_amount) ||
+    0;
+
+  if (merchantAverage <= 0) return 0;
+  const largeAmountThreshold = merchantAverage * 3;
+
   const rows = await query(
     `
       SELECT COUNT(*) AS count
       FROM transactions
       WHERE merchant_id = ?
-        AND txn_time >= DATE_SUB(?, INTERVAL 10 MINUTE)
+        AND txn_time >= DATE_SUB(?, INTERVAL 30 MINUTE)
         AND txn_time <= ?
+        AND amount > ?
     `,
-    [merchantId, timestamp, timestamp]
+    [
+      txn.merchant_id,
+      txn.timestamp,
+      txn.timestamp,
+      largeAmountThreshold,
+    ]
   );
 
-  return rows[0].count;
+  return Number(rows[0]?.count || 0) + (Number(txn.amount) > largeAmountThreshold ? 1 : 0);
+}
+
+async function getCancelledTxn10MinCount(txn) {
+  const rows = await query(
+    `
+      SELECT COUNT(*) AS count
+      FROM transactions
+      WHERE txn_time >= DATE_SUB(?, INTERVAL 10 MINUTE)
+        AND txn_time <= ?
+        AND LOWER(transaction_status) IN ('cancelled', 'canceled', 'failed', 'voided')
+        AND (
+          merchant_id = ?
+          OR (? IS NOT NULL AND ? <> '' AND masked_card_number = ?)
+        )
+    `,
+    [
+      txn.timestamp,
+      txn.timestamp,
+      txn.merchant_id,
+      txn.masked_card_number || "",
+      txn.masked_card_number || "",
+      txn.masked_card_number || "",
+    ]
+  );
+
+  const currentStatus = String(txn.status || "").toLowerCase();
+  const currentIsCancelled = ["cancelled", "canceled", "failed", "voided"].includes(currentStatus);
+  return Number(rows[0]?.count || 0) + (currentIsCancelled ? 1 : 0);
 }
 
 async function processTransaction(payload, req, validationOptions = {}) {
@@ -219,18 +345,26 @@ async function processTransaction(payload, req, validationOptions = {}) {
       payload,
       `Validation failed: ${validation.errors.join("; ")}`
     );
+
     return { validation };
   }
 
   const txn = validation.transaction;
-  const recentMerchantTransactionCount = await getRecentMerchantTransactionCount(
-    txn.merchant_id,
-    txn.timestamp
-  );
+
+  const merchant = await getMerchantProfile(txn.merchant_id);
+
+  const velocity30SecCount = await getVelocity30SecCount(txn);
+  const smallTxn5MinCount = await getSmallTxn5MinCount(txn);
+  const largeTxn30MinCount = await getLargeTxn30MinCount(txn, merchant);
+  const cancelledTxn10MinCount = await getCancelledTxn10MinCount(txn);
 
   const result = evaluateTransaction(txn, {
-    recentMerchantTransactionCount,
-    countryWasDefaulted: validation.metadata.countryWasDefaulted,
+    merchant,
+    velocity30SecCount,
+    smallTxn5MinCount,
+    largeTxn30MinCount,
+    cancelledTxn10MinCount,
+    missingRequiredInfo: validation.metadata.missingRequiredInfo,
   });
 
   await logAudit(
@@ -285,7 +419,7 @@ async function processTransaction(payload, req, validationOptions = {}) {
       txn.ip_address,
       txn.country,
       txn.timestamp,
-      result.status,
+      txn.status || "success",
       result.risk_score,
       result.risk_level,
       JSON.stringify(result.triggered_rules),
@@ -295,40 +429,60 @@ async function processTransaction(payload, req, validationOptions = {}) {
   );
 
   const persistedRisk = await getPersistedTransactionRisk(txn.transaction_id, txn);
-  const shouldGenerateAlert = persistedRisk.risk_level === "Medium" || persistedRisk.risk_level === "High";
+
+  const shouldGenerateAlert =
+    persistedRisk.risk_level === "Medium" ||
+    persistedRisk.risk_level === "High" ||
+    persistedRisk.risk_level === "Critical";
+
   let alertId = null;
 
   if (shouldGenerateAlert) {
     try {
       alertId = await createAlertRecord(txn, result);
+
       try {
         await query(
-          `INSERT INTO case_actions
-             (alert_id, user_id, action_type, status_after_action, remarks)
-           VALUES (?, ?, 'alert_created', 'Pending', ?)`,
-          [alertId, req.user.id, result.triggered_rules.join(", ") || "Alert created by risk engine"]
+          `
+            INSERT INTO case_actions
+              (alert_id, user_id, action_type, status_after_action, remarks)
+            VALUES (?, ?, 'alert_created', 'Pending', ?)
+          `,
+          [
+            alertId,
+            req.user.id,
+            result.triggered_rules.join(", ") || "Alert created by risk engine",
+          ]
         );
       } catch (actionErr) {
-        await logCritical(txn, `Alert ${alertId} was created but its case history entry failed: ${actionErr.message}`);
+        await logCritical(
+          txn,
+          `Alert ${alertId} was created but its case history entry failed: ${actionErr.message}`
+        );
       }
+
       await logAudit("alert_generated", txn, `Alert generated: ${alertId}`);
 
       const io = req.app.get("io");
-      io.emit("newAlert", {
-        alert_id: alertId,
-        transaction_id: txn.transaction_id,
-        merchant_id: txn.merchant_id,
-        ...result,
-      });
+      if (io) {
+        io.emit("newAlert", {
+          alert_id: alertId,
+          transaction_id: txn.transaction_id,
+          merchant_id: txn.merchant_id,
+          ...result,
+        });
+      }
     } catch (err) {
-      await logCritical(txn, "Failed to generate alert");
+      await logCritical(txn, `Failed to generate alert: ${err.message}`);
     }
   }
 
   await logAudit(
     "transaction_processed",
     txn,
-    `Transaction processed: ${persistedRisk.risk_level} risk, alert ${alertId ? `created (${alertId})` : "skipped"}`
+    `Transaction processed: ${persistedRisk.risk_level} risk, alert ${
+      alertId ? `created (${alertId})` : "skipped"
+    }`
   );
 
   await query(
@@ -342,6 +496,7 @@ async function processTransaction(payload, req, validationOptions = {}) {
 
   result.processing_status = "Complete";
   result.alert_id = alertId;
+
   return { txn, result, validation };
 }
 
@@ -355,8 +510,11 @@ function buildApiResponse(txn, result) {
     alert_required: result.alert_required,
     alert_status: result.alert_status,
     processing_status: result.processing_status,
+    transaction_status: result.status,
     source_type: txn.source_type,
     alert_id: result.alert_id,
+    decision: result.decision || result.status,
+    rejection_reason: result.rejection_reason || null,
   };
 }
 
@@ -373,6 +531,7 @@ exports.createTransaction = async (req, res) => {
 
     res.json(buildApiResponse(processed.txn, processed.result));
   } catch (err) {
+    console.error("createTransaction error:", err);
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
@@ -380,6 +539,7 @@ exports.createTransaction = async (req, res) => {
 exports.simulate = async (req, res) => {
   try {
     const generated = generateTransaction();
+
     const txn = {
       ...generated,
       timestamp: generated.txn_time,
@@ -388,6 +548,7 @@ exports.simulate = async (req, res) => {
     };
 
     const processed = await processTransaction(txn, req);
+
     if (!processed.validation.isValid) {
       return res.status(400).json({
         message: "Generated transaction failed validation",
@@ -397,6 +558,7 @@ exports.simulate = async (req, res) => {
 
     res.json({ transaction: { ...txn, ...processed.txn, ...processed.result } });
   } catch (err) {
+    console.error("simulate error:", err);
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
@@ -407,7 +569,8 @@ exports.getTransactions = (req, res) => {
       SELECT t.*, t.transaction_status AS status,
              m.merchant_name, m.merchant_average_amount,
              m.risk_level AS merchant_risk_level, m.merchant_risk_score,
-             m.has_physical_location
+             m.has_physical_location, m.business_category, m.mcc_code,
+             m.operating_hours_start, m.operating_hours_end
       FROM transactions t
       LEFT JOIN merchants m ON t.merchant_id = m.merchant_id
       ORDER BY COALESCE(t.txn_time, t.created_at) DESC
@@ -422,12 +585,14 @@ exports.getTransactions = (req, res) => {
 exports.showTransactionDetailsPage = async (req, res) => {
   try {
     const transactionId = req.params.id;
+
     const transactions = await query(
       `
         SELECT t.*, t.transaction_status AS status,
                m.merchant_name, m.merchant_average_amount,
                m.risk_level AS merchant_risk_level, m.merchant_risk_score,
-               m.has_physical_location
+               m.has_physical_location, m.business_category, m.mcc_code,
+               m.operating_hours_start, m.operating_hours_end
         FROM transactions t
         LEFT JOIN merchants m ON t.merchant_id = m.merchant_id
         WHERE t.transaction_id = ?
@@ -441,6 +606,7 @@ exports.showTransactionDetailsPage = async (req, res) => {
     }
 
     const transaction = transactions[0];
+
     const alerts = await query(
       `
         SELECT a.*, a.alert_id AS id, u.name AS officer_name, NULL AS escalation_report
@@ -452,6 +618,7 @@ exports.showTransactionDetailsPage = async (req, res) => {
       `,
       [transactionId]
     );
+
     const alert = alerts[0] || null;
 
     if (alert && !alert.read_at) {
@@ -461,32 +628,46 @@ exports.showTransactionDetailsPage = async (req, res) => {
 
     res.render("transactionDetails", { transaction, alert });
   } catch (err) {
-    console.error(err);
+    console.error("showTransactionDetailsPage error:", err);
     res.send("Server error");
   }
 };
 
 exports.getAlerts = async (req, res) => {
   const status = req.query.status || "Pending";
-  const orderByRisk = "a.read_at IS NOT NULL, FIELD(a.risk_level, 'High', 'Medium', 'Low'), a.created_at DESC";
-  const sql = status === "all"
-    ? `SELECT a.*, a.alert_id AS id, m.merchant_name, t.amount, t.currency, t.transaction_type, t.ip_address, t.country
-       FROM alerts a
-       LEFT JOIN transactions t ON a.transaction_id = t.transaction_id
-       LEFT JOIN merchants m ON a.merchant_id = m.merchant_id
-       ORDER BY ${orderByRisk} LIMIT 200`
-    : `SELECT a.*, a.alert_id AS id, m.merchant_name, t.amount, t.currency, t.transaction_type, t.ip_address, t.country
-       FROM alerts a
-       LEFT JOIN transactions t ON a.transaction_id = t.transaction_id
-       LEFT JOIN merchants m ON a.merchant_id = m.merchant_id
-       WHERE a.status = ?
-       ORDER BY ${orderByRisk} LIMIT 200`;
+
+  const orderByRisk =
+    "a.read_at IS NOT NULL, FIELD(a.risk_level, 'Critical', 'High', 'Medium', 'Low'), a.created_at DESC";
+
+  const sql =
+    status === "all"
+      ? `
+        SELECT a.*, a.alert_id AS id, m.merchant_name,
+               t.amount, t.currency, t.transaction_type, t.ip_address, t.country
+        FROM alerts a
+        LEFT JOIN transactions t ON a.transaction_id = t.transaction_id
+        LEFT JOIN merchants m ON a.merchant_id = m.merchant_id
+        ORDER BY ${orderByRisk}
+        LIMIT 200
+      `
+      : `
+        SELECT a.*, a.alert_id AS id, m.merchant_name,
+               t.amount, t.currency, t.transaction_type, t.ip_address, t.country
+        FROM alerts a
+        LEFT JOIN transactions t ON a.transaction_id = t.transaction_id
+        LEFT JOIN merchants m ON a.merchant_id = m.merchant_id
+        WHERE a.status = ?
+        ORDER BY ${orderByRisk}
+        LIMIT 200
+      `;
+
   const values = status === "all" ? [] : [status];
 
   try {
     const results = await query(sql, values);
     res.json(results);
   } catch (err) {
+    console.error("getAlerts error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -498,7 +679,9 @@ function normalizeImportRow(row) {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "_")
       .replace(/^_+|_+$/g, "");
+
     if (normalizedKey) normalized[normalizedKey] = value;
+
     return normalized;
   }, {});
 }
@@ -533,9 +716,11 @@ async function getMerchantImportProfile(merchantId) {
 
 exports.uploadTransactions = async (req, res) => {
   const rows = req.body?.transactions;
+
   if (!Array.isArray(rows) || rows.length === 0) {
     return res.status(400).json({ message: "The upload contains no transaction rows" });
   }
+
   if (rows.length > 500) {
     return res.status(400).json({ message: "A maximum of 500 transactions is allowed per upload" });
   }
@@ -609,7 +794,7 @@ exports.uploadTransactions = async (req, res) => {
 
       results.push({
         row: index + 2,
-        status: "processed",
+        status: processed.result.decision === "Rejected" ? "rejected" : "processed",
         ...buildApiResponse(processed.txn, processed.result),
       });
     } catch (err) {
@@ -622,14 +807,19 @@ exports.uploadTransactions = async (req, res) => {
     }
   }
 
-  const succeeded = results.filter((result) => result.status === "processed").length;
+  const succeeded = results.filter((result) =>
+    result.status === "processed" || result.status === "rejected"
+  ).length;
+  const rejected = results.filter((result) => result.status === "rejected").length;
   const alertsCreated = results.filter((result) => result.alert_id).length;
+
   res.status(succeeded > 0 ? 200 : 422).json({
     message: `Processed ${succeeded} of ${rows.length} transactions`,
     summary: {
       total: rows.length,
       succeeded,
       failed: rows.length - succeeded,
+      rejected,
       alerts_created: alertsCreated,
     },
     results,
@@ -638,7 +828,6 @@ exports.uploadTransactions = async (req, res) => {
 
 exports.getComplianceRules = async (req, res) => {
   try {
-    await ensureDefaultRules(req.user.id);
     const rules = await query(
       `
         SELECT rule_id, rule_name, rule_type, description, threshold_value,
@@ -648,18 +837,159 @@ exports.getComplianceRules = async (req, res) => {
         ORDER BY is_active DESC, rule_type ASC, rule_name ASC
       `
     );
+
     res.json(rules);
   } catch (err) {
+    console.error("getComplianceRules error:", err);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+function optionalDecimal(value, fieldName) {
+  if (value === "" || value === null || value === undefined) return null;
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0) {
+    throw new Error(`${fieldName} must be a positive number`);
+  }
+  return number;
+}
+
+function optionalInteger(value, fieldName) {
+  if (value === "" || value === null || value === undefined) return null;
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < 0) {
+    throw new Error(`${fieldName} must be a positive whole number`);
+  }
+  return number;
+}
+
+function normalizeRulePayload(body = {}) {
+  const ruleName = String(body.rule_name || "").trim();
+  const ruleType = String(body.rule_type || "").trim();
+  const description = String(body.description || "").trim();
+
+  if (!ruleName) throw new Error("Rule name is required");
+  if (ruleName.length > 100) throw new Error("Rule name must be 100 characters or fewer");
+  if (ruleType.length > 50) throw new Error("Rule type must be 50 characters or fewer");
+
+  return {
+    rule_name: ruleName,
+    rule_type: ruleType || null,
+    description: description || null,
+    threshold_value: optionalDecimal(body.threshold_value, "Threshold value"),
+    threshold_count: optionalInteger(body.threshold_count, "Threshold count"),
+    time_window_minutes: optionalInteger(body.time_window_minutes, "Time window"),
+    points: optionalInteger(body.points ?? 0, "Points") ?? 0,
+    is_active: body.is_active ? 1 : 0,
+  };
+}
+
+exports.createComplianceRule = async (req, res) => {
+  try {
+    const rule = normalizeRulePayload(req.body);
+
+    const result = await query(
+      `
+        INSERT INTO compliance_rules
+          (
+            rule_name, rule_type, description, threshold_value,
+            threshold_count, time_window_minutes, points, is_active,
+            created_by, updated_by
+          )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        rule.rule_name,
+        rule.rule_type,
+        rule.description,
+        rule.threshold_value,
+        rule.threshold_count,
+        rule.time_window_minutes,
+        rule.points,
+        rule.is_active,
+        req.user.id,
+        req.user.id,
+      ]
+    );
+
+    res.status(201).json({ message: "Rule created successfully", rule_id: result.insertId });
+  } catch (err) {
+    console.error("createComplianceRule error:", err);
+    res.status(400).json({ message: err.message || "Unable to create rule" });
+  }
+};
+
+exports.updateComplianceRule = async (req, res) => {
+  try {
+    const ruleId = Number(req.params.id);
+    if (!Number.isInteger(ruleId) || ruleId <= 0) {
+      return res.status(400).json({ message: "Invalid rule ID" });
+    }
+
+    const rule = normalizeRulePayload(req.body);
+
+    const result = await query(
+      `
+        UPDATE compliance_rules
+        SET rule_name = ?, rule_type = ?, description = ?,
+            threshold_value = ?, threshold_count = ?, time_window_minutes = ?,
+            points = ?, is_active = ?, updated_by = ?, updated_at = NOW()
+        WHERE rule_id = ?
+      `,
+      [
+        rule.rule_name,
+        rule.rule_type,
+        rule.description,
+        rule.threshold_value,
+        rule.threshold_count,
+        rule.time_window_minutes,
+        rule.points,
+        rule.is_active,
+        req.user.id,
+        ruleId,
+      ]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Rule not found" });
+    }
+
+    res.json({ message: "Rule updated successfully" });
+  } catch (err) {
+    console.error("updateComplianceRule error:", err);
+    res.status(400).json({ message: err.message || "Unable to update rule" });
+  }
+};
+
+exports.deleteComplianceRule = async (req, res) => {
+  try {
+    const ruleId = Number(req.params.id);
+    if (!Number.isInteger(ruleId) || ruleId <= 0) {
+      return res.status(400).json({ message: "Invalid rule ID" });
+    }
+
+    const result = await query("DELETE FROM compliance_rules WHERE rule_id = ?", [ruleId]);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Rule not found" });
+    }
+
+    res.json({ message: "Rule deleted successfully" });
+  } catch (err) {
+    console.error("deleteComplianceRule error:", err);
+    res.status(500).json({ message: "Unable to delete rule" });
   }
 };
 
 exports.getAlert = async (req, res) => {
   try {
     const alert = await getAlertById(req.params.id);
+
     if (!alert) return res.status(404).json({ message: "Alert not found" });
+
     res.json(alert);
   } catch (err) {
+    console.error("getAlert error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -667,16 +997,25 @@ exports.getAlert = async (req, res) => {
 exports.markAlertRead = async (req, res) => {
   try {
     const alert = await getAlertById(req.params.id);
+
     if (!alert) return res.status(404).json({ message: "Alert not found" });
+
     if (!alert.read_at) {
       await query(
-        `UPDATE alerts SET read_at = NOW() WHERE alert_id = ?`,
+        `
+          UPDATE alerts
+          SET read_at = NOW()
+          WHERE alert_id = ?
+        `,
         [req.params.id]
       );
     }
+
     const updated = await getAlertById(req.params.id);
+
     res.json({ message: "Alert marked as read", alert: updated });
   } catch (err) {
+    console.error("markAlertRead error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -684,7 +1023,9 @@ exports.markAlertRead = async (req, res) => {
 exports.dismissAlert = async (req, res) => {
   try {
     const alert = await getAlertById(req.params.id);
+
     if (!alert) return res.status(404).json({ message: "Alert not found" });
+
     if (alert.status !== "Pending") {
       return res.status(400).json({ message: "Only pending alerts can be dismissed" });
     }
@@ -694,35 +1035,52 @@ exports.dismissAlert = async (req, res) => {
 
     res.json({ message: "Alert successfully dismissed" });
   } catch (err) {
+    console.error("dismissAlert error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
 function formatEscalationReport(alert) {
   let triggeredRules = alert.triggered_rules;
+
   try {
     const parsed = JSON.parse(alert.triggered_rules);
     if (Array.isArray(parsed)) triggeredRules = parsed.join("; ");
   } catch {}
 
-  return `Escalation report for ${alert.transaction_id}: merchant=${alert.merchant_name || "N/A"}, amount=${alert.amount || "N/A"}, currency=${alert.currency || "N/A"}, risk_level=${alert.risk_level}, triggered_rules=${triggeredRules}`;
+  return `Escalation report for ${alert.transaction_id}: merchant=${
+    alert.merchant_name || "N/A"
+  }, amount=${alert.amount || "N/A"}, currency=${alert.currency || "N/A"}, risk_level=${
+    alert.risk_level
+  }, triggered_rules=${triggeredRules}`;
 }
 
 exports.escalateAlert = async (req, res) => {
   try {
     const alert = await getAlertById(req.params.id);
+
     if (!alert) return res.status(404).json({ message: "Alert not found" });
+
     if (alert.status !== "Pending") {
       return res.status(400).json({ message: "Only pending alerts can be escalated" });
     }
 
     const report = formatEscalationReport(alert);
-    await updateAlertStatus(req.params.id, "Escalated to STRO", req.user.id, report, "escalate_to_stro");
+
+    await updateAlertStatus(
+      req.params.id,
+      "Escalated to STRO",
+      req.user.id,
+      report,
+      "escalate_to_stro"
+    );
+
     await logAudit("alert_escalated", alert, `Alert escalated by user ${req.user.id}`);
     await logAudit("escalation_report", alert, report);
 
     res.json({ message: "Alert successfully escalated", escalation_report: report });
   } catch (err) {
+    console.error("escalateAlert error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };

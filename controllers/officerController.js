@@ -32,7 +32,7 @@ exports.showAlertDetails = (req, res) => {
   const sql = `
     SELECT a.*, a.alert_id AS id, COALESCE(a.message, a.triggered_rules) AS reason,
            m.merchant_name, t.amount, t.currency, t.ip_address, t.country,
-           u.name AS officer_name
+           m.mcc_code, m.merchant_risk_score, u.name AS officer_name
     FROM alerts a
     LEFT JOIN transactions t ON a.transaction_id = t.transaction_id
     LEFT JOIN merchants m ON a.merchant_id = m.merchant_id

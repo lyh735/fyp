@@ -1,5 +1,4 @@
-node_modules/
-*.log
 .env
-uploads/rfi-responses/*
-!uploads/rfi-responses/.gitkeep
+node_modules/
+venv/
+*.log
