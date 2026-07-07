@@ -94,6 +94,33 @@ async function ensureMerchantRecord(txn, payload = {}, userId) {
   );
 }
 
+async function ensureMerchantTerminals(merchantId, userId) {
+  // terminals_seeded gates a one-time initial pool so it doesn't get resurrected
+  // after an admin deliberately deletes all of a merchant's terminals.
+  const rows = await query("SELECT terminals_seeded FROM merchants WHERE merchant_id = ? LIMIT 1", [merchantId]);
+  if (!rows.length || rows[0].terminals_seeded) return;
+
+  const terminalCount = Math.floor(Math.random() * 3) + 1; // 1-3 terminals for a new outlet
+  for (let i = 1; i <= terminalCount; i++) {
+    await query(
+      `INSERT INTO terminals (terminal_id, merchant_id, label, status, created_by, updated_by)
+       VALUES (?, ?, ?, 'active', ?, ?)`,
+      [`${merchantId}-T${i}`, merchantId, `Counter ${i}`, userId, userId]
+    );
+  }
+
+  await query("UPDATE merchants SET terminals_seeded = 1 WHERE merchant_id = ?", [merchantId]);
+}
+
+async function pickActiveTerminalId(merchantId) {
+  const rows = await query(
+    "SELECT terminal_id FROM terminals WHERE merchant_id = ? AND status = 'active'",
+    [merchantId]
+  );
+  if (!rows.length) return null;
+  return rows[Math.floor(Math.random() * rows.length)].terminal_id;
+}
+
 async function createAlertRecord(txn, result) {
   const insertResult = await withRetries(() => query(
     `
@@ -220,6 +247,13 @@ async function processTransaction(payload, req) {
   );
 
   await ensureMerchantRecord(txn, payload, req.user.id);
+  await ensureMerchantTerminals(txn.merchant_id, req.user.id);
+
+  if (txn.source_type === "simulator") {
+    txn.terminal_id = txn.transaction_type === "face_to_face"
+      ? await pickActiveTerminalId(txn.merchant_id)
+      : null;
+  }
 
   await query(
     `

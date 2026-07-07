@@ -119,6 +119,16 @@ exports.updateMerchantProfile = async (req, res) => {
     const existing = await query("SELECT * FROM merchants WHERE merchant_id = ? LIMIT 1", [req.params.id]);
     if (!existing.length) return res.status(404).json({ message: "Merchant not found" });
 
+    if (normalized.mcc_code) {
+      const mccRows = await query(
+        "SELECT mcc_code FROM mcc_codes WHERE mcc_code = ? AND is_active = 1 LIMIT 1",
+        [normalized.mcc_code]
+      );
+      if (!mccRows.length) {
+        return res.status(400).json({ message: "MCC code is not a recognized, active code" });
+      }
+    }
+
     const values = EDITABLE_FIELDS.map((field) => normalized[field]);
     const result = await query(
       `UPDATE merchants SET
@@ -138,5 +148,59 @@ exports.updateMerchantProfile = async (req, res) => {
   } catch (err) {
     console.error("Unable to update merchant profile:", err);
     res.status(500).json({ message: "Unable to update merchant profile" });
+  }
+};
+
+exports.getMerchantTerminals = async (req, res) => {
+  try {
+    const terminals = await query(
+      `SELECT terminal_id, merchant_id, label, status, created_at
+       FROM terminals
+       WHERE merchant_id = ?
+       ORDER BY created_at ASC`,
+      [req.params.id]
+    );
+    res.json(terminals);
+  } catch (err) {
+    res.status(500).json({ message: "Unable to load terminals" });
+  }
+};
+
+exports.createTerminal = async (req, res) => {
+  const label = optionalText(req.body.label, 100) || "New terminal";
+
+  try {
+    const merchant = await query("SELECT merchant_id FROM merchants WHERE merchant_id = ? LIMIT 1", [req.params.id]);
+    if (!merchant.length) return res.status(404).json({ message: "Merchant not found" });
+
+    const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
+    const terminalId = `${req.params.id}-T${suffix}`;
+
+    await query(
+      `INSERT INTO terminals (terminal_id, merchant_id, label, status, created_by, updated_by)
+       VALUES (?, ?, ?, 'active', ?, ?)`,
+      [terminalId, req.params.id, label, req.user.id, req.user.id]
+    );
+
+    const created = await query("SELECT * FROM terminals WHERE terminal_id = ? LIMIT 1", [terminalId]);
+    res.json({ message: "Terminal added successfully", terminal: created[0] });
+  } catch (err) {
+    if (err.code === "ER_DUP_ENTRY") {
+      return res.status(409).json({ message: "Terminal ID collision, please try again" });
+    }
+    res.status(500).json({ message: "Unable to add terminal" });
+  }
+};
+
+exports.deleteTerminal = async (req, res) => {
+  try {
+    const result = await query(
+      "DELETE FROM terminals WHERE terminal_id = ? AND merchant_id = ?",
+      [req.params.terminalId, req.params.id]
+    );
+    if (!result.affectedRows) return res.status(404).json({ message: "Terminal not found" });
+    res.json({ message: "Terminal deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Unable to delete terminal" });
   }
 };
