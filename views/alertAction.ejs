@@ -179,6 +179,9 @@
           <a href="/api/officer/alerts/<%= alert.id %>/rfi" class="btn" style="background:#0d6efd;color:white;text-decoration:none;">
             Request Information (RFI)
           </a>
+          <a href="/api/officer/str/generate/<%= alert.id || alert.alert_id %>" class="btn btn-danger">
+           Generate STR Draft
+           </a>
           <button type="submit" name="action_type" value="escalate_to_stro" class="btn btn-danger">
             Escalate to STRO
           </button>

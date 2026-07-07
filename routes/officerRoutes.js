@@ -20,5 +20,8 @@ router.post("/action", officerController.takeActionPage);
 router.get("/audit-logs", officerController.showAuditLogsPage);
 router.get("/report", officerController.showReportPage);
 
+router.get("/str/generate/:alertId", officerController.generateSTRDraft);
+router.get("/str/view/:strId", officerController.viewSTRDraft);
+
 router.get("/action-success/:id", officerController.showActionSuccessPage);
 module.exports = router;
