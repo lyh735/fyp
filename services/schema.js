@@ -360,27 +360,7 @@ async function ensureDefaultRules(createdBy = null) {
       [rule.rule_type, rule.rule_name]
     );
 
-    if (existing.length) {
-      await query(
-        `
-          UPDATE compliance_rules
-          SET rule_name = ?, description = ?, threshold_value = ?,
-              threshold_count = ?, time_window_minutes = ?, points = ?,
-              is_active = 1, updated_by = ?, updated_at = NOW()
-          WHERE rule_id = ?
-        `,
-        [
-          rule.rule_name,
-          rule.description,
-          rule.threshold_value,
-          rule.threshold_count,
-          rule.time_window_minutes,
-          rule.points,
-          authorId,
-          existing[0].rule_id,
-        ]
-      );
-    } else {
+    if (!existing.length) {
       await query(
         `
           INSERT INTO compliance_rules

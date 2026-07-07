@@ -324,9 +324,8 @@ async function processTransaction(payload, req) {
 
   const txn = validation.transaction;
 
-  await ensureMerchantRecord(txn, payload, req.user.id);
-
-  const merchant = await getMerchantProfile(txn.merchant_id);
+  const merchant =
+  await getRequiredMerchantProfile(txn.merchant_id);
 
   const velocity30SecCount = await getVelocity30SecCount(txn);
   const smallTxn5MinCount = await getSmallTxn5MinCount(txn);
@@ -751,8 +750,6 @@ exports.uploadTransactions = async (req, res) => {
 
 exports.getComplianceRules = async (req, res) => {
   try {
-    await ensureDefaultRules(req.user.id);
-
     const rules = await query(
       `
         SELECT rule_id, rule_name, rule_type, description, threshold_value,

@@ -56,15 +56,14 @@ function validateTransaction(payload) {
     !normalizeText(payload.payment_gateway_ref);
 
   const requiredFields = [
-    "transaction_id",
-    "merchant_id",
-    "amount",
-    "currency",
-    "transaction_type",
-    "timestamp",
-    "customer_risk_profile",
-    "merchant_average_amount",
-  ];
+  "transaction_id",
+  "merchant_id",
+  "amount",
+  "currency",
+  "transaction_type",
+  "timestamp",
+  "customer_risk_profile",
+];
 
   for (const field of requiredFields) {
     if (payload[field] === undefined || payload[field] === null || payload[field] === "") {
@@ -73,7 +72,12 @@ function validateTransaction(payload) {
   }
 
   const amount = Number(payload.amount);
-  const merchantAverageAmount = Number(payload.merchant_average_amount);
+  const merchantAverageAmount =
+    payload.merchant_average_amount === undefined ||
+    payload.merchant_average_amount === null ||
+    payload.merchant_average_amount === ""
+      ? null
+      : Number(payload.merchant_average_amount);
   const transactionType = normalizeText(payload.transaction_type);
   const customerRiskProfile = normalizeText(payload.customer_risk_profile)?.toLowerCase();
   const paymentMethod = normalizeText(payload.payment_method);
@@ -88,7 +92,7 @@ function validateTransaction(payload) {
     errors.push("amount must be greater than 0");
   }
 
-  if (!Number.isFinite(merchantAverageAmount) || merchantAverageAmount <= 0) {
+  if (merchantAverageAmount !== null && (!Number.isFinite(merchantAverageAmount) || merchantAverageAmount <= 0)) {
     errors.push("merchant_average_amount must be greater than 0");
   }
 
@@ -132,7 +136,9 @@ function validateTransaction(payload) {
       country: normalizeText(payload.country) || "Singapore",
       timestamp,
       customer_risk_profile: customerRiskProfile,
-      merchant_average_amount: merchantAverageAmount,
+      merchant_average_amount: Number.isFinite(merchantAverageAmount)
+        ? merchantAverageAmount
+        : null,
       merchant_risk_score: merchantRiskScore ?? 0,
       merchant_risk_score_provided: merchantRiskScore !== null,
       has_physical_location: normalizeBoolean(
