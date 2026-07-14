@@ -224,6 +224,11 @@ exports.takeActionPage = (req, res) => {
 
 exports.generateSTRDraft = (req, res) => {
   const alertId = req.params.alertId;
+  const generatedBy = Number(req.user?.id || req.user?.user_id);
+
+  if (!Number.isInteger(generatedBy) || generatedBy <= 0) {
+    return res.status(401).send("Authenticated user id is required to generate an STR draft");
+  }
 
   const alertSql = `
     SELECT * FROM alerts
@@ -278,7 +283,7 @@ Prepare STR draft and escalate for approval.
       insertSql,
       [
         alert.alert_id,
-        "Compliance Officer",
+        generatedBy,
         strReference,
         narrativeText,
         "Draft"
@@ -301,8 +306,8 @@ exports.viewSTRDraft = (req, res) => {
     const sql = `
         SELECT s.*, a.transaction_id, a.merchant_id,
                a.risk_score, a.risk_level, a.triggered_rules
-        FROM str s
-        LEFT JOIN alerts a ON s.alert_id = a.id
+        FROM str_reports s
+        LEFT JOIN alerts a ON s.alert_id = a.alert_id
         WHERE s.str_id = ?
     `;
 
