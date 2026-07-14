@@ -128,6 +128,12 @@ exports.takeActionPage = (req, res) => {
     }
 
     const alert = alerts[0];
+
+    if (["close_case", "escalate_to_stro"].includes(action_type) && alert.status !== "Pending") {
+      const actionLabel = action_type === "close_case" ? "dismissed" : "escalated";
+      return res.status(400).send(`Only pending alerts can be ${actionLabel}`);
+    }
+
     let newStatus = alert.status;
 
     if (action_type === "review_started") {

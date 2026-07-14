@@ -67,9 +67,13 @@ async function apiFetch(url, options = {}) {
   return res;
 }
 
-function logout() {
-  clearSession();
-  window.location.href = "/login.html";
+async function logout() {
+  try {
+    await fetch("/api/auth/logout", { method: "POST" });
+  } finally {
+    clearSession();
+    window.location.href = "/login.html";
+  }
 }
 
 function showMessage(elementId, message, type = "error") {

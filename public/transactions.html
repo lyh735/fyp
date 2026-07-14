@@ -42,7 +42,7 @@
         </svg>
         Transactions
       </div>
-      <div class="nav-item" onclick="window.location.href='/import-transactions.html'">
+      <div class="nav-item" id="importTransactionsNav" style="display:none" onclick="window.location.href='/import-transactions.html'">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/>
         </svg>
@@ -209,6 +209,10 @@ if (["admin", "compliance_manager"].includes(user.role)) {
   const statUsersCard = document.getElementById("statUsersCard");
   if (adminNav) adminNav.style.display = "block";
   if (statUsersCard) statUsersCard.style.display = "";
+}
+if (String(user.role).trim().toLowerCase() === "admin") {
+  const importTransactionsNav = document.getElementById("importTransactionsNav");
+  if (importTransactionsNav) importTransactionsNav.style.display = "";
 }
 if (String(user.role).trim().toLowerCase() === "stro") {
   document.getElementById("stroNav").style.display = "block";

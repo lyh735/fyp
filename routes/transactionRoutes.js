@@ -15,10 +15,10 @@ const {
   dismissAlert,
   escalateAlert,
 } = require("../controllers/transactionController");
-const { authenticate, requireAdmin, requireAlertOfficer } = require("../middleware/authMiddleware");
+const { authenticate, requireAdmin, requireAlertOfficer, requireSystemAdmin } = require("../middleware/authMiddleware");
 
-router.post("/transactions",       authenticate, createTransaction);
-router.post("/transactions/upload", authenticate, uploadTransactions);
+router.post("/transactions",       authenticate, requireSystemAdmin, createTransaction);
+router.post("/transactions/upload", authenticate, requireSystemAdmin, uploadTransactions);
 router.get ("/transactions",       authenticate, getTransactions);
 router.get ("/alerts",             authenticate, getAlerts);
 router.get ("/alerts/:id",         authenticate, getAlert);

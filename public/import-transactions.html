@@ -241,6 +241,10 @@
 const user = requireAuth();
 if (!user) throw new Error("not authenticated");
 if (user.first_login) window.location.href = "/change-password.html";
+if (String(user.role).trim().toLowerCase() !== "admin") {
+  window.location.href = "/transactions.html";
+  throw new Error("admin required");
+}
 
 document.getElementById("sidebarName").textContent = user.name;
 document.getElementById("sidebarRole").textContent = user.role;
