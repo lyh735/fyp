@@ -43,19 +43,19 @@ CREATE TABLE IF NOT EXISTS merchant_category_risk (
 
 INSERT INTO merchant_category_risk (mcc_code, category_name, category_keyword, points, is_active)
 VALUES
-  ('5812', 'Restaurants', NULL, 5),
-  ('5814', 'Fast food', NULL, 5),
-  ('5732', 'Electronics', NULL, 10),
-  ('4829', 'Money transfer / remittance', NULL, 15),
-  ('6012', 'Financial institutions', NULL, 15),
-  ('6051', 'Money services / money orders', NULL, 15),
-  ('7011', 'Hotel / lodging', NULL, 15),
-  ('7995', 'Gambling / betting', NULL, 15),
-  (NULL, 'Food and beverage', 'food', 5),
-  (NULL, 'Retail', 'retail', 5),
-  (NULL, 'Electronics', 'electronic', 10),
-  (NULL, 'Travel / tourism', 'travel', 15),
-  (NULL, 'Financial services', 'financial', 15)
+  ('5812', 'Restaurants', NULL, 5, 1),
+  ('5814', 'Fast food', NULL, 5, 1),
+  ('5732', 'Electronics', NULL, 10, 1),
+  ('4829', 'Money transfer / remittance', NULL, 15, 1),
+  ('6012', 'Financial institutions', NULL, 15, 1),
+  ('6051', 'Money services / money orders', NULL, 15, 1),
+  ('7011', 'Hotel / lodging', NULL, 15, 1),
+  ('7995', 'Gambling / betting', NULL, 15, 1),
+  (NULL, 'Food and beverage', 'food', 5, 1),
+  (NULL, 'Retail', 'retail', 5, 1),
+  (NULL, 'Electronics', 'electronic', 10, 1),
+  (NULL, 'Travel / tourism', 'travel', 15, 1),
+  (NULL, 'Financial services', 'financial', 15, 1)
 ON DUPLICATE KEY UPDATE
   category_name = VALUES(category_name),
   points = VALUES(points),

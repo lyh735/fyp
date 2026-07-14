@@ -11,6 +11,8 @@ const {
   createComplianceRule,
   updateComplianceRule,
   deleteComplianceRule,
+  getMccRiskProfiles,
+  updateMccRiskProfile,
   markAlertRead,
   dismissAlert,
   escalateAlert,
@@ -26,6 +28,8 @@ router.get ("/rules",              authenticate, getComplianceRules);
 router.post("/rules",              authenticate, requireAdmin, createComplianceRule);
 router.put ("/rules/:id",          authenticate, requireAdmin, updateComplianceRule);
 router.delete("/rules/:id",        authenticate, requireAdmin, deleteComplianceRule);
+router.get ("/mcc-risk",           authenticate, getMccRiskProfiles);
+router.put ("/mcc-risk/:id",       authenticate, requireAdmin, updateMccRiskProfile);
 router.post("/alerts/:id/read",    authenticate, markAlertRead);
 router.post("/alerts/:id/dismiss", authenticate, requireAlertOfficer, dismissAlert);
 router.post("/alerts/:id/escalate",authenticate, requireAlertOfficer, escalateAlert);

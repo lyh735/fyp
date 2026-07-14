@@ -9,7 +9,11 @@ const {
   isSupportedRuleType,
   getActiveRulesByType,
   getMerchantCategoryRisk,
+  getMerchantCategoryProfiles,
+  updateMerchantCategoryProfile,
 } = require("../services/complianceRuleService");
+
+const FAILED_ATTEMPT_STATUSES = Object.freeze(["failed", "declined"]);
 
 async function withRetries(operation, attempts = 3) {
   let lastError;
@@ -38,7 +42,7 @@ async function logCritical(txn, message) {
 async function getPersistedTransactionRisk(transactionId, txn) {
   const rows = await query(
     `
-      SELECT risk_score, risk_level
+      SELECT risk_score, risk_level, raw_risk_score, priority_score
       FROM transactions
       WHERE transaction_id = ?
       LIMIT 1
@@ -81,11 +85,12 @@ async function ensureMerchantRecord(txn, payload = {}, userId) {
       INSERT INTO merchants
         (
           merchant_id, merchant_name, business_category, mcc_code,
-          merchant_average_amount, operating_hours_start, operating_hours_end,
+          merchant_average_amount, merchant_max_transaction_amount,
+          operating_hours_start, operating_hours_end,
           risk_level, merchant_risk_score, country, has_physical_location,
           status, created_by, updated_by
         )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       txn.merchant_id,
@@ -93,6 +98,7 @@ async function ensureMerchantRecord(txn, payload = {}, userId) {
       txn.business_category || payload.business_category || null,
       txn.mcc_code || payload.mcc_code || null,
       txn.merchant_average_amount || payload.merchant_average_amount || null,
+      payload.merchant_max_transaction_amount || null,
       payload.operating_hours_start || null,
       payload.operating_hours_end || null,
       payload.merchant_risk_level || txn.customer_risk_profile || null,
@@ -148,15 +154,23 @@ async function createAlertRecord(txn, result) {
       `
         INSERT INTO alerts
           (
-            transaction_id, merchant_id, risk_score, risk_level,
+            transaction_id, merchant_id, risk_score, base_rule_score,
+            mcc_risk_points, raw_risk_score, displayed_risk_score,
+            priority_multiplier, priority_score, risk_level,
             triggered_rules, status, priority, message
           )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         txn.transaction_id,
         txn.merchant_id,
         result.risk_score,
+        result.base_rule_score,
+        result.mcc_risk_points,
+        result.raw_risk_score,
+        result.displayed_risk_score,
+        result.priority_multiplier,
+        result.priority_score,
         result.risk_level,
         JSON.stringify(result.triggered_rules),
         "Pending",
@@ -194,11 +208,20 @@ async function getAlertById(alertId) {
              t.transaction_type, t.ip_address, t.country, t.ip_country, t.customer_risk_profile,
              m.merchant_average_amount, m.risk_level AS merchant_risk_level,
              m.mcc_code, m.merchant_risk_score, m.has_physical_location,
+             t.base_rule_score AS transaction_base_rule_score,
+             t.mcc_risk_points AS transaction_mcc_risk_points,
+             t.raw_risk_score AS transaction_raw_risk_score,
+             t.displayed_risk_score AS transaction_displayed_risk_score,
+             t.priority_multiplier AS transaction_priority_multiplier,
+             t.priority_score AS transaction_priority_score,
+             mcr.category_name AS mcc_category_name,
+             COALESCE(mcr.risk_level, 'LOW') AS mcc_risk_level,
              t.source_type, t.txn_time AS transaction_time,
              u.name AS officer_name, NULL AS escalation_report
       FROM alerts a
       LEFT JOIN transactions t ON a.transaction_id = t.transaction_id
       LEFT JOIN merchants m ON a.merchant_id = m.merchant_id
+      LEFT JOIN merchant_category_risk mcr ON mcr.is_active = 1 AND mcr.mcc_code = m.mcc_code
       LEFT JOIN users u ON a.reviewed_by = u.user_id
       WHERE a.alert_id = ?
       LIMIT 1
@@ -255,6 +278,13 @@ function getRuleWindowSeconds(rule, fallbackSeconds) {
   return Number.isInteger(configured) && configured > 0 ? configured : fallbackSeconds;
 }
 
+function getRule(rules, ...types) {
+  for (const type of types) {
+    if (rules[type]) return rules[type];
+  }
+  return null;
+}
+
 async function getVelocityCount(txn, rule, identity) {
   if (!rule || !identity) return 0;
   const windowSeconds = getRuleWindowSeconds(rule, 60);
@@ -265,17 +295,20 @@ async function getVelocityCount(txn, rule, identity) {
       WHERE txn_time >= TIMESTAMPADD(SECOND, ?, ?)
         AND txn_time <= ?
         AND ${identity.column} = ?
+        AND LOWER(COALESCE(transaction_status, '')) NOT IN ('failed', 'declined')
     `,
     [-windowSeconds, txn.timestamp, txn.timestamp, identity.value]
   );
 
-  return Number(rows[0]?.count || 0) + 1;
+  const currentStatus = String(txn.status || "").trim().toLowerCase();
+  const currentCountsForGeneralVelocity = !FAILED_ATTEMPT_STATUSES.includes(currentStatus);
+  return Number(rows[0]?.count || 0) + (currentCountsForGeneralVelocity ? 1 : 0);
 }
 
-async function getSmallTransactionCount(txn, rule, identity) {
+async function getSmallTransactionCount(txn, rule, identity, merchantCategoryRisk) {
   if (!rule || !identity) return 0;
   const windowSeconds = getRuleWindowSeconds(rule, 300);
-  const amountLimit = Number(rule.threshold_value || 10);
+  const amountLimit = Number(rule.threshold_value || merchantCategoryRisk?.expected_min_amount || 10);
   const rows = await query(
     `
       SELECT COUNT(*) AS count
@@ -291,15 +324,20 @@ async function getSmallTransactionCount(txn, rule, identity) {
   return Number(rows[0]?.count || 0) + (Number(txn.amount) < amountLimit ? 1 : 0);
 }
 
-async function getLargeTransactionCount(txn, merchant, rule, identity) {
+async function getLargeTransactionCount(txn, merchant, merchantCategoryRisk, rule, identity) {
   if (!rule || !identity) return 0;
 
-  const merchantAverage = Number(merchant?.merchant_average_amount || 0);
-  const multiplier = Number(rule.threshold_value || 3);
-  if (merchantAverage <= 0 || multiplier <= 0) return 0;
+  const merchantMaximum = Number(merchant?.merchant_max_transaction_amount || 0);
+  const mccExpectedMax = Number(merchantCategoryRisk?.expected_max_amount || 0);
+  const generalThreshold = Number(rule?.threshold_value || 0);
+  if (merchantMaximum <= 0 && mccExpectedMax <= 0 && generalThreshold <= 0) return 0;
 
   const windowSeconds = getRuleWindowSeconds(rule, 1800);
-  const largeAmountThreshold = merchantAverage * multiplier;
+  const largeAmountThreshold = merchantMaximum > 0
+    ? merchantMaximum
+    : mccExpectedMax > 0
+      ? mccExpectedMax
+      : generalThreshold;
   const rows = await query(
     `
       SELECT COUNT(*) AS count
@@ -313,6 +351,111 @@ async function getLargeTransactionCount(txn, merchant, rule, identity) {
   );
 
   return Number(rows[0]?.count || 0) + (Number(txn.amount) > largeAmountThreshold ? 1 : 0);
+}
+
+async function getRepeatedIdenticalAmountPattern(txn, rule, identity) {
+  if (!rule) {
+    return { count: 0, distinctIdentifierCount: 0 };
+  }
+  const windowSeconds = getRuleWindowSeconds(rule, 300);
+  const identifierExpression = `
+    COALESCE(
+      NULLIF(masked_card_number, ''),
+      NULLIF(masked_payment_ref, ''),
+      NULLIF(payment_gateway_ref, ''),
+      CONCAT('txn:', transaction_id)
+    )
+  `;
+  const currentIdentifier = identity?.value || `txn:${txn.transaction_id}`;
+  const rows = await query(
+    `
+      SELECT COUNT(*) AS count,
+             COUNT(DISTINCT ${identifierExpression}) AS distinct_identifier_count,
+             SUM(CASE WHEN ${identifierExpression} = ? THEN 1 ELSE 0 END) AS same_identifier_count
+      FROM transactions
+      WHERE txn_time >= TIMESTAMPADD(SECOND, ?, ?)
+        AND txn_time <= ?
+        AND transaction_id <> ?
+        AND merchant_id = ?
+        AND amount BETWEEN ? AND ?
+    `,
+    [
+      currentIdentifier,
+      -windowSeconds,
+      txn.timestamp,
+      txn.timestamp,
+      txn.transaction_id,
+      txn.merchant_id,
+      Number(txn.amount) - 0.01,
+      Number(txn.amount) + 0.01,
+    ]
+  );
+
+  const priorCount = Number(rows[0]?.count || 0);
+  const priorDistinctIdentifierCount = Number(rows[0]?.distinct_identifier_count || 0);
+  const sameIdentifierCount = Number(rows[0]?.same_identifier_count || 0);
+  return {
+    count: priorCount + 1,
+    distinctIdentifierCount: priorDistinctIdentifierCount + (sameIdentifierCount > 0 ? 0 : 1),
+    sameIdentifierCount: sameIdentifierCount + (identity ? 1 : 0),
+  };
+}
+
+async function getDailyActivity(txn) {
+  const rows = await query(
+    `
+      SELECT COUNT(*) AS count, COALESCE(SUM(amount), 0) AS value
+      FROM transactions
+      WHERE merchant_id = ?
+        AND DATE(txn_time) = DATE(?)
+    `,
+    [txn.merchant_id, txn.timestamp]
+  );
+  return {
+    count: Number(rows[0]?.count || 0) + 1,
+    value: Number(rows[0]?.value || 0) + Number(txn.amount || 0),
+  };
+}
+
+async function getMerchantDailyAverages(merchantId, beforeTimestamp) {
+  const rows = await query(
+    `
+      SELECT AVG(day_count) AS avg_count, AVG(day_value) AS avg_value
+      FROM (
+        SELECT DATE(txn_time) AS txn_date, COUNT(*) AS day_count, SUM(amount) AS day_value
+        FROM transactions
+        WHERE merchant_id = ?
+          AND txn_time < ?
+        GROUP BY DATE(txn_time)
+      ) daily
+    `,
+    [merchantId, beforeTimestamp]
+  );
+  return {
+    avgCount: Number(rows[0]?.avg_count || 0),
+    avgValue: Number(rows[0]?.avg_value || 0),
+  };
+}
+
+function resolveDailyThresholds(rules, merchantAverages, merchantCategoryRisk) {
+  const countRule = getRule(rules, "daily_transaction_count_spike");
+  const valueRule = getRule(rules, "daily_transaction_value_spike");
+  const countMultiplier = Number(countRule?.threshold_value || 2);
+  const valueMultiplier = Number(valueRule?.threshold_count || 2);
+
+  const dailyCountThreshold = merchantAverages.avgCount > 0
+    ? Math.ceil(merchantAverages.avgCount * countMultiplier)
+    : Number(merchantCategoryRisk?.expected_daily_count || countRule?.threshold_count || 0);
+  const dailyValueThreshold = merchantAverages.avgValue > 0
+    ? merchantAverages.avgValue * valueMultiplier
+    : Number(merchantCategoryRisk?.expected_daily_value || valueRule?.threshold_value || 0);
+
+  return {
+    dailyCountThreshold,
+    dailyCountThresholdSource: merchantAverages.avgCount > 0 ? "MERCHANT" : merchantCategoryRisk?.expected_daily_count ? "MCC" : "GENERAL",
+    dailyValueThreshold,
+    dailyValueThresholdSource: merchantAverages.avgValue > 0 ? "MERCHANT" : merchantCategoryRisk?.expected_daily_value ? "MCC" : "GENERAL",
+  };
 }
 
 async function getFailedAttemptCount(txn, rule, identity) {
@@ -416,23 +559,38 @@ async function processTransaction(payload, req, validationOptions = {}) {
 
   const rules = await getActiveRulesByType();
   const paymentIdentifier = getPaymentActivityIdentifier(txn);
+  const merchantCategoryRisk = getRule(rules, "merchant_category_risk", "merchant_profile")
+    ? await getMerchantCategoryRisk(merchant)
+    : await getMerchantCategoryRisk(merchant);
+  const dailyActivityPromise = getDailyActivity(txn);
+  const merchantDailyAveragesPromise = getMerchantDailyAverages(txn.merchant_id, txn.timestamp);
+  const smallRule = getRule(rules, "repeated_small_transactions", "velocity_small_amount");
+  const largeRule = getRule(rules, "frequent_large_transactions", "large_amount_frequency");
+  const velocityRule = getRule(rules, "transaction_velocity", "velocity");
+  const duplicateRule = getRule(rules, "duplicate_payment_identifier", "duplicate_transaction");
+  const identicalRule = getRule(rules, "repeated_identical_amounts");
   const [
-    merchantCategoryRisk,
     velocityCount,
     smallTransactionCount,
     largeTransactionCount,
     failedAttemptCount,
     previousFailureCount,
     duplicatePattern,
+    repeatedIdenticalPattern,
+    dailyActivity,
+    merchantDailyAverages,
   ] = await Promise.all([
-    rules.merchant_profile ? getMerchantCategoryRisk(merchant) : null,
-    getVelocityCount(txn, rules.velocity, paymentIdentifier),
-    getSmallTransactionCount(txn, rules.velocity_small_amount, paymentIdentifier),
-    getLargeTransactionCount(txn, merchant, rules.large_amount_frequency, paymentIdentifier),
+    getVelocityCount(txn, velocityRule, paymentIdentifier),
+    getSmallTransactionCount(txn, smallRule, paymentIdentifier, merchantCategoryRisk),
+    getLargeTransactionCount(txn, merchant, merchantCategoryRisk, largeRule, paymentIdentifier),
     getFailedAttemptCount(txn, rules.failed_attempt_velocity, paymentIdentifier),
     getPreviousFailureCount(txn, rules.failure_then_success, paymentIdentifier),
-    getDuplicatePattern(txn, rules.duplicate_transaction, paymentIdentifier),
+    getDuplicatePattern(txn, duplicateRule, paymentIdentifier),
+    getRepeatedIdenticalAmountPattern(txn, identicalRule, paymentIdentifier),
+    dailyActivityPromise,
+    merchantDailyAveragesPromise,
   ]);
+  const dailyThresholds = resolveDailyThresholds(rules, merchantDailyAverages, merchantCategoryRisk);
 
   const result = evaluateTransaction(txn, {
     merchant,
@@ -446,6 +604,12 @@ async function processTransaction(payload, req, validationOptions = {}) {
     previousFailureCount,
     duplicatePatternCount: duplicatePattern.count,
     previousDuplicateTransaction: duplicatePattern.previous,
+    repeatedIdenticalAmountCount: repeatedIdenticalPattern.count,
+    repeatedIdenticalDistinctIdentifierCount: repeatedIdenticalPattern.distinctIdentifierCount,
+    repeatedIdenticalSameIdentifierCount: repeatedIdenticalPattern.sameIdentifierCount,
+    dailyTransactionCount: dailyActivity.count,
+    dailyTransactionValue: dailyActivity.value,
+    ...dailyThresholds,
     missingRequiredInfo: validation.metadata.missingRequiredInfo,
     ipCountryVerified: validation.metadata.ipCountryVerified,
   });
@@ -475,9 +639,10 @@ async function processTransaction(payload, req, validationOptions = {}) {
           terminal_id, payment_gateway_ref,
           payment_method, transaction_type, amount, currency, ip_address,
           country, ip_country, customer_risk_profile, txn_time, transaction_status, risk_score, risk_level,
-          triggered_rules, processing_status, source_type
+          base_rule_score, mcc_risk_points, raw_risk_score, displayed_risk_score,
+          priority_multiplier, priority_score, triggered_rules, processing_status, source_type
         )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       txn.transaction_id,
@@ -500,6 +665,12 @@ async function processTransaction(payload, req, validationOptions = {}) {
       txn.status || "success",
       result.risk_score,
       result.risk_level,
+      result.base_rule_score,
+      result.mcc_risk_points,
+      result.raw_risk_score,
+      result.displayed_risk_score,
+      result.priority_multiplier,
+      result.priority_score,
       JSON.stringify(result.triggered_rules),
       "Processing",
       txn.source_type,
@@ -583,6 +754,14 @@ function buildApiResponse(txn, result) {
     transaction_id: txn.transaction_id,
     merchant_id: txn.merchant_id,
     risk_score: result.risk_score,
+    official_risk_score: result.official_risk_score,
+    base_rule_score: result.base_rule_score,
+    mcc_risk_points: result.mcc_risk_points,
+    raw_risk_score: result.raw_risk_score,
+    displayed_risk_score: result.displayed_risk_score,
+    priority_multiplier: result.priority_multiplier,
+    priority_score: result.priority_score,
+    mcc: result.mcc,
     risk_level: result.risk_level,
     triggered_rules: result.triggered_rules,
     alert_required: result.alert_required,
@@ -648,9 +827,12 @@ exports.getTransactions = (req, res) => {
              m.merchant_name, m.merchant_average_amount,
              m.risk_level AS merchant_risk_level, m.merchant_risk_score,
              m.has_physical_location, m.business_category, m.mcc_code,
-             m.operating_hours_start, m.operating_hours_end
+             m.operating_hours_start, m.operating_hours_end,
+             mcr.category_name AS mcc_category_name,
+             COALESCE(mcr.risk_level, 'LOW') AS mcc_risk_level
       FROM transactions t
       LEFT JOIN merchants m ON t.merchant_id = m.merchant_id
+      LEFT JOIN merchant_category_risk mcr ON mcr.is_active = 1 AND mcr.mcc_code = m.mcc_code
       ORDER BY COALESCE(t.txn_time, t.created_at) DESC
     `,
     (err, results) => {
@@ -670,9 +852,12 @@ exports.showTransactionDetailsPage = async (req, res) => {
                m.merchant_name, m.merchant_average_amount,
                m.risk_level AS merchant_risk_level, m.merchant_risk_score,
                m.has_physical_location, m.business_category, m.mcc_code,
-               m.operating_hours_start, m.operating_hours_end
+               m.operating_hours_start, m.operating_hours_end,
+               mcr.category_name AS mcc_category_name,
+               COALESCE(mcr.risk_level, 'LOW') AS mcc_risk_level
         FROM transactions t
         LEFT JOIN merchants m ON t.merchant_id = m.merchant_id
+        LEFT JOIN merchant_category_risk mcr ON mcr.is_active = 1 AND mcr.mcc_code = m.mcc_code
         WHERE t.transaction_id = ?
         LIMIT 1
       `,
@@ -715,25 +900,31 @@ exports.getAlerts = async (req, res) => {
   const status = req.query.status || "Pending";
 
   const orderByRisk =
-    "a.read_at IS NOT NULL, FIELD(a.risk_level, 'Critical', 'High', 'Medium', 'Low'), a.created_at DESC";
+    "a.read_at IS NOT NULL, COALESCE(a.priority_score, a.risk_score, 0) DESC, a.created_at DESC";
 
   const sql =
     status === "all"
       ? `
         SELECT a.*, a.alert_id AS id, m.merchant_name,
-               t.amount, t.currency, t.transaction_type, t.ip_address, t.country
+               t.amount, t.currency, t.transaction_type, t.ip_address, t.country,
+               m.mcc_code, mcr.category_name AS mcc_category_name,
+               COALESCE(mcr.risk_level, 'LOW') AS mcc_risk_level
         FROM alerts a
         LEFT JOIN transactions t ON a.transaction_id = t.transaction_id
         LEFT JOIN merchants m ON a.merchant_id = m.merchant_id
+        LEFT JOIN merchant_category_risk mcr ON mcr.is_active = 1 AND mcr.mcc_code = m.mcc_code
         ORDER BY ${orderByRisk}
         LIMIT 200
       `
       : `
         SELECT a.*, a.alert_id AS id, m.merchant_name,
-               t.amount, t.currency, t.transaction_type, t.ip_address, t.country
+               t.amount, t.currency, t.transaction_type, t.ip_address, t.country,
+               m.mcc_code, mcr.category_name AS mcc_category_name,
+               COALESCE(mcr.risk_level, 'LOW') AS mcc_risk_level
         FROM alerts a
         LEFT JOIN transactions t ON a.transaction_id = t.transaction_id
         LEFT JOIN merchants m ON a.merchant_id = m.merchant_id
+        LEFT JOIN merchant_category_risk mcr ON mcr.is_active = 1 AND mcr.mcc_code = m.mcc_code
         WHERE a.status = ?
         ORDER BY ${orderByRisk}
         LIMIT 200
@@ -781,7 +972,8 @@ async function getMerchantImportProfile(merchantId) {
   const merchants = await query(
     `
       SELECT merchant_id, merchant_name, business_category, mcc_code,
-             merchant_average_amount, operating_hours_start, operating_hours_end,
+             merchant_average_amount, merchant_max_transaction_amount,
+             operating_hours_start, operating_hours_end,
              risk_level, merchant_risk_score, country, has_physical_location
       FROM merchants
       WHERE merchant_id = ?
@@ -834,6 +1026,10 @@ exports.uploadTransactions = async (req, res) => {
         merchant_average_amount:
           Number(merchantProfile?.merchant_average_amount) > 0
             ? Number(merchantProfile.merchant_average_amount)
+            : null,
+        merchant_max_transaction_amount:
+          Number(merchantProfile?.merchant_max_transaction_amount) > 0
+            ? Number(merchantProfile.merchant_max_transaction_amount)
             : null,
         merchant_risk_score: Number.isInteger(Number(merchantProfile?.merchant_risk_score))
           ? Number(merchantProfile.merchant_risk_score)
@@ -1089,6 +1285,31 @@ exports.deleteComplianceRule = async (req, res) => {
   } catch (err) {
     console.error("deleteComplianceRule error:", err);
     res.status(500).json({ message: "Unable to deactivate rule" });
+  }
+};
+
+exports.getMccRiskProfiles = async (req, res) => {
+  try {
+    const profiles = await getMerchantCategoryProfiles();
+    res.json(profiles);
+  } catch (err) {
+    console.error("getMccRiskProfiles error:", err);
+    res.status(500).json({ message: "Unable to load MCC risk profiles" });
+  }
+};
+
+exports.updateMccRiskProfile = async (req, res) => {
+  try {
+    const riskId = Number(req.params.id);
+    if (!Number.isInteger(riskId) || riskId <= 0) {
+      return res.status(400).json({ message: "Invalid MCC risk profile ID" });
+    }
+
+    await updateMerchantCategoryProfile(riskId, req.body);
+    res.json({ message: "MCC risk profile updated successfully" });
+  } catch (err) {
+    console.error("updateMccRiskProfile error:", err);
+    res.status(400).json({ message: err.message || "Unable to update MCC risk profile" });
   }
 };
 

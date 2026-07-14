@@ -111,7 +111,8 @@
     if (!Array.isArray(items)) items = [items];
     return items.map((item) => {
       if (item && typeof item === 'object') {
-        const text = item.rule || item.name || item.description || JSON.stringify(item);
+        const evidence = item.evidence && item.evidence.thresholdSource ? ` (threshold source: ${item.evidence.thresholdSource})` : '';
+        const text = `${item.rule_name || item.rule_type || item.rule || item.name || item.description || JSON.stringify(item)}${evidence}`;
         const points = item.points != null ? `+${item.points}` : '';
         return { points, text };
       }
@@ -220,8 +221,8 @@
 
     <div class="row mb-3">
       <div class="col-md-3">
-        <div class="label-title">Risk Score</div>
-        <h3><%= alert.risk_score ?? '—' %></h3>
+        <div class="label-title">Official Risk Score</div>
+        <h3><%= alert.displayed_risk_score ?? alert.risk_score ?? '-' %></h3>
       </div>
       <div class="col-md-3">
         <div class="label-title">Risk Level</div>
@@ -232,8 +233,26 @@
         <h3><%= alert.mcc_code || 'Not provided' %></h3>
       </div>
       <div class="col-md-3">
-        <div class="label-title">Merchant Profile Risk Score</div>
-        <h3><%= alert.merchant_risk_score != null ? alert.merchant_risk_score : '—' %></h3>
+        <div class="label-title">MCC Category</div>
+        <h3><%= alert.mcc_category_name || '-' %></h3>
+      </div>
+    </div>
+    <div class="row mb-3">
+      <div class="col-md-3">
+        <div class="label-title">Base Rule Score</div>
+        <h3><%= alert.base_rule_score ?? '-' %></h3>
+      </div>
+      <div class="col-md-3">
+        <div class="label-title">MCC Risk Points</div>
+        <h3><%= alert.mcc_risk_points ?? '-' %></h3>
+      </div>
+      <div class="col-md-3">
+        <div class="label-title">Investigation Priority Score</div>
+        <h3><%= alert.priority_score ?? alert.risk_score ?? '-' %></h3>
+      </div>
+      <div class="col-md-3">
+        <div class="label-title">Priority Multiplier</div>
+        <h3>x<%= alert.priority_multiplier ?? 1 %></h3>
       </div>
     </div>
 
@@ -242,7 +261,7 @@
     </h3>
 
     <div class="severity-text">
-      Severity Score:
+      Official Risk Score:
       <%= alert.risk_score ?? '—' %> (<%= alert.risk_level || 'Unclassified' %>)
     </div>
 
@@ -290,3 +309,4 @@ function goToAlertAction(alertId) {
 }
 
 </script>
+

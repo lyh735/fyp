@@ -4,11 +4,14 @@ exports.showAlertsPage = (req, res) => {
 
   const sql = `
     SELECT a.*, a.alert_id AS id, COALESCE(a.message, a.triggered_rules) AS reason,
-           m.merchant_name, t.amount, t.currency, t.ip_address, t.country
+           m.merchant_name, m.mcc_code, t.amount, t.currency, t.ip_address, t.country,
+           mcr.category_name AS mcc_category_name,
+           COALESCE(mcr.risk_level, 'LOW') AS mcc_risk_level
     FROM alerts a
     LEFT JOIN transactions t ON a.transaction_id = t.transaction_id
     LEFT JOIN merchants m ON a.merchant_id = m.merchant_id
-    ORDER BY a.created_at DESC
+    LEFT JOIN merchant_category_risk mcr ON mcr.is_active = 1 AND mcr.mcc_code = m.mcc_code
+    ORDER BY COALESCE(a.priority_score, a.risk_score, 0) DESC, a.created_at DESC
   `;
 
   db.query(sql, (err, alerts) => {
@@ -32,10 +35,14 @@ exports.showAlertDetails = (req, res) => {
   const sql = `
     SELECT a.*, a.alert_id AS id, COALESCE(a.message, a.triggered_rules) AS reason,
            m.merchant_name, t.amount, t.currency, t.ip_address, t.country,
-           m.mcc_code, m.merchant_risk_score, u.name AS officer_name
+           m.mcc_code, m.merchant_risk_score,
+           mcr.category_name AS mcc_category_name,
+           COALESCE(mcr.risk_level, 'LOW') AS mcc_risk_level,
+           u.name AS officer_name
     FROM alerts a
     LEFT JOIN transactions t ON a.transaction_id = t.transaction_id
     LEFT JOIN merchants m ON a.merchant_id = m.merchant_id
+    LEFT JOIN merchant_category_risk mcr ON mcr.is_active = 1 AND mcr.mcc_code = m.mcc_code
     LEFT JOIN users u ON a.reviewed_by = u.user_id
     WHERE a.alert_id = ?
     LIMIT 1

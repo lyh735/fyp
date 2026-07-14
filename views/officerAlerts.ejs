@@ -155,6 +155,7 @@
           <th>Alert ID</th>
           <th>Transaction ID</th>
           <th>Risk Level</th>
+          <th>Investigation Priority Score</th>
           <th>Status</th>
           <th>Reason</th>
           <th>Action</th>
@@ -170,6 +171,11 @@
 
             <td>
               <strong>#<%= alert.id %></strong>
+            </td>
+
+            <td>
+              <strong><%= alert.priority_score != null ? alert.priority_score : alert.risk_score %></strong>
+              <div class="text-muted small">x<%= alert.priority_multiplier != null ? alert.priority_multiplier : 1 %></div>
             </td>
 
             <td>
