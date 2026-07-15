@@ -687,7 +687,7 @@ if (pwForm) pwForm.addEventListener("submit", async (e) => {
   try {
     const res = await apiFetch("/api/auth/change-password", {
       method: "POST",
-      body: JSON.stringify({ newPassword: newPw })
+      body: JSON.stringify({ currentPassword: currentPw, newPassword: newPw })
     });
     if (!res) return;
     const data = await res.json();

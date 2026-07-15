@@ -89,7 +89,7 @@ exports.createUser = async (req, res) => {
 };
 
 exports.changePassword = async (req, res) => {
-  const { newPassword } = req.body;
+  const { currentPassword, newPassword } = req.body;
   const userId = req.user.id;
 
   if (!newPassword || newPassword.length < 8) {
@@ -97,13 +97,35 @@ exports.changePassword = async (req, res) => {
   }
 
   try {
-    const hashed = await bcrypt.hash(newPassword, 10);
     db.query(
-      "UPDATE users SET password_hash = ?, first_login = FALSE, updated_at = NOW() WHERE user_id = ?",
-      [hashed, userId],
-      (err) => {
+      "SELECT user_id, password_hash, first_login FROM users WHERE user_id = ? LIMIT 1",
+      [userId],
+      async (err, results) => {
         if (err) return res.status(500).json({ message: "Server error" });
-        res.json({ message: "Password updated successfully" });
+        if (!results.length) return res.status(404).json({ message: "User not found" });
+
+        const user = results[0];
+        const requiresCurrentPassword = !user.first_login;
+        if (requiresCurrentPassword) {
+          if (!currentPassword) {
+            return res.status(400).json({ message: "Current password is required" });
+          }
+
+          const matchesCurrentPassword = await bcrypt.compare(currentPassword, user.password_hash);
+          if (!matchesCurrentPassword) {
+            return res.status(401).json({ message: "Current password is incorrect" });
+          }
+        }
+
+        const hashed = await bcrypt.hash(newPassword, 10);
+        db.query(
+          "UPDATE users SET password_hash = ?, first_login = FALSE, updated_at = NOW() WHERE user_id = ?",
+          [hashed, userId],
+          (updateErr) => {
+            if (updateErr) return res.status(500).json({ message: "Server error" });
+            res.json({ message: "Password updated successfully" });
+          }
+        );
       }
     );
   } catch {
