@@ -128,6 +128,7 @@
                 <div class="form-group"><label for="createMerchantName">Merchant name *</label><input id="createMerchantName" maxlength="100" required></div>
                 <div class="form-group"><label for="createBusinessCategory">Business category *</label><input id="createBusinessCategory" maxlength="100" required></div>
                 <div class="form-group"><label for="createMccCode">MCC code *</label><select id="createMccCode" required><option value="">Select MCC code</option></select></div>
+                <div class="form-group"><label for="createMaxTransactionAmount">Merchant max transaction amount</label><input id="createMaxTransactionAmount" type="number" min="0" step="0.01"></div>
                 <div class="form-group"><label for="createHoursStart">Operating start *</label><input id="createHoursStart" type="time" required></div>
                 <div class="form-group"><label for="createHoursEnd">Operating end *</label><input id="createHoursEnd" type="time" required></div>
                 <div class="form-group"><label for="createCountry">Country *</label><input id="createCountry" maxlength="50" required></div>
@@ -157,6 +158,7 @@
                 <div class="guide-item"><code>merchant_name *</code><span>Merchant name cannot be blank</span></div>
                 <div class="guide-item"><code>business_category *</code><span>Supported business label</span></div>
                 <div class="guide-item"><code>mcc_code *</code><span>Must exist in the active MCC catalog</span></div>
+                <div class="guide-item"><code>merchant_max_transaction_amount</code><span>Optional configured maximum transaction amount</span></div>
                 <div class="guide-item"><code>operating_hours_start *</code><span>HH:MM or HH:MM:SS</span></div>
                 <div class="guide-item"><code>operating_hours_end *</code><span>Must be later than start time</span></div>
                 <div class="guide-item"><code>country *</code><span>Cannot be blank</span></div>
@@ -240,6 +242,7 @@
               <div class="form-group"><label for="businessCategory">Business category *</label><input id="businessCategory" maxlength="100" required></div>
               <div class="form-group"><label for="mccCode">MCC code *</label><select id="mccCode" required><option value="">Select MCC code</option></select></div>
               <div class="form-group"><label for="averageAmount">Merchant average amount</label><input id="averageAmount" type="number" min="0" step="0.01"></div>
+              <div class="form-group"><label for="maxTransactionAmount">Merchant max transaction amount</label><input id="maxTransactionAmount" type="number" min="0" step="0.01"></div>
               <div class="form-group"><label for="riskScore">Merchant risk score</label><input id="riskScore" type="number" min="0" max="100" step="1"></div>
               <div class="form-group"><label for="riskLevel">Risk level</label><select id="riskLevel"><option value="">Not set</option><option>Low</option><option>Medium</option><option>High</option></select></div>
               <div class="form-group"><label for="hoursStart">Operating hours start *</label><input id="hoursStart" type="time" step="1" required></div>
@@ -291,7 +294,7 @@ const pageParams=new URLSearchParams(location.search);
 let currentMerchantId=pageParams.get("id");
 let merchants=[],merchant=null,transactions=[],terminals=[],mccCodes=[],mccLoaded=false;
 let pendingMerchantRows=[],pendingMerchantValidation={issues:[],invalidIndexes:new Set(),defaults:[]},merchantImportSourceName="";
-const merchantImportTemplateHeaders=["merchant_id","merchant_name","business_category","mcc_code","operating_hours_start","operating_hours_end","country","has_physical_location","status"];
+const merchantImportTemplateHeaders=["merchant_id","merchant_name","business_category","mcc_code","merchant_average_amount","merchant_max_transaction_amount","operating_hours_start","operating_hours_end","country","has_physical_location","status"];
 
 sidebarName.textContent=user.name;sidebarRole.textContent=user.role;sidebarAvatar.textContent=user.name.charAt(0).toUpperCase();topbarName.textContent=user.name;topbarRole.textContent=user.role;topbarRole.className=`badge badge-${canEdit?"admin":"user"}`;
 mccSection.hidden=!canEdit;editButton.hidden=!canEdit;terminalForm.hidden=!canEdit;terminalActionsHead.hidden=!canEdit;merchantAdminTools.hidden=!canEdit;
@@ -321,6 +324,7 @@ function sanitizeMerchantImportRow(row){
 function activeMccSet(){return new Set(mccCodes.filter(m=>m.is_active).map(m=>String(m.mcc_code)))}
 function validateMerchantValues(row,{requireId=true}={}){
   const issues=[],merchantId=String(row.merchant_id??"").trim(),merchantName=String(row.merchant_name??"").trim(),businessCategory=String(row.business_category??"").trim(),mccCode=String(row.mcc_code??"").trim(),countryValue=String(row.country??"").trim(),locationValue=String(row.has_physical_location??"").trim().toLowerCase(),statusValue=String(row.status??"").trim().toLowerCase(),rawStart=String(row.operating_hours_start??"").trim(),rawEnd=String(row.operating_hours_end??"").trim(),start=normalizeMerchantTimeValue(row.operating_hours_start),end=normalizeMerchantTimeValue(row.operating_hours_end),supportedMcc=activeMccSet();
+  const averageAmount=row.merchant_average_amount==null||String(row.merchant_average_amount).trim()===""?null:Number(row.merchant_average_amount),maxTransactionAmount=row.merchant_max_transaction_amount==null||String(row.merchant_max_transaction_amount).trim()===""?null:Number(row.merchant_max_transaction_amount);
   if(requireId&&!merchantId)issues.push("merchant_id is required");else if(merchantId.length>50)issues.push("merchant_id exceeds 50 characters");
   if(!merchantName)issues.push("merchant_name is required");else if(merchantName.length>100)issues.push("merchant_name exceeds 100 characters");
   if(!businessCategory)issues.push("business_category is required");
@@ -331,6 +335,8 @@ function validateMerchantValues(row,{requireId=true}={}){
   if(!countryValue)issues.push("country is required");
   if(!["1","0","yes","no","y","n","true","false"].includes(locationValue))issues.push("has_physical_location must be Yes/No or 1/0");
   if(!["active","inactive"].includes(statusValue))issues.push("status must be active or inactive");
+  if(averageAmount!==null&&(!Number.isFinite(averageAmount)||averageAmount<0))issues.push("merchant_average_amount must be a non-negative number");
+  if(maxTransactionAmount!==null&&(!Number.isFinite(maxTransactionAmount)||maxTransactionAmount<0))issues.push("merchant_max_transaction_amount must be a non-negative number");
   return issues;
 }
 
@@ -430,6 +436,7 @@ function renderProfile(){
     addField("Business category",merchant.business_category),
     addField("MCC code",merchant.mcc_code),
     addField("Merchant average amount",merchant.merchant_average_amount==null?null:money(merchant.merchant_average_amount)),
+    addField("Merchant max transaction amount",merchant.merchant_max_transaction_amount==null?null:money(merchant.merchant_max_transaction_amount)),
     addField("Merchant risk score",merchant.merchant_risk_score),
     addField("Risk level",merchant.risk_level),
     addField("Operating hours",merchant.operating_hours_start||merchant.operating_hours_end?`${display(merchant.operating_hours_start)} - ${display(merchant.operating_hours_end)}`:null),
@@ -572,6 +579,7 @@ function populateForm(){
   if(!mccLoaded&&canEdit)loadMccCatalog();else populateMccOptions();
   mccCode.value=merchant.mcc_code||"";
   averageAmount.value=merchant.merchant_average_amount??"";
+  maxTransactionAmount.value=merchant.merchant_max_transaction_amount??"";
   riskScore.value=merchant.merchant_risk_score??0;
   const level=String(merchant.risk_level||"").toLowerCase();
   riskLevel.value=level?level.charAt(0).toUpperCase()+level.slice(1):"";
@@ -726,7 +734,7 @@ if(mccForm)mccForm.addEventListener("submit",async e=>{
 
 if(merchantCreateForm)merchantCreateForm.addEventListener("submit",async e=>{
   e.preventDefault();
-  const payload={merchant_id:createMerchantId.value,merchant_name:createMerchantName.value,business_category:createBusinessCategory.value,mcc_code:createMccCode.value,operating_hours_start:createHoursStart.value,operating_hours_end:createHoursEnd.value,country:createCountry.value,has_physical_location:createPhysicalLocation.value,status:createStatus.value};
+  const payload={merchant_id:createMerchantId.value,merchant_name:createMerchantName.value,business_category:createBusinessCategory.value,mcc_code:createMccCode.value,merchant_max_transaction_amount:createMaxTransactionAmount.value,operating_hours_start:createHoursStart.value,operating_hours_end:createHoursEnd.value,country:createCountry.value,has_physical_location:createPhysicalLocation.value,status:createStatus.value};
   const issues=validateMerchantValues(payload,{requireId:true});
   if(issues.length){setPageMessage(issues[0]);return;}
   createMerchantButton.disabled=true;createMerchantButton.textContent="Creating...";
@@ -762,7 +770,7 @@ if(terminalForm)terminalForm.addEventListener("submit",async e=>{
 profileForm.addEventListener("submit",async e=>{
   e.preventDefault();
   saveButton.disabled=true;saveButton.textContent="Saving...";hideMessage("pageMessage");
-  const payload={merchant_name:merchantName.value,business_category:businessCategory.value,mcc_code:mccCode.value,merchant_average_amount:averageAmount.value,merchant_risk_score:riskScore.value,operating_hours_start:hoursStart.value,operating_hours_end:hoursEnd.value,risk_level:riskLevel.value,country:country.value,has_physical_location:physicalLocation.value,status:merchantStatus.value};
+  const payload={merchant_name:merchantName.value,business_category:businessCategory.value,mcc_code:mccCode.value,merchant_average_amount:averageAmount.value,merchant_max_transaction_amount:maxTransactionAmount.value,merchant_risk_score:riskScore.value,operating_hours_start:hoursStart.value,operating_hours_end:hoursEnd.value,risk_level:riskLevel.value,country:country.value,has_physical_location:physicalLocation.value,status:merchantStatus.value};
   const issues=validateMerchantValues(payload,{requireId:false});
   if(issues.length){saveButton.disabled=false;saveButton.textContent="Save changes";setPageMessage(issues[0]);return;}
   try{

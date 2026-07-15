@@ -40,7 +40,8 @@
     if (!Array.isArray(items)) items = [items];
     return items.map((item) => {
       if (item && typeof item === 'object') {
-        const text = item.rule || item.name || item.description || JSON.stringify(item);
+        const evidence = item.evidence && item.evidence.thresholdSource ? ` (threshold source: ${item.evidence.thresholdSource})` : '';
+        const text = `${item.rule_name || item.rule_type || item.rule || item.name || item.description || JSON.stringify(item)}${evidence}`;
         const points = item.points != null ? `+${item.points}` : '';
         return { points, text };
       }
@@ -94,8 +95,8 @@
         <h2><%= transaction.risk_level || '—' %></h2>
       </div>
       <div class="col-md-6">
-        <div class="label-title">Risk Score</div>
-        <h2><%= transaction.risk_score != null ? transaction.risk_score : '—' %></h2>
+        <div class="label-title">Official Risk Score</div>
+        <h2><%= transaction.displayed_risk_score != null ? transaction.displayed_risk_score : (transaction.risk_score != null ? transaction.risk_score : '-') %></h2>
       </div>
     </div>
     <div class="row mb-4">
@@ -113,8 +114,8 @@
     <h3 class="mb-3">Risk Score Breakdown</h3>
     <div class="row mb-3">
       <div class="col-md-3">
-        <div class="label-title">Final Risk Score</div>
-        <h2><%= transaction.risk_score != null ? transaction.risk_score : 'â€”' %></h2>
+        <div class="label-title">Official Risk Score</div>
+        <h2><%= transaction.displayed_risk_score != null ? transaction.displayed_risk_score : (transaction.risk_score != null ? transaction.risk_score : '-') %></h2>
       </div>
       <div class="col-md-3">
         <div class="label-title">Final Risk Level</div>
@@ -125,8 +126,26 @@
         <h4><%= transaction.mcc_code || 'Not provided' %></h4>
       </div>
       <div class="col-md-3">
-        <div class="label-title">Merchant Profile Risk Score</div>
-        <h4><%= transaction.merchant_risk_score != null ? transaction.merchant_risk_score : 'â€”' %></h4>
+        <div class="label-title">MCC Category</div>
+        <h4><%= transaction.mcc_category_name || '-' %></h4>
+      </div>
+    </div>
+    <div class="row mb-3">
+      <div class="col-md-3">
+        <div class="label-title">Base Rule Score</div>
+        <h4><%= transaction.base_rule_score != null ? transaction.base_rule_score : '-' %></h4>
+      </div>
+      <div class="col-md-3">
+        <div class="label-title">MCC Risk Points</div>
+        <h4><%= transaction.mcc_risk_points != null ? transaction.mcc_risk_points : '-' %></h4>
+      </div>
+      <div class="col-md-3">
+        <div class="label-title">Investigation Priority Score</div>
+        <h4><%= transaction.priority_score != null ? transaction.priority_score : '-' %></h4>
+      </div>
+      <div class="col-md-3">
+        <div class="label-title">Priority Multiplier</div>
+        <h4>x<%= transaction.priority_multiplier != null ? transaction.priority_multiplier : 1 %></h4>
       </div>
     </div>
     <% if (transactionBreakdown.length) { %>
@@ -219,3 +238,4 @@
 </script>
 </body>
 </html>
+
