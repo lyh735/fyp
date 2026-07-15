@@ -8,18 +8,28 @@ const {
   getAlerts,
   getAlert,
   getComplianceRules,
+  createComplianceRule,
+  updateComplianceRule,
+  deleteComplianceRule,
+  getMccRiskProfiles,
+  updateMccRiskProfile,
   markAlertRead,
   dismissAlert,
   escalateAlert,
 } = require("../controllers/transactionController");
-const { authenticate, requireAdmin, requireAlertOfficer } = require("../middleware/authMiddleware");
+const { authenticate, requireAdmin, requireAlertOfficer, requireSystemAdmin } = require("../middleware/authMiddleware");
 
-router.post("/transactions",       authenticate, createTransaction);
-router.post("/transactions/upload", authenticate, uploadTransactions);
+router.post("/transactions",       authenticate, requireSystemAdmin, createTransaction);
+router.post("/transactions/upload", authenticate, requireSystemAdmin, uploadTransactions);
 router.get ("/transactions",       authenticate, getTransactions);
 router.get ("/alerts",             authenticate, getAlerts);
 router.get ("/alerts/:id",         authenticate, getAlert);
 router.get ("/rules",              authenticate, getComplianceRules);
+router.post("/rules",              authenticate, requireAdmin, createComplianceRule);
+router.put ("/rules/:id",          authenticate, requireAdmin, updateComplianceRule);
+router.delete("/rules/:id",        authenticate, requireAdmin, deleteComplianceRule);
+router.get ("/mcc-risk",           authenticate, getMccRiskProfiles);
+router.put ("/mcc-risk/:id",       authenticate, requireAdmin, updateMccRiskProfile);
 router.post("/alerts/:id/read",    authenticate, markAlertRead);
 router.post("/alerts/:id/dismiss", authenticate, requireAlertOfficer, dismissAlert);
 router.post("/alerts/:id/escalate",authenticate, requireAlertOfficer, escalateAlert);

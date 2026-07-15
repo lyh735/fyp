@@ -3,7 +3,15 @@ const router = express.Router();
 
 const officerController = require("../controllers/officerController");
 const rfiController = require("../controllers/rfiController");
+const { authenticate, requireAlertOfficer } = require("../middleware/authMiddleware");
 const { handleResponseUpload } = require("../middleware/rfiUpload");
+
+router.use(authenticate);
+
+router.get("/audit-logs", officerController.showAuditLogsPage);
+router.get("/report", officerController.showReportPage);
+
+router.use(requireAlertOfficer);
 
 router.get("/alerts", officerController.showAlertsPage);
 router.get("/alerts/:id", officerController.showAlertDetails);
@@ -16,9 +24,6 @@ router.post("/rfi/:id/response", handleResponseUpload, rfiController.recordRespo
 router.get("/rfi/:id/response-file", rfiController.downloadResponseFile);
 
 router.post("/action", officerController.takeActionPage);
-
-router.get("/audit-logs", officerController.showAuditLogsPage);
-router.get("/report", officerController.showReportPage);
 
 router.get("/str/generate/:alertId", officerController.generateSTRDraft);
 router.get("/str/view/:strId", officerController.viewSTRDraft);

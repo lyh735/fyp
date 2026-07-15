@@ -10,6 +10,7 @@ const VALID_PAYMENT_METHODS = [
   "PayNow",
   "SGQR",
 ];
+const VALID_TRANSACTION_STATUSES = ["success", "completed", "cancelled", "canceled", "failed", "declined", "voided"];
 
 function toMysqlDateTime(value) {
   const textValue = String(value || "").trim();
@@ -53,18 +54,21 @@ function validateTransaction(payload, options = {}) {
     allowedSourceTypes = null,
   } = options;
   const errors = [];
-  const countryWasDefaulted = !payload.country;
+  const missingRequiredInfo =
+    !normalizeText(payload.masked_card_number) &&
+    !normalizeText(payload.masked_payment_ref) &&
+    !normalizeText(payload.terminal_id) &&
+    !normalizeText(payload.payment_gateway_ref);
 
   const requiredFields = [
-    "transaction_id",
-    "merchant_id",
-    "amount",
-    "currency",
-    "transaction_type",
-    "timestamp",
-    "customer_risk_profile",
-    "merchant_average_amount",
-  ];
+  "transaction_id",
+  "merchant_id",
+  "amount",
+  "currency",
+  "transaction_type",
+  "timestamp",
+  "customer_risk_profile",
+];
 
   for (const field of requiredFields) {
     if (payload[field] === undefined || payload[field] === null || payload[field] === "") {
@@ -73,18 +77,27 @@ function validateTransaction(payload, options = {}) {
   }
 
   const amount = Number(payload.amount);
-  const merchantAverageAmount = Number(payload.merchant_average_amount);
+  const merchantAverageAmount =
+    payload.merchant_average_amount === undefined ||
+    payload.merchant_average_amount === null ||
+    payload.merchant_average_amount === ""
+      ? null
+      : Number(payload.merchant_average_amount);
   const transactionType = normalizeText(payload.transaction_type);
   const customerRiskProfile = normalizeText(payload.customer_risk_profile)?.toLowerCase();
   const paymentMethod = normalizeText(payload.payment_method);
   const timestamp = toMysqlDateTime(payload.timestamp);
-  const merchantRiskScore = Number(payload.merchant_risk_score ?? 0);
+  const merchantRiskScore =
+    payload.merchant_risk_score === undefined || payload.merchant_risk_score === null || payload.merchant_risk_score === ""
+      ? null
+      : Number(payload.merchant_risk_score);
+  const transactionStatus = normalizeText(payload.transaction_status || payload.status)?.toLowerCase();
 
   if (!Number.isFinite(amount) || amount <= 0) {
     errors.push("amount must be greater than 0");
   }
 
-  if (!Number.isFinite(merchantAverageAmount) || merchantAverageAmount <= 0) {
+  if (merchantAverageAmount !== null && (!Number.isFinite(merchantAverageAmount) || merchantAverageAmount <= 0)) {
     errors.push("merchant_average_amount must be greater than 0");
   }
 
@@ -94,10 +107,6 @@ function validateTransaction(payload, options = {}) {
 
   if (transactionType && !VALID_TRANSACTION_TYPES.includes(transactionType)) {
     errors.push("transaction_type must be online or face_to_face");
-  }
-
-  if (transactionType === "online" && !normalizeText(payload.ip_address)) {
-    errors.push("ip_address is required for online transactions");
   }
 
   if (requireTerminalForFaceToFace && transactionType === "face_to_face" && !normalizeText(payload.terminal_id)) {
@@ -110,11 +119,15 @@ function validateTransaction(payload, options = {}) {
     errors.push(`payment_method must be one of: ${VALID_PAYMENT_METHODS.join(", ")}`);
   }
 
+  if (transactionStatus && !VALID_TRANSACTION_STATUSES.includes(transactionStatus)) {
+    errors.push(`transaction_status must be one of: ${VALID_TRANSACTION_STATUSES.join(", ")}`);
+  }
+
   if (!timestamp) {
     errors.push("timestamp must be valid");
   }
 
-  if (!Number.isInteger(merchantRiskScore)) {
+  if (merchantRiskScore !== null && !Number.isInteger(merchantRiskScore)) {
     errors.push("merchant_risk_score must be an integer");
   }
 
@@ -137,10 +150,14 @@ function validateTransaction(payload, options = {}) {
       transaction_type: transactionType,
       ip_address: normalizeText(payload.ip_address) || null,
       country: normalizeText(payload.country) || "Singapore",
+      ip_country: normalizeText(payload.ip_country) || null,
       timestamp,
       customer_risk_profile: customerRiskProfile,
-      merchant_average_amount: merchantAverageAmount,
-      merchant_risk_score: merchantRiskScore,
+      merchant_average_amount: Number.isFinite(merchantAverageAmount)
+        ? merchantAverageAmount
+        : null,
+      merchant_risk_score: merchantRiskScore ?? 0,
+      merchant_risk_score_provided: merchantRiskScore !== null,
       has_physical_location: normalizeBoolean(
         payload.has_physical_location ?? payload.has_physical_store,
         true
@@ -152,9 +169,20 @@ function validateTransaction(payload, options = {}) {
       terminal_id: normalizeText(payload.terminal_id) || null,
       payment_gateway_ref: normalizeText(payload.payment_gateway_ref) || null,
       payment_method: paymentMethod || null,
+      business_category: normalizeText(payload.business_category) || null,
+      mcc_code: normalizeText(payload.mcc_code) || null,
+      status: transactionStatus || "success",
       source_type: sourceType,
     },
-    metadata: { countryWasDefaulted },
+    metadata: {
+      missingRequiredInfo,
+      ipCountryVerified: Boolean(
+        payload.ip_country_verified === true ||
+        payload.ip_country_verified === 1 ||
+        payload.ip_country_verified === "1" ||
+        payload.ip_country_verified === "true"
+      ),
+    },
   };
 }
 

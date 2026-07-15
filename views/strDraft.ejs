@@ -1,42 +1,1595 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>STR Draft</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Suspicious Transaction Report Draft</title>
+
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  >
+
+  <style>
+    body {
+      background-color: #f4f6f8;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #212529;
+    }
+
+    .report-container {
+      max-width: 1100px;
+      margin: 30px auto;
+      background-color: #ffffff;
+      border: 1px solid #d8dde3;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+    }
+
+    .report-header {
+      background-color: #7b1113;
+      color: #ffffff;
+      padding: 28px 35px;
+      text-align: center;
+    }
+
+    .report-header h1 {
+      margin: 0;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .report-header p {
+      margin: 8px 0 0;
+      font-size: 14px;
+    }
+
+    .confidential-banner {
+      background-color: #fff3cd;
+      border-bottom: 1px solid #ffe69c;
+      color: #664d03;
+      padding: 12px 30px;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    .report-body {
+      padding: 30px 35px;
+    }
+
+    .section-card {
+      border: 1px solid #dfe3e8;
+      border-radius: 6px;
+      margin-bottom: 28px;
+      overflow: hidden;
+    }
+
+    .section-title {
+      background-color: #edf0f2;
+      border-bottom: 1px solid #dfe3e8;
+      padding: 13px 18px;
+      font-size: 17px;
+      font-weight: 700;
+      color: #343a40;
+    }
+
+    .section-content {
+      padding: 20px;
+    }
+
+    .form-label {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .form-control,
+    .form-select {
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .readonly-field {
+      background-color: #e9ecef;
+    }
+
+    .risk-badge {
+      display: inline-block;
+      padding: 7px 14px;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: 13px;
+    }
+
+    .risk-low {
+      background-color: #d1e7dd;
+      color: #0f5132;
+    }
+
+    .risk-medium {
+      background-color: #fff3cd;
+      color: #664d03;
+    }
+
+    .risk-high {
+      background-color: #f8d7da;
+      color: #842029;
+    }
+
+    .risk-critical {
+      background-color: #6f0000;
+      color: #ffffff;
+    }
+
+    .checkbox-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px 25px;
+    }
+
+    .narrative-box {
+      min-height: 280px;
+      line-height: 1.7;
+    }
+
+    .declaration-box {
+      background-color: #f8f9fa;
+      border-left: 4px solid #7b1113;
+      padding: 18px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .report-footer {
+      background-color: #f1f3f5;
+      border-top: 1px solid #dfe3e8;
+      padding: 18px 35px;
+      font-size: 12px;
+      color: #5f6368;
+    }
+
+    .button-group {
+      display: flex;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 25px;
+    }
+
+    @media print {
+      body {
+        background-color: #ffffff;
+      }
+
+      .report-container {
+        box-shadow: none;
+        border: none;
+        margin: 0;
+        max-width: 100%;
+      }
+
+      .no-print {
+        display: none !important;
+      }
+
+      .section-card {
+        page-break-inside: avoid;
+      }
+
+      input,
+      select,
+      textarea {
+        border: none !important;
+        padding-left: 0 !important;
+        background-color: transparent !important;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .checkbox-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .report-body {
+        padding: 20px 16px;
+      }
+    }
+  </style>
 </head>
 
-<body class="bg-light">
-<div class="container mt-5">
+<body>
 
-  <div class="card shadow">
-    <div class="card-header bg-danger text-white">
-      <h4>Suspicious Transaction Report Draft</h4>
+<%
+  const currentAlert = typeof alert !== "undefined" && alert ? alert : {};
+  const currentDraft =
+    typeof strDraft !== "undefined" && strDraft ? strDraft : {};
+
+  const alertId =
+    currentAlert.alert_id ||
+    currentDraft.alert_id ||
+    "";
+
+  const transactionId =
+    currentAlert.transaction_id ||
+    "";
+
+  const merchantId =
+    currentAlert.merchant_id ||
+    "";
+
+  const riskScore =
+    currentAlert.risk_score !== undefined &&
+    currentAlert.risk_score !== null
+      ? currentAlert.risk_score
+      : "";
+
+  const riskLevel =
+    currentAlert.risk_level ||
+    "Pending Assessment";
+
+  const priority =
+    currentAlert.priority ||
+    "Normal";
+
+  const alertStatus =
+    currentAlert.status ||
+    "Open";
+
+  const alertDate = currentAlert.created_at
+    ? new Date(currentAlert.created_at).toLocaleString("en-SG", {
+        timeZone: "Asia/Singapore"
+      })
+    : "";
+
+  let triggeredRules = [];
+
+  try {
+    if (Array.isArray(currentAlert.triggered_rules)) {
+      triggeredRules = currentAlert.triggered_rules;
+    } else if (typeof currentAlert.triggered_rules === "string") {
+      triggeredRules = JSON.parse(currentAlert.triggered_rules);
+    }
+  } catch (error) {
+    triggeredRules = currentAlert.triggered_rules
+      ? [currentAlert.triggered_rules]
+      : [];
+  }
+
+  const riskClass =
+    String(riskLevel).toLowerCase() === "low"
+      ? "risk-low"
+      : String(riskLevel).toLowerCase() === "medium"
+      ? "risk-medium"
+      : String(riskLevel).toLowerCase() === "high"
+      ? "risk-high"
+      : String(riskLevel).toLowerCase() === "critical"
+      ? "risk-critical"
+      : "risk-medium";
+
+  const existingNarrative =
+    currentDraft.narrative_text ||
+    `On ${alertDate || "[DATE AND TIME]"}, the institution's automated transaction monitoring system generated Alert ID ${alertId || "[ALERT ID]"} relating to Transaction ID ${transactionId || "[TRANSACTION ID]"} involving Merchant ID ${merchantId || "[MERCHANT ID]"}.
+
+The transaction was assigned a ${riskLevel || "[RISK LEVEL]"} risk rating with a calculated risk score of ${riskScore || "[RISK SCORE]"}/100.
+
+The monitoring system identified the following risk indicators:
+${triggeredRules.length > 0
+  ? triggeredRules.map((rule, index) => `${index + 1}. ${rule}`).join("\n")
+  : "1. [INSERT RISK INDICATOR]\n2. [INSERT ADDITIONAL RISK INDICATOR]"}
+
+The transaction activity should be assessed against the customer's or merchant's known profile, expected transaction behaviour, stated business activities, source of funds, and previous transaction history.
+
+Based on the information currently available, the reporting entity considers that further review is required to determine whether there are reasonable grounds to suspect that the funds may represent proceeds of criminal conduct or may be connected with money laundering, terrorist financing, fraud, or another financial crime.
+
+The Compliance Officer should complete the outstanding information, document the investigation findings, and determine whether the matter should be submitted as a Suspicious Transaction Report.`;
+%>
+
+<div class="report-container">
+
+  <div class="report-header">
+    <h1>Suspicious Transaction Report Draft</h1>
+    <p>Internal Compliance Review Document</p>
+  </div>
+
+  <div class="confidential-banner">
+    CONFIDENTIAL — NOT TO BE DISCLOSED TO THE SUBJECT OR UNAUTHORISED PERSONS
+  </div>
+
+  <form
+    action="/api/officer/str-draft/<%= alertId %>"
+    method="POST"
+  >
+
+    <div class="report-body">
+
+      <!-- Section A -->
+      <div class="section-card">
+        <div class="section-title">
+          Section A – Reporting Entity Information
+        </div>
+
+        <div class="section-content">
+          <div class="row g-3">
+
+            <div class="col-md-6">
+              <label class="form-label">
+                Reporting Entity Name
+              </label>
+              <input
+                type="text"
+                name="reporting_entity_name"
+                class="form-control"
+                value="<%= currentDraft.reporting_entity_name || '' %>"
+                placeholder="Enter organisation name"
+              >
+            </div>
+
+            <div class="col-md-3">
+              <label class="form-label">
+                Entity Type
+              </label>
+              <select
+                name="reporting_entity_type"
+                class="form-select"
+              >
+                <option value="">Select entity type</option>
+                <option value="Bank">Bank</option>
+                <option value="Payment Institution">
+                  Payment Institution
+                </option>
+                <option value="FinTech Company">
+                  FinTech Company
+                </option>
+                <option value="Money Services Business">
+                  Money Services Business
+                </option>
+                <option value="Other">
+                  Other
+                </option>
+              </select>
+            </div>
+
+            <div class="col-md-3">
+              <label class="form-label">
+                UEN
+              </label>
+              <input
+                type="text"
+                name="uen"
+                class="form-control"
+                value="<%= currentDraft.uen || '' %>"
+                placeholder="Enter UEN"
+              >
+            </div>
+
+            <div class="col-md-12">
+              <label class="form-label">
+                Business Address
+              </label>
+              <input
+                type="text"
+                name="business_address"
+                class="form-control"
+                value="<%= currentDraft.business_address || '' %>"
+                placeholder="Enter registered business address"
+              >
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Compliance Officer Name
+              </label>
+              <input
+                type="text"
+                name="compliance_officer_name"
+                class="form-control"
+                value="<%= currentDraft.compliance_officer_name || '' %>"
+                placeholder="Enter officer name"
+              >
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Contact Number
+              </label>
+              <input
+                type="text"
+                name="compliance_contact_number"
+                class="form-control"
+                value="<%= currentDraft.compliance_contact_number || '' %>"
+                placeholder="+65"
+              >
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Email Address
+              </label>
+              <input
+                type="email"
+                name="compliance_email"
+                class="form-control"
+                value="<%= currentDraft.compliance_email || '' %>"
+                placeholder="officer@example.com"
+              >
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Date of Report
+              </label>
+              <input
+                type="date"
+                name="report_date"
+                class="form-control"
+                value="<%= currentDraft.report_date || '' %>"
+              >
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Internal STR Reference Number
+              </label>
+              <input
+                type="text"
+                name="str_reference_number"
+                class="form-control"
+                value="<%= currentDraft.str_reference_number || '' %>"
+                placeholder="STR-2026-XXXX"
+              >
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Internal Case Number
+              </label>
+              <input
+                type="text"
+                name="internal_case_number"
+                class="form-control"
+                value="<%= currentDraft.internal_case_number || '' %>"
+                placeholder="CASE-XXXX"
+              >
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- Section B -->
+      <div class="section-card">
+        <div class="section-title">
+          Section B – Subject Information
+        </div>
+
+        <div class="section-content">
+          <div class="row g-3">
+
+            <div class="col-md-6">
+              <label class="form-label">
+                Subject / Customer Name
+              </label>
+              <input
+                type="text"
+                name="subject_name"
+                class="form-control"
+                value="<%= currentDraft.subject_name || '' %>"
+                placeholder="Enter subject or customer name"
+              >
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">
+                Merchant Name
+              </label>
+              <input
+                type="text"
+                name="merchant_name"
+                class="form-control"
+                value="<%= currentDraft.merchant_name || '' %>"
+                placeholder="Enter merchant name"
+              >
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Merchant ID
+              </label>
+              <input
+                type="text"
+                name="merchant_id"
+                class="form-control readonly-field"
+                value="<%= merchantId %>"
+                readonly
+              >
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Account Number
+              </label>
+              <input
+                type="text"
+                name="account_number"
+                class="form-control"
+                value="<%= currentDraft.account_number || '' %>"
+                placeholder="Enter account number"
+              >
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">
+                NRIC / Passport / UEN
+              </label>
+              <input
+                type="text"
+                name="identification_number"
+                class="form-control"
+                value="<%= currentDraft.identification_number || '' %>"
+                placeholder="Enter identification number"
+              >
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Nationality / Country of Registration
+              </label>
+              <input
+                type="text"
+                name="nationality"
+                class="form-control"
+                value="<%= currentDraft.nationality || '' %>"
+                placeholder="Enter country"
+              >
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Date of Birth / Incorporation
+              </label>
+              <input
+                type="date"
+                name="date_of_birth_or_incorporation"
+                class="form-control"
+                value="<%= currentDraft.date_of_birth_or_incorporation || '' %>"
+              >
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Business Type / Occupation
+              </label>
+              <input
+                type="text"
+                name="business_type"
+                class="form-control"
+                value="<%= currentDraft.business_type || '' %>"
+                placeholder="Enter occupation or business type"
+              >
+            </div>
+
+            <div class="col-md-8">
+              <label class="form-label">
+                Residential / Registered Address
+              </label>
+              <input
+                type="text"
+                name="subject_address"
+                class="form-control"
+                value="<%= currentDraft.subject_address || '' %>"
+                placeholder="Enter address"
+              >
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Contact Number
+              </label>
+              <input
+                type="text"
+                name="subject_contact_number"
+                class="form-control"
+                value="<%= currentDraft.subject_contact_number || '' %>"
+                placeholder="+65"
+              >
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- Section C -->
+      <div class="section-card">
+        <div class="section-title">
+          Section C – Transaction Details
+        </div>
+
+        <div class="section-content">
+          <div class="row g-3">
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Transaction ID
+              </label>
+              <input
+                type="text"
+                name="transaction_id"
+                class="form-control readonly-field"
+                value="<%= transactionId %>"
+                readonly
+              >
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Transaction Date and Time
+              </label>
+              <input
+                type="datetime-local"
+                name="transaction_datetime"
+                class="form-control"
+                value="<%= currentDraft.transaction_datetime || '' %>"
+              >
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Transaction Status
+              </label>
+              <input
+                type="text"
+                name="transaction_status"
+                class="form-control"
+                value="<%= currentDraft.transaction_status || alertStatus %>"
+              >
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Transaction Amount
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                name="transaction_amount"
+                class="form-control"
+                value="<%= currentDraft.transaction_amount || '' %>"
+                placeholder="0.00"
+              >
+            </div>
+
+            <div class="col-md-2">
+              <label class="form-label">
+                Currency
+              </label>
+              <select
+                name="currency"
+                class="form-select"
+              >
+                <option value="SGD">SGD</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="CNY">CNY</option>
+                <option value="MYR">MYR</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div class="col-md-3">
+              <label class="form-label">
+                Payment Method
+              </label>
+              <select
+                name="payment_method"
+                class="form-select"
+              >
+                <option value="">Select payment method</option>
+                <option value="Bank Transfer">
+                  Bank Transfer
+                </option>
+                <option value="Credit Card">
+                  Credit Card
+                </option>
+                <option value="Debit Card">
+                  Debit Card
+                </option>
+                <option value="Digital Wallet">
+                  Digital Wallet
+                </option>
+                <option value="Cash">
+                  Cash
+                </option>
+                <option value="Cryptocurrency">
+                  Cryptocurrency
+                </option>
+                <option value="Other">
+                  Other
+                </option>
+              </select>
+            </div>
+
+            <div class="col-md-3">
+              <label class="form-label">
+                Transaction Channel
+              </label>
+              <select
+                name="transaction_channel"
+                class="form-select"
+              >
+                <option value="">Select channel</option>
+                <option value="Online">Online</option>
+                <option value="Mobile Application">
+                  Mobile Application
+                </option>
+                <option value="ATM">ATM</option>
+                <option value="Branch">Branch</option>
+                <option value="Point of Sale">
+                  Point of Sale
+                </option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">
+                Source of Funds
+              </label>
+              <input
+                type="text"
+                name="source_of_funds"
+                class="form-control"
+                value="<%= currentDraft.source_of_funds || '' %>"
+                placeholder="Describe the known or suspected source of funds"
+              >
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">
+                Destination / Beneficiary of Funds
+              </label>
+              <input
+                type="text"
+                name="destination_of_funds"
+                class="form-control"
+                value="<%= currentDraft.destination_of_funds || '' %>"
+                placeholder="Enter destination or beneficiary details"
+              >
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">
+                Originating Country
+              </label>
+              <input
+                type="text"
+                name="originating_country"
+                class="form-control"
+                value="<%= currentDraft.originating_country || '' %>"
+                placeholder="Enter originating country"
+              >
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">
+                Destination Country
+              </label>
+              <input
+                type="text"
+                name="destination_country"
+                class="form-control"
+                value="<%= currentDraft.destination_country || '' %>"
+                placeholder="Enter destination country"
+              >
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- Section D -->
+      <div class="section-card">
+        <div class="section-title">
+          Section D – Alert and Risk Assessment Information
+        </div>
+
+        <div class="section-content">
+          <div class="row g-3 align-items-end">
+
+            <div class="col-md-3">
+              <label class="form-label">
+                Alert ID
+              </label>
+              <input
+                type="text"
+                name="alert_id"
+                class="form-control readonly-field"
+                value="<%= alertId %>"
+                readonly
+              >
+            </div>
+
+            <div class="col-md-3">
+              <label class="form-label">
+                Risk Score
+              </label>
+              <input
+                type="text"
+                name="risk_score"
+                class="form-control readonly-field"
+                value="<%= riskScore %>"
+                readonly
+              >
+            </div>
+
+            <div class="col-md-3">
+              <label class="form-label">
+                Risk Level
+              </label>
+
+              <div>
+                <span class="risk-badge <%= riskClass %>">
+                  <%= riskLevel %>
+                </span>
+              </div>
+
+              <input
+                type="hidden"
+                name="risk_level"
+                value="<%= riskLevel %>"
+              >
+            </div>
+
+            <div class="col-md-3">
+              <label class="form-label">
+                Priority
+              </label>
+              <input
+                type="text"
+                name="priority"
+                class="form-control readonly-field"
+                value="<%= priority %>"
+                readonly
+              >
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">
+                Alert Generated Date and Time
+              </label>
+              <input
+                type="text"
+                class="form-control readonly-field"
+                value="<%= alertDate %>"
+                readonly
+              >
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">
+                Detection Method
+              </label>
+              <input
+                type="text"
+                name="detection_method"
+                class="form-control"
+                value="<%= currentDraft.detection_method || 'Automated Transaction Monitoring System' %>"
+              >
+            </div>
+
+          </div>
+
+          <hr class="my-4">
+
+          <label class="form-label">
+            System-Triggered Rules
+          </label>
+
+          <% if (triggeredRules.length > 0) { %>
+            <ul class="mb-0">
+              <% triggeredRules.forEach(function(rule) { %>
+                <li><%= rule %></li>
+              <% }); %>
+            </ul>
+          <% } else { %>
+            <p class="text-muted mb-0">
+              No triggered rule information was found.
+            </p>
+          <% } %>
+        </div>
+      </div>
+
+      <!-- Section E -->
+      <div class="section-card">
+        <div class="section-title">
+          Section E – Suspicion Indicators
+        </div>
+
+        <div class="section-content">
+
+          <p class="text-muted">
+            Select all indicators identified during the review.
+          </p>
+
+          <div class="checkbox-grid">
+
+            <div class="form-check">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                name="risk_indicators[]"
+                value="Unusually large transaction"
+                id="indicator1"
+              >
+              <label class="form-check-label" for="indicator1">
+                Unusually large transaction
+              </label>
+            </div>
+
+            <div class="form-check">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                name="risk_indicators[]"
+                value="Rapid movement of funds"
+                id="indicator2"
+              >
+              <label class="form-check-label" for="indicator2">
+                Rapid movement of funds
+              </label>
+            </div>
+
+            <div class="form-check">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                name="risk_indicators[]"
+                value="Structuring or smurfing"
+                id="indicator3"
+              >
+              <label class="form-check-label" for="indicator3">
+                Structuring or smurfing
+              </label>
+            </div>
+
+            <div class="form-check">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                name="risk_indicators[]"
+                value="High-risk merchant category"
+                id="indicator4"
+              >
+              <label class="form-check-label" for="indicator4">
+                High-risk merchant category
+              </label>
+            </div>
+
+            <div class="form-check">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                name="risk_indicators[]"
+                value="Multiple failed transactions"
+                id="indicator5"
+              >
+              <label class="form-check-label" for="indicator5">
+                Multiple failed transactions
+              </label>
+            </div>
+
+            <div class="form-check">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                name="risk_indicators[]"
+                value="Transaction inconsistent with profile"
+                id="indicator6"
+              >
+              <label class="form-check-label" for="indicator6">
+                Transaction inconsistent with profile
+              </label>
+            </div>
+
+            <div class="form-check">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                name="risk_indicators[]"
+                value="Politically exposed person"
+                id="indicator7"
+              >
+              <label class="form-check-label" for="indicator7">
+                Politically Exposed Person connection
+              </label>
+            </div>
+
+            <div class="form-check">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                name="risk_indicators[]"
+                value="Sanctions screening match"
+                id="indicator8"
+              >
+              <label class="form-check-label" for="indicator8">
+                Sanctions screening match
+              </label>
+            </div>
+
+            <div class="form-check">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                name="risk_indicators[]"
+                value="Adverse media"
+                id="indicator9"
+              >
+              <label class="form-check-label" for="indicator9">
+                Adverse media information
+              </label>
+            </div>
+
+            <div class="form-check">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                name="risk_indicators[]"
+                value="High-risk jurisdiction"
+                id="indicator10"
+              >
+              <label class="form-check-label" for="indicator10">
+                High-risk jurisdiction
+              </label>
+            </div>
+
+            <div class="form-check">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                name="risk_indicators[]"
+                value="Unclear economic purpose"
+                id="indicator11"
+              >
+              <label class="form-check-label" for="indicator11">
+                No clear economic or lawful purpose
+              </label>
+            </div>
+
+            <div class="form-check">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                name="risk_indicators[]"
+                value="Third-party fund transfer"
+                id="indicator12"
+              >
+              <label class="form-check-label" for="indicator12">
+                Unexplained third-party fund transfer
+              </label>
+            </div>
+
+          </div>
+
+          <div class="mt-4">
+            <label class="form-label">
+              Other Suspicion Indicators
+            </label>
+            <textarea
+              name="other_risk_indicators"
+              class="form-control"
+              rows="3"
+              placeholder="Enter any additional indicators identified during the investigation"
+            ><%= currentDraft.other_risk_indicators || '' %></textarea>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Section F -->
+      <div class="section-card">
+        <div class="section-title">
+          Section F – Narrative of Suspicion
+        </div>
+
+        <div class="section-content">
+          <p class="text-muted">
+            The narrative should clearly explain who was involved, what
+            occurred, when and where it happened, how the activity was
+            identified, and why it is considered suspicious.
+          </p>
+
+          <textarea
+            name="narrative_text"
+            class="form-control narrative-box"
+            required
+          ><%= existingNarrative %></textarea>
+        </div>
+      </div>
+
+      <!-- Section G -->
+      <div class="section-card">
+        <div class="section-title">
+          Section G – Supporting Documents and Evidence
+        </div>
+
+        <div class="section-content">
+
+          <div class="checkbox-grid">
+
+            <% [
+              "Transaction history",
+              "Account statement",
+              "KYC records",
+              "Merchant profile",
+              "Customer identification documents",
+              "Internal investigation notes",
+              "System alert logs",
+              "Screenshots",
+              "Sanctions screening results",
+              "Adverse media search results"
+            ].forEach(function(document, index) { %>
+
+              <div class="form-check">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  name="supporting_documents[]"
+                  value="<%= document %>"
+                  id="document<%= index %>"
+                >
+                <label
+                  class="form-check-label"
+                  for="document<%= index %>"
+                >
+                  <%= document %>
+                </label>
+              </div>
+
+            <% }); %>
+
+          </div>
+
+          <div class="mt-4">
+            <label class="form-label">
+              Other Supporting Evidence
+            </label>
+            <textarea
+              name="other_supporting_evidence"
+              class="form-control"
+              rows="3"
+              placeholder="Describe any additional documents or evidence"
+            ><%= currentDraft.other_supporting_evidence || '' %></textarea>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Section H -->
+      <div class="section-card">
+        <div class="section-title">
+          Section H – Internal Investigation and Actions Taken
+        </div>
+
+        <div class="section-content">
+          <div class="row g-3">
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Initial Review Completed By
+              </label>
+              <input
+                type="text"
+                name="reviewed_by"
+                class="form-control"
+                value="<%= currentDraft.reviewed_by || '' %>"
+                placeholder="Enter reviewer name"
+              >
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Review Date
+              </label>
+              <input
+                type="date"
+                name="review_date"
+                class="form-control"
+                value="<%= currentDraft.review_date || '' %>"
+              >
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Escalated To
+              </label>
+              <input
+                type="text"
+                name="escalated_to"
+                class="form-control"
+                value="<%= currentDraft.escalated_to || '' %>"
+                placeholder="Enter supervisor or MLRO name"
+              >
+            </div>
+
+            <div class="col-md-12">
+              <label class="form-label">
+                Investigation Findings
+              </label>
+              <textarea
+                name="investigation_findings"
+                class="form-control"
+                rows="6"
+                placeholder="Describe the investigation steps, findings and relevant explanations obtained"
+              ><%= currentDraft.investigation_findings || '' %></textarea>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Customer Contacted
+              </label>
+              <select
+                name="customer_contacted"
+                class="form-select"
+              >
+                <option value="">Select</option>
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+                <option value="Not Applicable">
+                  Not Applicable
+                </option>
+              </select>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Transaction Blocked
+              </label>
+              <select
+                name="transaction_blocked"
+                class="form-select"
+              >
+                <option value="">Select</option>
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+              </select>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Account Restricted or Frozen
+              </label>
+              <select
+                name="account_frozen"
+                class="form-select"
+              >
+                <option value="">Select</option>
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+                <option value="Not Applicable">
+                  Not Applicable
+                </option>
+              </select>
+            </div>
+
+            <div class="col-md-12">
+              <label class="form-label">
+                Other Actions Taken
+              </label>
+              <textarea
+                name="other_actions_taken"
+                class="form-control"
+                rows="3"
+                placeholder="Describe any enhanced monitoring, restrictions, escalation or account actions"
+              ><%= currentDraft.other_actions_taken || '' %></textarea>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- Section I -->
+      <div class="section-card">
+        <div class="section-title">
+          Section I – Compliance Recommendation
+        </div>
+
+        <div class="section-content">
+          <div class="row g-3">
+
+            <div class="col-md-6">
+              <label class="form-label">
+                Recommended Outcome
+              </label>
+
+              <select
+                name="recommended_action"
+                class="form-select"
+                required
+              >
+                <option value="">
+                  Select recommended outcome
+                </option>
+                <option value="File STR">
+                  File Suspicious Transaction Report
+                </option>
+                <option value="Continue Monitoring">
+                  Continue Monitoring
+                </option>
+                <option value="Enhanced Due Diligence">
+                  Conduct Enhanced Due Diligence
+                </option>
+                <option value="Suspend Transaction">
+                  Suspend Transaction
+                </option>
+                <option value="Restrict Account">
+                  Restrict Account
+                </option>
+                <option value="Close Investigation">
+                  Close Investigation
+                </option>
+                <option value="Escalate">
+                  Escalate to Senior Management
+                </option>
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">
+                Draft Status
+              </label>
+
+              <select
+                name="status"
+                class="form-select"
+              >
+                <option value="draft">Draft</option>
+                <option value="pending_approval">
+                  Pending Approval
+                </option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+                <option value="submitted">Submitted</option>
+              </select>
+            </div>
+
+            <div class="col-md-12">
+              <label class="form-label">
+                Recommendation Remarks
+              </label>
+              <textarea
+                name="recommendation_remarks"
+                class="form-control"
+                rows="4"
+                placeholder="Explain the reason for the recommended action"
+              ><%= currentDraft.recommendation_remarks || '' %></textarea>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- Section J -->
+      <div class="section-card">
+        <div class="section-title">
+          Section J – Reporting Officer Declaration
+        </div>
+
+        <div class="section-content">
+
+          <div class="declaration-box mb-4">
+            I declare that the information contained in this internal report
+            is accurate to the best of my knowledge and has been prepared
+            based on the information available at the time of the review. I
+            understand that the information is confidential and must not be
+            disclosed to the subject of the report or any unauthorised person.
+          </div>
+
+          <div class="row g-3">
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Reporting Officer Name
+              </label>
+              <input
+                type="text"
+                name="reporting_officer_name"
+                class="form-control"
+                value="<%= currentDraft.reporting_officer_name || '' %>"
+                placeholder="Enter officer name"
+              >
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Designation
+              </label>
+              <input
+                type="text"
+                name="reporting_officer_designation"
+                class="form-control"
+                value="<%= currentDraft.reporting_officer_designation || '' %>"
+                placeholder="Example: Compliance Officer"
+              >
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Declaration Date
+              </label>
+              <input
+                type="date"
+                name="declaration_date"
+                class="form-control"
+                value="<%= currentDraft.declaration_date || '' %>"
+              >
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">
+                Electronic Signature / Initials
+              </label>
+              <input
+                type="text"
+                name="reporting_officer_signature"
+                class="form-control"
+                value="<%= currentDraft.reporting_officer_signature || '' %>"
+                placeholder="Enter officer initials or signature name"
+              >
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- Section K -->
+      <div class="section-card">
+        <div class="section-title">
+          Section K – Internal Approval
+        </div>
+
+        <div class="section-content">
+          <div class="row g-3">
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Approving Officer Name
+              </label>
+              <input
+                type="text"
+                name="approved_by_name"
+                class="form-control"
+                value="<%= currentDraft.approved_by_name || '' %>"
+                placeholder="Enter approving officer name"
+              >
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Approving Officer Designation
+              </label>
+              <input
+                type="text"
+                name="approved_by_designation"
+                class="form-control"
+                value="<%= currentDraft.approved_by_designation || '' %>"
+                placeholder="Example: MLRO / Compliance Manager"
+              >
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">
+                Approval Date
+              </label>
+              <input
+                type="date"
+                name="approval_date"
+                class="form-control"
+                value="<%= currentDraft.approval_date || '' %>"
+              >
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">
+                Approval Decision
+              </label>
+              <select
+                name="approval_decision"
+                class="form-select"
+              >
+                <option value="">Select decision</option>
+                <option value="Approved">Approved</option>
+                <option value="Rejected">Rejected</option>
+                <option value="Returned for Amendment">
+                  Returned for Amendment
+                </option>
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">
+                Electronic Signature / Initials
+              </label>
+              <input
+                type="text"
+                name="approving_officer_signature"
+                class="form-control"
+                value="<%= currentDraft.approving_officer_signature || '' %>"
+                placeholder="Enter approving officer initials"
+              >
+            </div>
+
+            <div class="col-md-12">
+              <label class="form-label">
+                Approval Remarks
+              </label>
+              <textarea
+                name="approval_remarks"
+                class="form-control"
+                rows="3"
+                placeholder="Enter approval, rejection or amendment remarks"
+              ><%= currentDraft.approval_remarks || '' %></textarea>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <div class="button-group no-print">
+
+        <a
+          href="/api/officer/alerts/<%= alertId %>"
+          class="btn btn-outline-secondary"
+        >
+          Back to Alert
+        </a>
+
+        <button
+          type="button"
+          class="btn btn-outline-dark"
+          onclick="window.print()"
+        >
+          Print Draft
+        </button>
+
+        <button
+          type="submit"
+          name="submit_action"
+          value="save_draft"
+          class="btn btn-primary"
+        >
+          Save Draft
+        </button>
+
+        <button
+          type="submit"
+          name="submit_action"
+          value="submit_approval"
+          class="btn btn-danger"
+        >
+          Submit for Approval
+        </button>
+
+      </div>
+
     </div>
+  </form>
 
-    <div class="card-body">
-      <p><strong>STR Reference:</strong> <%= str.str_reference_number %></p>
-      <p><strong>Status:</strong> <%= str.status %></p>
-      <p><strong>Generated By:</strong> <%= str.generated_by %></p>
-      <p><strong>Generated At:</strong> <%= str.generated_at %></p>
-
-      <hr>
-
-      <p><strong>Transaction ID:</strong> <%= str.transaction_id %></p>
-      <p><strong>Merchant ID:</strong> <%= str.merchant_id %></p>
-      <p><strong>Risk Level:</strong> <%= str.risk_level %></p>
-      <p><strong>Risk Score:</strong> <%= str.risk_score %></p>
-      <p><strong>Triggered Rules:</strong> <%= str.triggered_rules %></p>
-
-      <hr>
-
-      <h5>Narrative Text</h5>
-      <pre style="white-space: pre-wrap;"><%= str.narrative_text %></pre>
-
-      <a href="/api/officer/alerts" class="btn btn-secondary">Back</a>
-      <button onclick="window.print()" class="btn btn-primary">Print / Save PDF</button>
-    </div>
+  <div class="report-footer">
+    <strong>Important:</strong>
+    This page is an internal STR preparation draft for the compliance
+    monitoring system. All information must be reviewed and verified by an
+    authorised officer before any official submission. The existence of a
+    suspicious transaction review must not be disclosed to the customer or
+    merchant concerned.
   </div>
 
 </div>
+
+<script
+  src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js">
+</script>
+
 </body>
 </html>

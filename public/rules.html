@@ -5,6 +5,199 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Compliance Rules - Compliance Monitoring System</title>
   <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    .rules-page {
+      display: grid;
+      gap: 18px;
+    }
+
+    .rules-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 14px 16px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .rules-tabs {
+      display: inline-flex;
+      gap: 4px;
+      padding: 4px;
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+
+    .rules-tab {
+      border: 0;
+      background: transparent;
+      color: var(--text-muted);
+      border-radius: 8px;
+      padding: 8px 13px;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .rules-tab.active {
+      background: #fff;
+      color: var(--primary);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .rules-summary {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .summary-chip {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 7px;
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .summary-chip strong {
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .rules-panel {
+      display: none;
+    }
+
+    .rules-panel.active {
+      display: block;
+    }
+
+    .rules-card-header {
+      align-items: flex-start;
+    }
+
+    .header-copy h3 {
+      margin-bottom: 2px;
+    }
+
+    .header-copy p {
+      color: var(--text-muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .rule-name {
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 3px;
+    }
+
+    .rule-description {
+      color: var(--text-muted);
+      font-size: 12px;
+      max-width: 460px;
+      line-height: 1.45;
+    }
+
+    .type-code {
+      display: inline-flex;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 12px;
+      color: #334155;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 7px;
+      white-space: nowrap;
+    }
+
+    .metric-stack {
+      display: grid;
+      gap: 2px;
+      white-space: nowrap;
+    }
+
+    .metric-primary {
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .metric-muted {
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .risk-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.3px;
+    }
+
+    .risk-low { background: #dcfce7; color: #15803d; }
+    .risk-medium, .risk-elevated { background: #fef3c7; color: #b45309; }
+    .risk-high, .risk-very_high { background: #fee2e2; color: #b91c1c; }
+
+    .priority-state {
+      display: grid;
+      gap: 2px;
+      white-space: nowrap;
+    }
+
+    .priority-state strong {
+      font-size: 12px;
+      color: var(--text);
+    }
+
+    .priority-state span {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .rules-table td {
+      vertical-align: top;
+    }
+
+    @media (max-width: 900px) {
+      .rules-toolbar,
+      .header-actions {
+        align-items: stretch;
+      }
+
+      .rules-tabs,
+      .search-wrap,
+      .risk-filter-group {
+        width: 100%;
+        max-width: none;
+      }
+
+      .rules-tab {
+        flex: 1;
+      }
+    }
+  </style>
 </head>
 <body>
 <div class="app-layout">
@@ -103,40 +296,164 @@
       </div>
     </div>
 
-    <div class="content-area">
-      <div class="card">
+    <div class="content-area rules-page">
+      <div class="rules-toolbar">
+        <div class="rules-tabs" role="tablist" aria-label="Rules sections">
+          <button type="button" class="rules-tab active" id="rulesTab" onclick="switchRulesView('rules')">Rule Weights</button>
+          <button type="button" class="rules-tab" id="mccTab" onclick="switchRulesView('mcc')">MCC Profiles</button>
+        </div>
+        <div class="rules-summary">
+          <span class="summary-chip"><strong id="activeRuleCount">-</strong> active rules</span>
+          <span class="summary-chip"><strong id="mccProfileCount">-</strong> MCC profiles</span>
+          <span class="summary-chip"><strong id="highMccCount">-</strong> high priority MCCs</span>
+        </div>
+      </div>
+
+      <div class="card" id="ruleEditorCard" style="display:none;margin-bottom:22px">
         <div class="card-header">
-          <h3>Existing Rules</h3>
-          <div class="search-wrap">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
-            <input id="ruleSearch" class="search-input" type="text" placeholder="Search rules..." oninput="renderRules()" />
+          <h3 id="ruleFormTitle">Create Rule</h3>
+          <button type="button" class="btn btn-secondary" id="cancelEditBtn" style="display:none;width:auto;padding:9px 16px" onclick="resetRuleForm()">Cancel Edit</button>
+        </div>
+        <form id="ruleForm">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="ruleName">Rule Name</label>
+              <input id="ruleName" name="rule_name" type="text" maxlength="100" required />
+            </div>
+            <div class="form-group">
+              <label for="ruleType">Rule Type</label>
+              <select id="ruleType" name="rule_type" required>
+                <option value="">Select rule type</option>
+                <option value="merchant_category_risk">Merchant MCC / industry risk</option>
+                <option value="large_transaction">Large transaction</option>
+                <option value="transaction_velocity">High transaction velocity</option>
+                <option value="repeated_small_transactions">Repeated small-value transactions</option>
+                <option value="frequent_large_transactions">Repeated unusually large transactions</option>
+                <option value="failed_attempt_velocity">Failed-attempt velocity</option>
+                <option value="failure_then_success">Failure followed by success</option>
+                <option value="duplicate_payment_identifier">Duplicate payment identifier</option>
+                <option value="repeated_identical_amounts">Repeated identical amounts</option>
+                <option value="outside_operating_hours">Outside operating hours</option>
+                <option value="daily_transaction_count_spike">Daily transaction count spike</option>
+                <option value="daily_transaction_value_spike">Daily transaction value spike</option>
+                <option value="merchant_average_deviation">Merchant average deviation</option>
+                <option value="data_quality">Missing monitoring references</option>
+                <option value="ip_validation">Missing or invalid online IP</option>
+                <option value="ip_country_mismatch">Verified IP-country mismatch</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="thresholdValue">Threshold Value</label>
+              <input id="thresholdValue" name="threshold_value" type="number" min="0" step="0.01" />
+            </div>
+            <div class="form-group">
+              <label for="thresholdCount">Threshold Count</label>
+              <input id="thresholdCount" name="threshold_count" type="number" min="0" step="1" />
+            </div>
+            <div class="form-group">
+              <label for="timeWindow">Time Window (seconds)</label>
+              <input id="timeWindow" name="time_window_seconds" type="number" min="0" step="1" />
+            </div>
+            <div class="form-group">
+              <label for="rulePoints">Points</label>
+              <input id="rulePoints" name="points" type="number" min="0" step="1" value="0" required />
+            </div>
+            <div class="form-group">
+              <label for="ruleStatus">Status</label>
+              <select id="ruleStatus" name="is_active">
+                <option value="1">Active</option>
+                <option value="0">Inactive</option>
+              </select>
+            </div>
+            <div class="form-group full">
+              <label for="ruleDescription">Description</label>
+              <textarea id="ruleDescription" name="description" rows="3"></textarea>
+            </div>
           </div>
-          <div class="risk-filter-group">
-            <button type="button" class="filter-chip active" data-status="all" onclick="setStatusFilter('all', this)">All</button>
-            <button type="button" class="filter-chip" data-status="active" onclick="setStatusFilter('active', this)">Active</button>
-            <button type="button" class="filter-chip" data-status="inactive" onclick="setStatusFilter('inactive', this)">Inactive</button>
+          <button type="submit" class="btn btn-primary" id="saveRuleBtn" style="width:auto;padding:10px 26px">Save Rule</button>
+        </form>
+      </div>
+
+      <div class="rules-panel active" id="rulesPanel">
+        <div class="card">
+          <div class="card-header rules-card-header">
+            <div class="header-copy">
+              <h3>Rule Weights</h3>
+              <p>Transaction behaviours, thresholds, windows and points used by the backend risk engine.</p>
+            </div>
+            <div class="header-actions">
+              <div class="search-wrap">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <input id="ruleSearch" class="search-input" type="text" placeholder="Search rules..." oninput="renderRules()" />
+              </div>
+              <div class="risk-filter-group">
+                <button type="button" class="filter-chip active" data-status="all" onclick="setStatusFilter('all', this)">All</button>
+                <button type="button" class="filter-chip" data-status="active" onclick="setStatusFilter('active', this)">Active</button>
+                <button type="button" class="filter-chip" data-status="inactive" onclick="setStatusFilter('inactive', this)">Inactive</button>
+              </div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="rules-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Rule</th>
+                  <th>Type</th>
+                  <th>Threshold</th>
+                  <th>Window</th>
+                  <th>Points</th>
+                  <th>Status</th>
+                  <th>Updated</th>
+                  <th class="admin-only" style="display:none">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="rulesBody">
+                <tr><td colspan="9"><div class="empty-state"><p>Loading...</p></div></td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Rule</th>
-                <th>Type</th>
-                <th>Threshold</th>
-                <th>Window</th>
-                <th>Points</th>
-                <th>Status</th>
-                <th>Updated</th>
-              </tr>
-            </thead>
-            <tbody id="rulesBody">
-              <tr><td colspan="8"><div class="empty-state"><p>Loading...</p></div></td></tr>
-            </tbody>
-          </table>
+      </div>
+
+      <div class="rules-panel" id="mccPanel">
+        <div class="card">
+          <div class="card-header rules-card-header">
+            <div class="header-copy">
+              <h3>MCC Risk Profiles</h3>
+              <p>Category defaults used when merchant-specific behaviour is not yet available.</p>
+            </div>
+            <div class="header-actions">
+              <div class="search-wrap">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <input id="mccSearch" class="search-input" type="text" placeholder="Search MCC profiles..." oninput="renderMccProfiles()" />
+              </div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="rules-table">
+              <thead>
+                <tr>
+                  <th>MCC</th>
+                  <th>Category</th>
+                  <th>Risk</th>
+                  <th>Points</th>
+                  <th>Expected Amount</th>
+                  <th>Daily Defaults</th>
+                  <th>Velocity</th>
+                  <th>Priority</th>
+                  <th class="admin-only" style="display:none">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="mccRiskBody">
+                <tr><td colspan="9"><div class="empty-state"><p>Loading...</p></div></td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -159,7 +476,49 @@ roleEl.className = `badge badge-${user.role}`;
 if (["admin", "compliance_manager"].includes(user.role)) document.getElementById("adminNav").style.display = "block";
 
 let rules = [];
+let mccProfiles = [];
 let statusFilter = "all";
+let editingRuleId = null;
+let currentRulesView = "rules";
+const canManageRules = ["admin", "compliance_manager"].includes(user.role);
+const tableColspan = canManageRules ? 9 : 8;
+
+if (canManageRules) {
+  document.getElementById("ruleEditorCard").style.display = "block";
+  document.querySelectorAll(".admin-only").forEach((el) => {
+    el.style.display = "";
+  });
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function showToast(title, body) {
+  let container = document.getElementById("toastContainer");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "toastContainer";
+    container.className = "toast-container";
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement("div");
+  toast.className = "toast";
+  toast.innerHTML = `
+    <div class="toast-icon">&#9888;</div>
+    <div class="toast-content">
+      <div class="toast-title">${escapeHtml(title)}</div>
+      <div class="toast-body">${escapeHtml(body)}</div>
+    </div>`;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 4500);
+}
 
 function formatDate(value) {
   if (!value) return "-";
@@ -175,12 +534,49 @@ function formatDate(value) {
 function formatThreshold(rule) {
   const parts = [];
   if (rule.threshold_value !== null && rule.threshold_value !== undefined) {
-    parts.push(`Value ${Number(rule.threshold_value).toLocaleString("en-SG")}`);
+    const value = Number(rule.threshold_value).toLocaleString("en-SG");
+    if (rule.rule_type === "large_transaction") parts.push(`Amount ${value}`);
+    else if (["merchant_average_deviation", "frequent_large_transactions"].includes(rule.rule_type)) parts.push(`Multiplier ${value}x`);
+    else if (rule.rule_type === "repeated_small_transactions") parts.push(`Amount below ${value}`);
+    else if (rule.rule_type === "daily_transaction_value_spike") parts.push(`Daily value ${value}`);
+    else parts.push(`Value ${value}`);
   }
   if (rule.threshold_count !== null && rule.threshold_count !== undefined) {
     parts.push(`Count ${rule.threshold_count}`);
   }
   return parts.length ? parts.join(" / ") : "-";
+}
+
+function formatWindow(seconds) {
+  const value = Number(seconds || 0);
+  if (!value) return "-";
+  if (value === 60) return "60 seconds (1 minute)";
+  if (value === 300) return "300 seconds (5 minutes)";
+  if (value === 1800) return "1800 seconds (30 minutes)";
+  if (value % 60 === 0) return `${value} seconds (${value / 60} minutes)`;
+  return `${value} seconds`;
+}
+
+function updateSummary() {
+  const activeRules = rules.filter((rule) => Number(rule.is_active) === 1).length;
+  const highMcc = mccProfiles.filter((profile) => {
+    const riskLevel = String(profile.risk_level || "").trim().toUpperCase();
+    return Number(profile.use_priority_multiplier) === 1 && ["HIGH", "VERY_HIGH"].includes(riskLevel);
+  }).length;
+  document.getElementById("activeRuleCount").textContent = activeRules;
+  document.getElementById("mccProfileCount").textContent = mccProfiles.length;
+  document.getElementById("highMccCount").textContent = highMcc;
+}
+
+function switchRulesView(view) {
+  currentRulesView = view;
+  document.getElementById("rulesPanel").classList.toggle("active", view === "rules");
+  document.getElementById("mccPanel").classList.toggle("active", view === "mcc");
+  document.getElementById("rulesTab").classList.toggle("active", view === "rules");
+  document.getElementById("mccTab").classList.toggle("active", view === "mcc");
+  if (canManageRules) {
+    document.getElementById("ruleEditorCard").style.display = view === "rules" ? "block" : "none";
+  }
 }
 
 function statusPill(isActive) {
@@ -210,7 +606,7 @@ function renderRules() {
   });
 
   if (!filtered.length) {
-    body.innerHTML = '<tr><td colspan="8"><div class="empty-state"><p>No rules found.</p></div></td></tr>';
+    body.innerHTML = `<tr><td colspan="${tableColspan}"><div class="empty-state"><p>No rules found.</p></div></td></tr>`;
     return;
   }
 
@@ -218,32 +614,268 @@ function renderRules() {
     <tr>
       <td style="font-family:monospace;color:var(--text-muted)">${rule.rule_id}</td>
       <td>
-        <div style="font-weight:700">${rule.rule_name || "-"}</div>
-        <div style="color:var(--text-muted);font-size:12px;max-width:420px">${rule.description || "-"}</div>
+        <div class="rule-name">${escapeHtml(rule.rule_name || "-")}</div>
+        <div class="rule-description">${escapeHtml(rule.description || "-")}</div>
       </td>
-      <td>${rule.rule_type || "-"}</td>
-      <td>${formatThreshold(rule)}</td>
-      <td>${rule.time_window_minutes ? `${rule.time_window_minutes} min` : "-"}</td>
-      <td style="font-weight:700">${rule.points || 0}</td>
+      <td><span class="type-code">${escapeHtml(rule.rule_type || "-")}</span></td>
+      <td><div class="metric-stack"><span class="metric-primary">${escapeHtml(formatThreshold(rule))}</span></div></td>
+      <td><span class="metric-muted">${escapeHtml(formatWindow(rule.time_window_seconds))}</span></td>
+      <td><span class="metric-primary">${rule.points || 0}</span></td>
       <td>${statusPill(Number(rule.is_active) === 1)}</td>
       <td style="color:var(--text-muted);font-size:12px">${formatDate(rule.updated_at || rule.created_at)}</td>
+      ${canManageRules ? `
+        <td>
+          <div class="table-actions">
+            <button type="button" class="btn btn-secondary" onclick="editRule(${Number(rule.rule_id)})">Edit</button>
+            <button type="button" class="btn btn-danger" onclick="deleteRule(${Number(rule.rule_id)})">Deactivate</button>
+          </div>
+        </td>` : ""}
     </tr>
   `).join("");
 }
+
+function formatAmountRange(profile) {
+  const min = profile.expected_min_amount ?? "-";
+  const max = profile.expected_max_amount ?? "-";
+  return `${min} to ${max}`;
+}
+
+function formatPriorityEligibility(profile) {
+  if (Number(profile.use_priority_multiplier) !== 1) return "Disabled";
+  const multiplier = Number(profile.priority_multiplier || 1);
+  const riskLevel = String(profile.risk_level || "").trim().toUpperCase();
+  const eligible = ["HIGH", "VERY_HIGH"].includes(riskLevel);
+  if (eligible) return `<div class="priority-state"><strong>Eligible x${multiplier}</strong><span>Queue only</span></div>`;
+  return `<div class="priority-state"><strong>Not eligible</strong><span>Configured x${multiplier}</span></div>`;
+}
+
+function riskBadge(level) {
+  const normalized = String(level || "LOW").trim().toUpperCase();
+  const css = normalized.toLowerCase();
+  return `<span class="risk-badge risk-${escapeHtml(css)}">${escapeHtml(normalized)}</span>`;
+}
+
+function renderMccProfiles() {
+  const body = document.getElementById("mccRiskBody");
+  const q = document.getElementById("mccSearch").value.trim().toLowerCase();
+  const filtered = mccProfiles.filter((profile) =>
+    `${profile.mcc_code || ""} ${profile.category_name || ""} ${profile.category_keyword || ""} ${profile.risk_level || ""}`.toLowerCase().includes(q)
+  );
+
+  if (!filtered.length) {
+    body.innerHTML = `<tr><td colspan="${canManageRules ? 9 : 8}"><div class="empty-state"><p>No MCC profiles found.</p></div></td></tr>`;
+    return;
+  }
+
+  body.innerHTML = filtered.map((profile) => `
+    <tr>
+      <td><span class="type-code">${escapeHtml(profile.mcc_code || profile.category_keyword || "-")}</span></td>
+      <td>
+        <div class="rule-name">${escapeHtml(profile.category_name || "-")}</div>
+        <div class="rule-description">${escapeHtml(profile.category_keyword || "")}</div>
+      </td>
+      <td>${riskBadge(profile.risk_level)}</td>
+      <td><span class="metric-primary">${Number(profile.risk_points || 0)}</span></td>
+      <td>
+        <div class="metric-stack">
+          <span class="metric-primary">${escapeHtml(formatAmountRange(profile))}</span>
+        </div>
+      </td>
+      <td>
+        <div class="metric-stack">
+          <span class="metric-primary">Count ${escapeHtml(profile.expected_daily_count ?? "-")}</span>
+          <span class="metric-muted">Value ${escapeHtml(profile.expected_daily_value ?? "-")}</span>
+        </div>
+      </td>
+      <td>
+        <div class="metric-stack">
+          <span class="metric-primary">Count ${escapeHtml(profile.velocity_count ?? "-")}</span>
+          <span class="metric-muted">${escapeHtml(profile.velocity_window_seconds ?? "-")} seconds</span>
+        </div>
+      </td>
+      <td>${formatPriorityEligibility(profile)}</td>
+      ${canManageRules ? `
+        <td>
+          <button type="button" class="btn btn-secondary" onclick="editMccProfile(${Number(profile.risk_id)})">Edit</button>
+        </td>` : ""}
+    </tr>
+  `).join("");
+}
+
+function promptNumber(label, currentValue) {
+  const value = prompt(label, currentValue ?? "");
+  if (value === null) return undefined;
+  return value;
+}
+
+async function editMccProfile(riskId) {
+  const profile = mccProfiles.find((item) => Number(item.risk_id) === Number(riskId));
+  if (!profile || !canManageRules) return;
+
+  const riskLevel = prompt("MCC risk level: LOW, MEDIUM, ELEVATED, HIGH, VERY_HIGH", profile.risk_level || "LOW");
+  if (riskLevel === null) return;
+  const riskPoints = promptNumber("MCC risk points", profile.risk_points);
+  if (riskPoints === undefined) return;
+  const expectedMin = promptNumber("Expected minimum amount", profile.expected_min_amount);
+  if (expectedMin === undefined) return;
+  const expectedMax = promptNumber("Expected maximum amount", profile.expected_max_amount);
+  if (expectedMax === undefined) return;
+  const expectedCount = promptNumber("Expected daily count", profile.expected_daily_count);
+  if (expectedCount === undefined) return;
+  const expectedValue = promptNumber("Expected daily value", profile.expected_daily_value);
+  if (expectedValue === undefined) return;
+  const velocityCount = promptNumber("Velocity count", profile.velocity_count);
+  if (velocityCount === undefined) return;
+  const velocityWindow = promptNumber("Velocity window seconds", profile.velocity_window_seconds);
+  if (velocityWindow === undefined) return;
+  const useMultiplier = confirm("Enable priority multiplier for this MCC profile?");
+  const multiplier = promptNumber("Priority multiplier", profile.priority_multiplier || 3);
+  if (multiplier === undefined) return;
+
+  const res = await apiFetch(`/api/mcc-risk/${riskId}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      risk_level: riskLevel,
+      risk_points: riskPoints,
+      expected_min_amount: expectedMin,
+      expected_max_amount: expectedMax,
+      expected_daily_count: expectedCount,
+      expected_daily_value: expectedValue,
+      velocity_count: velocityCount,
+      velocity_window_seconds: velocityWindow,
+      use_priority_multiplier: useMultiplier,
+      priority_multiplier: multiplier,
+      is_active: Number(profile.is_active) === 1,
+    }),
+  });
+  if (!res) return;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    showToast("MCC Profile", data.message || "Unable to update MCC profile.");
+    return;
+  }
+  showToast("MCC Profile", data.message || "MCC profile updated successfully.");
+  await loadMccProfiles();
+}
+
+function getRulePayload() {
+  return {
+    rule_name: document.getElementById("ruleName").value.trim(),
+    rule_type: document.getElementById("ruleType").value.trim(),
+    threshold_value: document.getElementById("thresholdValue").value,
+    threshold_count: document.getElementById("thresholdCount").value,
+    time_window_seconds: document.getElementById("timeWindow").value,
+    points: document.getElementById("rulePoints").value,
+    is_active: document.getElementById("ruleStatus").value === "1",
+    description: document.getElementById("ruleDescription").value.trim(),
+  };
+}
+
+function resetRuleForm() {
+  editingRuleId = null;
+  document.getElementById("ruleForm").reset();
+  document.getElementById("rulePoints").value = "0";
+  document.getElementById("ruleStatus").value = "1";
+  document.getElementById("ruleType").disabled = false;
+  document.getElementById("ruleFormTitle").textContent = "Create Rule";
+  document.getElementById("saveRuleBtn").textContent = "Save Rule";
+  document.getElementById("cancelEditBtn").style.display = "none";
+}
+
+function editRule(ruleId) {
+  const rule = rules.find((item) => Number(item.rule_id) === Number(ruleId));
+  if (!rule) return;
+
+  editingRuleId = rule.rule_id;
+  document.getElementById("ruleName").value = rule.rule_name || "";
+  document.getElementById("ruleType").value = rule.rule_type || "";
+  document.getElementById("thresholdValue").value = rule.threshold_value ?? "";
+  document.getElementById("thresholdCount").value = rule.threshold_count ?? "";
+  document.getElementById("timeWindow").value = rule.time_window_seconds ?? "";
+  document.getElementById("rulePoints").value = rule.points ?? 0;
+  document.getElementById("ruleStatus").value = Number(rule.is_active) === 1 ? "1" : "0";
+  document.getElementById("ruleDescription").value = rule.description || "";
+  document.getElementById("ruleFormTitle").textContent = `Edit Rule #${rule.rule_id}`;
+  document.getElementById("saveRuleBtn").textContent = "Update Rule";
+  document.getElementById("cancelEditBtn").style.display = "inline-flex";
+  document.getElementById("ruleEditorCard").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function deleteRule(ruleId) {
+  if (!confirm("Deactivate this rule? It will stop affecting new transactions but can be reactivated later.")) return;
+
+  const res = await apiFetch(`/api/rules/${ruleId}`, { method: "DELETE" });
+  if (!res) return;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    showToast("Rule Status", data.message || "Unable to deactivate rule.");
+    return;
+  }
+
+  showToast("Rule Status", data.message || "Rule deactivated successfully.");
+  if (Number(editingRuleId) === Number(ruleId)) resetRuleForm();
+  await loadRules();
+}
+
+document.getElementById("ruleForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!canManageRules) return;
+
+  const saveButton = document.getElementById("saveRuleBtn");
+  saveButton.disabled = true;
+  saveButton.textContent = editingRuleId ? "Updating..." : "Saving...";
+
+  try {
+    const url = editingRuleId ? `/api/rules/${editingRuleId}` : "/api/rules";
+    const method = editingRuleId ? "PUT" : "POST";
+    const res = await apiFetch(url, {
+      method,
+      body: JSON.stringify(getRulePayload()),
+    });
+    if (!res) return;
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      showToast("Rule Save", data.message || "Unable to save rule.");
+      return;
+    }
+
+    showToast("Rule Save", data.message || "Rule saved successfully.");
+    resetRuleForm();
+    await loadRules();
+  } finally {
+    saveButton.disabled = false;
+    saveButton.textContent = editingRuleId ? "Update Rule" : "Save Rule";
+  }
+});
 
 async function loadRules() {
   const res = await apiFetch("/api/rules");
   if (!res) return;
   if (!res.ok) {
     document.getElementById("rulesBody").innerHTML =
-      '<tr><td colspan="8"><div class="empty-state"><p>Unable to load rules.</p></div></td></tr>';
+      `<tr><td colspan="${tableColspan}"><div class="empty-state"><p>Unable to load rules.</p></div></td></tr>`;
     return;
   }
   rules = await res.json();
+  updateSummary();
   renderRules();
 }
 
+async function loadMccProfiles() {
+  const res = await apiFetch("/api/mcc-risk");
+  if (!res) return;
+  if (!res.ok) {
+    document.getElementById("mccRiskBody").innerHTML =
+      `<tr><td colspan="${canManageRules ? 9 : 8}"><div class="empty-state"><p>Unable to load MCC profiles.</p></div></td></tr>`;
+    return;
+  }
+  mccProfiles = await res.json();
+  updateSummary();
+  renderMccProfiles();
+}
+
 loadRules();
+loadMccProfiles();
 </script>
 </body>
 </html>

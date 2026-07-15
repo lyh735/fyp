@@ -53,7 +53,7 @@ io.on("connection", (socket) => {
 app.set("io", io);
 
 
-const PORT = 3006;
+const PORT = process.env.PORT || 3006;
 
 ensureComplianceSchema()
   .catch((err) => {

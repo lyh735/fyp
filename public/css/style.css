@@ -110,7 +110,8 @@ body {
 }
 
 .form-group input,
-.form-group select {
+.form-group select,
+.form-group textarea {
   width: 100%;
   padding: 11px 14px;
   border: 1.5px solid var(--border);
@@ -123,14 +124,21 @@ body {
   outline: none;
 }
 
+.form-group textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
 .form-group input:focus,
-.form-group select:focus {
+.form-group select:focus,
+.form-group textarea:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3.5px rgba(59,130,246,0.14);
   background: #fff;
 }
 
-.form-group input:disabled {
+.form-group input:disabled,
+.form-group textarea:disabled {
   background: #f1f5f9;
   color: var(--text-muted);
   cursor: not-allowed;
@@ -802,9 +810,11 @@ tbody td {
 .pill-normal     { background: #dcfce7; color: #15803d; }
 .pill-medium     { background: #fef3c7; color: #b45309; }
 .pill-high       { background: #fee2e2; color: #b91c1c; }
+.pill-critical   { background: #fecaca; color: #991b1b; }
 .pill-suspicious { background: #fee2e2; color: #b91c1c; }
 .pill-review     { background: #fef3c7; color: #b45309; }
 .pill-pending    { background: #ede9fe; color: #6d28d9; }
+.pill-rejected   { background: #111827; color: #ffffff; }
 
 /* ── Payment method badges ── */
 .pm-badge {
@@ -1079,6 +1089,19 @@ tbody td {
 }
 
 .form-grid .full { grid-column: 1 / -1; }
+
+.table-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.table-actions .btn {
+  width: auto;
+  padding: 7px 11px;
+  font-size: 12px;
+  white-space: nowrap;
+}
 
 /* ══════════════════════════════════════════
    EMPTY STATE

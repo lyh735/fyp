@@ -11,6 +11,7 @@ const EDITABLE_FIELDS = [
   "business_category",
   "mcc_code",
   "merchant_average_amount",
+  "merchant_max_transaction_amount",
   "merchant_risk_score",
   "operating_hours_start",
   "operating_hours_end",
@@ -84,6 +85,9 @@ function normalizeMerchant(body, options = {}) {
   const averageAmount = body.merchant_average_amount === "" || body.merchant_average_amount == null
     ? null
     : Number(body.merchant_average_amount);
+  const maxTransactionAmount = body.merchant_max_transaction_amount === "" || body.merchant_max_transaction_amount == null
+    ? null
+    : Number(body.merchant_max_transaction_amount);
   const riskScore = body.merchant_risk_score === "" || body.merchant_risk_score == null
     ? 0
     : Number(body.merchant_risk_score);
@@ -106,6 +110,9 @@ function normalizeMerchant(body, options = {}) {
   if (averageAmount !== null && (!Number.isFinite(averageAmount) || averageAmount < 0)) {
     throw new Error("Average amount must be a non-negative number");
   }
+  if (maxTransactionAmount !== null && (!Number.isFinite(maxTransactionAmount) || maxTransactionAmount < 0)) {
+    throw new Error("Maximum transaction amount must be a non-negative number");
+  }
   if (!Number.isInteger(riskScore) || riskScore < 0 || riskScore > 100) {
     throw new Error("Risk score must be a whole number from 0 to 100");
   }
@@ -116,6 +123,7 @@ function normalizeMerchant(body, options = {}) {
     business_category: businessCategory,
     mcc_code: mccCode,
     merchant_average_amount: averageAmount,
+    merchant_max_transaction_amount: maxTransactionAmount,
     merchant_risk_score: riskScore,
     operating_hours_start: operatingHoursStart,
     operating_hours_end: operatingHoursEnd,
@@ -230,16 +238,18 @@ exports.createMerchant = async (req, res) => {
     await query(
       `INSERT INTO merchants (
          merchant_id, merchant_name, business_category, mcc_code,
-         merchant_average_amount, merchant_risk_score, operating_hours_start,
+         merchant_average_amount, merchant_max_transaction_amount,
+         merchant_risk_score, operating_hours_start,
          operating_hours_end, risk_level, country, has_physical_location,
          status, created_by, updated_by
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         normalized.merchant_id,
         normalized.merchant_name,
         normalized.business_category,
         normalized.mcc_code,
         normalized.merchant_average_amount,
+        normalized.merchant_max_transaction_amount,
         normalized.merchant_risk_score,
         normalized.operating_hours_start,
         normalized.operating_hours_end,
@@ -281,7 +291,8 @@ exports.updateMerchantProfile = async (req, res) => {
     const result = await query(
       `UPDATE merchants SET
          merchant_name = ?, business_category = ?, mcc_code = ?,
-         merchant_average_amount = ?, merchant_risk_score = ?,
+         merchant_average_amount = ?, merchant_max_transaction_amount = ?,
+         merchant_risk_score = ?,
          operating_hours_start = ?, operating_hours_end = ?, risk_level = ?,
          country = ?, has_physical_location = ?, status = ?,
          updated_by = ?, updated_at = NOW()
@@ -340,16 +351,18 @@ exports.uploadMerchants = async (req, res) => {
       await query(
         `INSERT INTO merchants (
            merchant_id, merchant_name, business_category, mcc_code,
-           merchant_average_amount, merchant_risk_score, operating_hours_start,
+           merchant_average_amount, merchant_max_transaction_amount,
+           merchant_risk_score, operating_hours_start,
            operating_hours_end, risk_level, country, has_physical_location,
            status, created_by, updated_by
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           normalized.merchant_id,
           normalized.merchant_name,
           normalized.business_category,
           normalized.mcc_code,
           normalized.merchant_average_amount,
+          normalized.merchant_max_transaction_amount,
           normalized.merchant_risk_score,
           normalized.operating_hours_start,
           normalized.operating_hours_end,
@@ -387,6 +400,60 @@ exports.uploadMerchants = async (req, res) => {
     },
     results,
   });
+};
+
+exports.getMerchantTerminals = async (req, res) => {
+  try {
+    const terminals = await query(
+      `SELECT terminal_id, merchant_id, label, status, created_at
+       FROM terminals
+       WHERE merchant_id = ?
+       ORDER BY created_at ASC`,
+      [req.params.id]
+    );
+    res.json(terminals);
+  } catch (err) {
+    res.status(500).json({ message: "Unable to load terminals" });
+  }
+};
+
+exports.createTerminal = async (req, res) => {
+  const label = optionalText(req.body.label, 100) || "New terminal";
+
+  try {
+    const merchant = await query("SELECT merchant_id FROM merchants WHERE merchant_id = ? LIMIT 1", [req.params.id]);
+    if (!merchant.length) return res.status(404).json({ message: "Merchant not found" });
+
+    const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
+    const terminalId = `${req.params.id}-T${suffix}`;
+
+    await query(
+      `INSERT INTO terminals (terminal_id, merchant_id, label, status, created_by, updated_by)
+       VALUES (?, ?, ?, 'active', ?, ?)`,
+      [terminalId, req.params.id, label, req.user.id, req.user.id]
+    );
+
+    const created = await query("SELECT * FROM terminals WHERE terminal_id = ? LIMIT 1", [terminalId]);
+    res.json({ message: "Terminal added successfully", terminal: created[0] });
+  } catch (err) {
+    if (err.code === "ER_DUP_ENTRY") {
+      return res.status(409).json({ message: "Terminal ID collision, please try again" });
+    }
+    res.status(500).json({ message: "Unable to add terminal" });
+  }
+};
+
+exports.deleteTerminal = async (req, res) => {
+  try {
+    const result = await query(
+      "DELETE FROM terminals WHERE terminal_id = ? AND merchant_id = ?",
+      [req.params.terminalId, req.params.id]
+    );
+    if (!result.affectedRows) return res.status(404).json({ message: "Terminal not found" });
+    res.json({ message: "Terminal deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Unable to delete terminal" });
+  }
 };
 
 exports.getMerchantTerminals = async (req, res) => {

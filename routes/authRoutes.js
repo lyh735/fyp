@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const {
   login,
+  logout,
   createUser,
   changePassword,
   updateProfile,
@@ -15,6 +16,7 @@ const {
 const { authenticate, requireAdmin } = require("../middleware/authMiddleware");
 
 router.post("/login",           login);
+router.post("/logout",          logout);
 router.post("/change-password", authenticate, changePassword);
 router.get ("/profile",         authenticate, getProfile);
 router.put ("/profile",         authenticate, updateProfile);

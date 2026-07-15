@@ -4,11 +4,14 @@ exports.showAlertsPage = (req, res) => {
 
   const sql = `
     SELECT a.*, a.alert_id AS id, COALESCE(a.message, a.triggered_rules) AS reason,
-           m.merchant_name, t.amount, t.currency, t.ip_address, t.country
+           m.merchant_name, m.mcc_code, t.amount, t.currency, t.ip_address, t.country,
+           mcr.category_name AS mcc_category_name,
+           COALESCE(mcr.risk_level, 'LOW') AS mcc_risk_level
     FROM alerts a
     LEFT JOIN transactions t ON a.transaction_id = t.transaction_id
     LEFT JOIN merchants m ON a.merchant_id = m.merchant_id
-    ORDER BY a.created_at DESC
+    LEFT JOIN merchant_category_risk mcr ON mcr.is_active = 1 AND mcr.mcc_code = m.mcc_code
+    ORDER BY COALESCE(a.priority_score, a.risk_score, 0) DESC, a.created_at DESC
   `;
 
   db.query(sql, (err, alerts) => {
@@ -32,10 +35,14 @@ exports.showAlertDetails = (req, res) => {
   const sql = `
     SELECT a.*, a.alert_id AS id, COALESCE(a.message, a.triggered_rules) AS reason,
            m.merchant_name, t.amount, t.currency, t.ip_address, t.country,
+           m.mcc_code, m.merchant_risk_score,
+           mcr.category_name AS mcc_category_name,
+           COALESCE(mcr.risk_level, 'LOW') AS mcc_risk_level,
            u.name AS officer_name
     FROM alerts a
     LEFT JOIN transactions t ON a.transaction_id = t.transaction_id
     LEFT JOIN merchants m ON a.merchant_id = m.merchant_id
+    LEFT JOIN merchant_category_risk mcr ON mcr.is_active = 1 AND mcr.mcc_code = m.mcc_code
     LEFT JOIN users u ON a.reviewed_by = u.user_id
     WHERE a.alert_id = ?
     LIMIT 1
@@ -128,6 +135,12 @@ exports.takeActionPage = (req, res) => {
     }
 
     const alert = alerts[0];
+
+    if (["close_case", "escalate_to_stro"].includes(action_type) && alert.status !== "Pending") {
+      const actionLabel = action_type === "close_case" ? "dismissed" : "escalated";
+      return res.status(400).send(`Only pending alerts can be ${actionLabel}`);
+    }
+
     let newStatus = alert.status;
 
     if (action_type === "review_started") {
@@ -218,6 +231,11 @@ exports.takeActionPage = (req, res) => {
 
 exports.generateSTRDraft = (req, res) => {
   const alertId = req.params.alertId;
+  const generatedBy = Number(req.user?.id || req.user?.user_id);
+
+  if (!Number.isInteger(generatedBy) || generatedBy <= 0) {
+    return res.status(401).send("Authenticated user id is required to generate an STR draft");
+  }
 
   const alertSql = `
     SELECT * FROM alerts
@@ -273,7 +291,11 @@ Prepare STR draft and escalate for approval.
     db.query(
       insertSql,
       [
+<<<<<<< HEAD
         Number(alert.alert_id),
+=======
+        alert.alert_id,
+>>>>>>> f7179f043bdd8e903f356662c508a739fb60b5b0
         generatedBy,
         strReference,
         narrativeText,
@@ -294,6 +316,7 @@ Prepare STR draft and escalate for approval.
 exports.viewSTRDraft = (req, res) => {
   const strId = req.params.strId;
 
+<<<<<<< HEAD
   const sql = `
     SELECT 
       s.*,
@@ -308,6 +331,15 @@ exports.viewSTRDraft = (req, res) => {
       ON s.alert_id = a.alert_id
     WHERE s.str_id = ?
   `;
+=======
+    const sql = `
+        SELECT s.*, a.transaction_id, a.merchant_id,
+               a.risk_score, a.risk_level, a.triggered_rules
+        FROM str_reports s
+        LEFT JOIN alerts a ON s.alert_id = a.alert_id
+        WHERE s.str_id = ?
+    `;
+>>>>>>> f7179f043bdd8e903f356662c508a739fb60b5b0
 
   db.query(sql, [strId], (err, results) => {
     if (err) {

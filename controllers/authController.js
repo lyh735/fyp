@@ -3,6 +3,12 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const JWT_SECRET = process.env.JWT_SECRET || "compliance_jwt_secret_2024";
 const ASSIGNABLE_ROLES = new Set(["analyst", "stro"]);
+const AUTH_COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: "strict",
+  secure: process.env.NODE_ENV === "production",
+  path: "/",
+};
 
 exports.login = (req, res) => {
   const { email, password } = req.body;
@@ -32,6 +38,11 @@ exports.login = (req, res) => {
       { expiresIn: "8h" }
     );
 
+    res.cookie("cms_token", token, {
+      ...AUTH_COOKIE_OPTIONS,
+      maxAge: 8 * 60 * 60 * 1000,
+    });
+
     res.json({
       token,
       user: {
@@ -43,6 +54,11 @@ exports.login = (req, res) => {
       }
     });
   });
+};
+
+exports.logout = (req, res) => {
+  res.clearCookie("cms_token", AUTH_COOKIE_OPTIONS);
+  res.json({ message: "Logged out successfully" });
 };
 
 exports.createUser = async (req, res) => {

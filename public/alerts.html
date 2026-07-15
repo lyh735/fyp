@@ -179,6 +179,12 @@
             <div><strong>Merchant</strong><div id="detailMerchant">-</div></div>
             <div><strong>Amount</strong><div id="detailAmount">-</div></div>
             <div><strong>Risk Level</strong><div id="detailRiskLevel">-</div></div>
+            <div><strong>Official Risk Score</strong><div id="detailOfficialRiskScore">-</div></div>
+            <div><strong>Base Rule Score</strong><div id="detailBaseRuleScore">-</div></div>
+            <div><strong>MCC Risk Points</strong><div id="detailMccRiskPoints">-</div></div>
+            <div><strong>Merchant MCC</strong><div id="detailMcc">-</div></div>
+            <div><strong>Investigation Priority Score</strong><div id="detailPriorityScore">-</div></div>
+            <div><strong>Priority Multiplier</strong><div id="detailPriorityMultiplier">-</div></div>
             <div><strong>Status</strong><div id="detailAlertStatus">-</div></div>
             <div><strong>Read Status</strong><div id="detailReadStatus">-</div></div>
             <div><strong>Read At</strong><div id="detailReadAt">-</div></div>
@@ -370,14 +376,10 @@ async function loadAlerts() {
   const res = await apiFetch(`/api/alerts${query}`);
   if (!res) return;
   const data = await res.json();
-  const priority = { High: 3, Medium: 2, Low: 1 };
   data.sort((a, b) => {
     if (!!a.read_at !== !!b.read_at) return a.read_at ? 1 : -1;
-    const levelA = priority[a.risk_level] || 1;
-    const levelB = priority[b.risk_level] || 1;
-    if (levelA !== levelB) return levelB - levelA;
-    const scoreA = parseFloat(a.risk_score) || 0;
-    const scoreB = parseFloat(b.risk_score) || 0;
+    const scoreA = parseFloat(a.priority_score ?? a.risk_score) || 0;
+    const scoreB = parseFloat(b.priority_score ?? b.risk_score) || 0;
     if (scoreA !== scoreB) return scoreB - scoreA;
     return new Date(b.created_at) - new Date(a.created_at);
   });
@@ -408,6 +410,12 @@ async function showAlertDetails(alertId) {
   document.getElementById("detailMerchant").textContent = alert.merchant_name || alert.merchant_id || "-";
   document.getElementById("detailAmount").textContent = alert.amount != null ? formatMoney(alert.amount, alert.currency) : "-";
   document.getElementById("detailRiskLevel").textContent = alert.risk_level || "-";
+  document.getElementById("detailOfficialRiskScore").textContent = alert.displayed_risk_score ?? alert.risk_score ?? "-";
+  document.getElementById("detailBaseRuleScore").textContent = alert.base_rule_score ?? "-";
+  document.getElementById("detailMccRiskPoints").textContent = alert.mcc_risk_points ?? "-";
+  document.getElementById("detailMcc").textContent = [alert.mcc_code, alert.mcc_category_name, alert.mcc_risk_level].filter(Boolean).join(" / ") || "-";
+  document.getElementById("detailPriorityScore").textContent = alert.priority_score ?? alert.risk_score ?? "-";
+  document.getElementById("detailPriorityMultiplier").textContent = `x${alert.priority_multiplier ?? 1}`;
   document.getElementById("detailAlertStatus").textContent = alert.status || "Pending";
   document.getElementById("detailReadStatus").textContent = alert.read_at ? "Read" : "Unread";
   document.getElementById("detailReadAt").textContent = alert.read_at ? formatDate(alert.read_at) : "-";
@@ -416,7 +424,15 @@ async function showAlertDetails(alertId) {
   let triggered = alert.triggered_rules;
   try {
     const parsed = JSON.parse(alert.triggered_rules);
-    if (Array.isArray(parsed)) triggered = parsed.join("; ");
+    if (Array.isArray(parsed)) {
+      triggered = parsed.map((item) => {
+        if (item && typeof item === "object") {
+          const evidence = item.evidence?.thresholdSource ? ` (${item.evidence.thresholdSource})` : "";
+          return `+${item.points || 0} ${item.rule_name || item.rule_type || "Rule"}${evidence}`;
+        }
+        return String(item);
+      }).join("; ");
+    }
   } catch {}
   document.getElementById("detailTriggeredRules").textContent = triggered || "-";
   document.getElementById("detailEscalationReport").textContent = alert.escalation_report || "-";
