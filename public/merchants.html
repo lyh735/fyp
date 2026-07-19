@@ -29,7 +29,17 @@
     .form-actions .btn{width:auto}
     .page-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
     .workspace-toggle{display:flex;gap:10px;flex-wrap:wrap}
-    .admin-tools-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:22px}
+    .directory-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap}
+    .directory-tabs{display:flex;gap:8px;flex-wrap:wrap}
+    .directory-tab{border:1px solid var(--border);background:white;color:var(--text-muted);border-radius:8px;padding:9px 13px;font-weight:700;cursor:pointer}
+    .directory-tab:hover{border-color:var(--primary);color:var(--primary)}
+    .directory-tab.active{background:var(--primary);border-color:var(--primary);color:white}
+    .directory-stats{display:flex;gap:10px;flex-wrap:wrap}
+    .directory-stat{border:1px solid var(--border);background:white;border-radius:8px;padding:8px 11px;min-width:94px}
+    .directory-stat span{display:block;color:var(--text-muted);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.4px}
+    .directory-stat strong{display:block;font-size:16px;margin-top:2px}
+    .admin-tools-grid{display:block;margin-bottom:22px}
+    .directory-panel{margin-bottom:22px}
     .helper-text{color:var(--text-muted);font-size:12px;line-height:1.6}
     .import-drop-zone{border:2px dashed #94a3b8;border-radius:12px;padding:24px 16px;text-align:center;background:#f8fafc;cursor:pointer;transition:.18s}
     .import-drop-zone:hover,.import-drop-zone.dragging{border-color:var(--primary);background:#eff6ff}
@@ -54,6 +64,15 @@
     .result-stat strong{display:block;font-size:24px;margin-bottom:4px}
     .result-stat span{color:var(--text-muted);font-size:11px;text-transform:uppercase;font-weight:700}
     .error-list{margin:0;padding:18px 0 0 20px;color:#b91c1c;font-size:12.5px;line-height:1.7;max-height:220px;overflow:auto}
+    .merchant-subtext{display:block;color:var(--text-muted);font-size:12px;margin-top:4px;font-weight:500}
+    .code-chip,.status-chip,.risk-chip{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-size:11.5px;font-weight:800;line-height:1}
+    .code-chip{background:#eef2ff;color:#3730a3}
+    .status-chip.active{background:#dcfce7;color:#166534}
+    .status-chip.inactive{background:#fee2e2;color:#991b1b}
+    .risk-chip.low{background:#dcfce7;color:#166534}
+    .risk-chip.medium{background:#fef3c7;color:#92400e}
+    .risk-chip.high{background:#fee2e2;color:#991b1b}
+    .risk-chip.unknown{background:#f1f5f9;color:#475569}
     @media(max-width:1000px){
       .profile-grid,.admin-form,.admin-tools-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
       .summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -65,6 +84,8 @@
       .profile-grid,.admin-form,.summary-grid,.admin-tools-grid,.column-guide,.result-stats{grid-template-columns:1fr}
       .profile-field.wide{grid-column:auto}
       .page-heading{align-items:flex-start;flex-direction:column}
+      .directory-toolbar{align-items:stretch;flex-direction:column}
+      .directory-stat{flex:1}
     }
   </style>
 </head>
@@ -118,8 +139,22 @@
       <div id="pageMessage" class="message"></div>
 
       <div id="directoryView">
+        <div id="directoryToolbar" class="directory-toolbar">
+          <div class="directory-tabs" role="tablist" aria-label="Merchant directory tools">
+            <button class="directory-tab active" type="button" data-directory-mode="list">Merchant List</button>
+            <button id="createMerchantTab" class="directory-tab" type="button" data-directory-mode="create" hidden>Create Merchant</button>
+            <button id="importMerchantTab" class="directory-tab" type="button" data-directory-mode="import" hidden>Import</button>
+            <button id="mccProfileTab" class="directory-tab" type="button" data-directory-mode="mcc" hidden>MCC Profiles</button>
+          </div>
+          <div class="directory-stats" aria-label="Merchant summary">
+            <div class="directory-stat"><span>Total</span><strong id="directoryTotalMerchants">0</strong></div>
+            <div class="directory-stat"><span>Active</span><strong id="directoryActiveMerchants">0</strong></div>
+            <div class="directory-stat"><span>High risk</span><strong id="directoryHighRiskMerchants">0</strong></div>
+          </div>
+        </div>
+
         <div id="merchantAdminTools" class="admin-tools-grid" hidden>
-          <section class="card">
+          <section id="createMerchantPanel" class="card directory-panel" hidden>
             <div class="card-header"><h3>Create Merchant</h3></div>
             <div class="card-body">
               <p class="helper-text">Manual creation requires the same core fields as bulk upload. Overnight operating hours are not supported in this workflow.</p>
@@ -139,7 +174,7 @@
             </div>
           </section>
 
-          <section class="card">
+          <section id="importMerchantPanel" class="card directory-panel" hidden>
             <div class="card-header"><h3>Import Merchants</h3></div>
             <div class="card-body">
               <p class="helper-text">Upload an XLSX, XLS, CSV, TSV, or TXT file with the required merchant columns. The first worksheet and first row of headings will be used.</p>
@@ -157,7 +192,7 @@
                 <div class="guide-item"><code>merchant_id *</code><span>Unique merchant reference</span></div>
                 <div class="guide-item"><code>merchant_name *</code><span>Merchant name cannot be blank</span></div>
                 <div class="guide-item"><code>business_category *</code><span>Supported business label</span></div>
-                <div class="guide-item"><code>mcc_code *</code><span>Must exist in the active MCC catalog</span></div>
+                <div class="guide-item"><code>mcc_code *</code><span>Must exist in the active MCC risk profiles</span></div>
                 <div class="guide-item"><code>merchant_max_transaction_amount</code><span>Optional configured maximum transaction amount</span></div>
                 <div class="guide-item"><code>operating_hours_start *</code><span>HH:MM or HH:MM:SS</span></div>
                 <div class="guide-item"><code>operating_hours_end *</code><span>Must be later than start time</span></div>
@@ -194,7 +229,7 @@
           </div>
         </section>
 
-        <section class="card">
+        <section id="merchantListPanel" class="card directory-panel">
           <div class="card-header">
             <h3>All Merchants</h3>
             <div class="search-wrap"><input id="merchantSearch" class="search-input" style="padding-left:12px" placeholder="Search by name, ID, category or country"></div>
@@ -207,9 +242,10 @@
           </div>
         </section>
 
-        <section class="card" id="mccSection" hidden>
-          <div class="card-header"><h3>MCC Code Catalog</h3></div>
+        <section class="card directory-panel" id="mccSection" hidden>
+          <div class="card-header"><h3>MCC Risk Profiles</h3></div>
           <div class="card-body">
+            <p class="helper-text">These active profiles provide the selectable MCC codes for merchants and the category defaults used by the risk engine.</p>
             <div class="table-wrap">
               <table>
                 <thead><tr><th>MCC Code</th><th>Description</th><th>Active</th><th>Actions</th></tr></thead>
@@ -219,7 +255,7 @@
             <form id="mccForm" style="display:flex;gap:10px;align-items:flex-end;margin-top:14px;flex-wrap:wrap">
               <div class="form-group" style="margin:0"><label for="mccCodeInput">MCC code</label><input id="mccCodeInput" maxlength="20" placeholder="e.g. 5812" required></div>
               <div class="form-group" style="margin:0;flex:1;min-width:200px"><label for="mccDescInput">Description</label><input id="mccDescInput" maxlength="150" placeholder="e.g. Eating Places, Restaurants" required></div>
-              <button class="btn btn-secondary" type="submit">Add MCC code</button>
+              <button class="btn btn-secondary" type="submit">Add MCC profile</button>
             </form>
           </div>
         </section>
@@ -293,17 +329,22 @@ const canEdit=["admin","compliance_manager"].includes(String(user.role).toLowerC
 const pageParams=new URLSearchParams(location.search);
 let currentMerchantId=pageParams.get("id");
 let merchants=[],merchant=null,transactions=[],terminals=[],mccCodes=[],mccLoaded=false;
+let directoryMode="list";
 let pendingMerchantRows=[],pendingMerchantValidation={issues:[],invalidIndexes:new Set(),defaults:[]},merchantImportSourceName="";
 const merchantImportTemplateHeaders=["merchant_id","merchant_name","business_category","mcc_code","merchant_average_amount","merchant_max_transaction_amount","operating_hours_start","operating_hours_end","country","has_physical_location","status"];
 
 sidebarName.textContent=user.name;sidebarRole.textContent=user.role;sidebarAvatar.textContent=user.name.charAt(0).toUpperCase();topbarName.textContent=user.name;topbarRole.textContent=user.role;topbarRole.className=`badge badge-${canEdit?"admin":"user"}`;
-mccSection.hidden=!canEdit;editButton.hidden=!canEdit;terminalForm.hidden=!canEdit;terminalActionsHead.hidden=!canEdit;merchantAdminTools.hidden=!canEdit;
+merchantAdminTools.hidden=!canEdit;createMerchantTab.hidden=!canEdit;importMerchantTab.hidden=!canEdit;mccProfileTab.hidden=!canEdit;editButton.hidden=!canEdit;terminalForm.hidden=!canEdit;terminalActionsHead.hidden=!canEdit;
 
 function display(v,f="-"){return v===null||v===undefined||v===""?f:String(v)}
 function money(v,c="SGD"){return new Intl.NumberFormat("en-SG",{style:"currency",currency:c||"SGD"}).format(Number(v)||0)}
 function dateTime(v){return v?new Date(v).toLocaleString("en-SG"):"-"}
 function setPageMessage(message,type){if(!message){hideMessage("pageMessage");return}showMessage("pageMessage",message,type)}
 function escapeHtml(value){return String(value??"").replace(/[&<>\"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[char]))}
+function normalizeBadgeValue(value){return String(value||"unknown").trim().toLowerCase().replace(/[^a-z0-9]+/g,"_")||"unknown"}
+function badgeHtml(type,value){const normalized=normalizeBadgeValue(value);return `<span class="${type}-chip ${normalized}">${escapeHtml(display(value,type==="risk"?"Unknown":"-"))}</span>`}
+function appendTextCell(row,value){const td=document.createElement("td");td.textContent=display(value);row.append(td);return td}
+function appendHtmlCell(row,html){const td=document.createElement("td");td.innerHTML=html;row.append(td);return td}
 function normalizeFieldName(value){return String(value).trim().toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"")}
 function normalizePreviewValue(value){return value instanceof Date?value.toISOString():value}
 function normalizeMerchantRow(row){return Object.fromEntries(Object.entries(row||{}).map(([key,value])=>[normalizeFieldName(key),value]))}
@@ -328,7 +369,7 @@ function validateMerchantValues(row,{requireId=true}={}){
   if(requireId&&!merchantId)issues.push("merchant_id is required");else if(merchantId.length>50)issues.push("merchant_id exceeds 50 characters");
   if(!merchantName)issues.push("merchant_name is required");else if(merchantName.length>100)issues.push("merchant_name exceeds 100 characters");
   if(!businessCategory)issues.push("business_category is required");
-  if(!mccCode)issues.push("mcc_code is required");else if(supportedMcc.size&&!supportedMcc.has(mccCode))issues.push("mcc_code is not in the active MCC catalog");
+  if(!mccCode)issues.push("mcc_code is required");else if(supportedMcc.size&&!supportedMcc.has(mccCode))issues.push("mcc_code is not in the active MCC risk profiles");
   if(!rawStart)issues.push("operating_hours_start is required");else if(!start)issues.push("operating_hours_start must be in HH:MM or HH:MM:SS format");
   if(!rawEnd)issues.push("operating_hours_end is required");else if(!end)issues.push("operating_hours_end must be in HH:MM or HH:MM:SS format");
   if(start&&end&&start>=end)issues.push("operating_hours_start must be before operating_hours_end");
@@ -373,10 +414,31 @@ async function readMerchantFile(file){
   return XLSX.utils.sheet_to_json(sheet,{defval:"",raw:true});
 }
 
+function setDirectoryMode(mode){
+  const nextMode=canEdit?mode:"list";
+  directoryMode=nextMode;
+  merchantListPanel.hidden=nextMode!=="list";
+  createMerchantPanel.hidden=!canEdit||nextMode!=="create";
+  importMerchantPanel.hidden=!canEdit||nextMode!=="import";
+  mccSection.hidden=!canEdit||nextMode!=="mcc";
+  if(nextMode==="import"){
+    if(pendingMerchantRows.length)merchantImportPreviewCard.hidden=false;
+    if(merchantImportResultStats.innerHTML.trim())merchantImportResultCard.hidden=false;
+  }else{
+    merchantImportPreviewCard.hidden=true;
+    merchantImportResultCard.hidden=true;
+  }
+  document.querySelectorAll("[data-directory-mode]").forEach(button=>{
+    button.classList.toggle("active",button.dataset.directoryMode===nextMode);
+  });
+  if(nextMode==="mcc"&&canEdit&&!mccLoaded)loadMccCatalog().catch(()=>setPageMessage("Network error."));
+}
+
 function setView(view){
   const profile=view==="profile";
   directoryView.hidden=profile;
   profileViewPage.hidden=!profile;
+  directoryToolbar.hidden=profile;
   backToDirectory.hidden=!profile;
   profileToggle.hidden=!currentMerchantId;
   profileToggle.disabled=!currentMerchantId;
@@ -396,6 +458,7 @@ function setView(view){
     pageTitle.textContent="Merchant Directory";
     pageSubtitle.textContent="Select a merchant to view its profile, terminals, and related transactions.";
     profileToggle.textContent=merchant?.merchant_name||"Selected Merchant";
+    setDirectoryMode(directoryMode);
   }
 }
 
@@ -409,7 +472,14 @@ function updateHistoryForMerchant(id){
 
 function addField(label,value,wide=false){const box=document.createElement("div"),dt=document.createElement("dt"),dd=document.createElement("dd");box.className=`profile-field${wide?" wide":""}`;dt.textContent=label;dd.textContent=display(value);box.append(dt,dd);return box}
 
+function updateDirectoryStats(){
+  directoryTotalMerchants.textContent=merchants.length;
+  directoryActiveMerchants.textContent=merchants.filter(m=>String(m.status||"").toLowerCase()==="active").length;
+  directoryHighRiskMerchants.textContent=merchants.filter(m=>String(m.risk_level||"").toLowerCase()==="high").length;
+}
+
 function renderMerchantDirectory(filter=""){
+  updateDirectoryStats();
   merchantBody.replaceChildren();
   const q=filter.trim().toLowerCase();
   const rows=merchants.filter(m=>[m.merchant_id,m.merchant_name,m.business_category,m.country,m.risk_level,m.status].some(v=>String(v??"").toLowerCase().includes(q)));
@@ -420,8 +490,16 @@ function renderMerchantDirectory(filter=""){
   rows.forEach(m=>{
     const tr=document.createElement("tr"),nameCell=document.createElement("td"),link=document.createElement("a");
     link.className="merchant-link";link.href=`/merchants.html?id=${encodeURIComponent(m.merchant_id)}`;link.textContent=m.merchant_name;
-    nameCell.append(link);tr.append(nameCell);
-    [m.merchant_id,m.business_category,m.country,m.risk_level,m.status,m.transaction_count,money(m.total_transaction_amount),dateTime(m.last_transaction_at)].forEach(v=>{const td=document.createElement("td");td.textContent=display(v);tr.append(td)});
+    const mcc=document.createElement("span");mcc.className="merchant-subtext";mcc.textContent=m.mcc_code?`MCC ${m.mcc_code}`:"MCC not set";
+    nameCell.append(link,mcc);tr.append(nameCell);
+    appendTextCell(tr,m.merchant_id);
+    appendTextCell(tr,m.business_category);
+    appendTextCell(tr,m.country);
+    appendHtmlCell(tr,badgeHtml("risk",m.risk_level));
+    appendHtmlCell(tr,badgeHtml("status",m.status));
+    appendTextCell(tr,m.transaction_count);
+    appendTextCell(tr,money(m.total_transaction_amount));
+    appendTextCell(tr,dateTime(m.last_transaction_at));
     merchantBody.append(tr);
   });
 }
@@ -494,7 +572,7 @@ async function loadMccCatalog(){
   const res=await apiFetch("/api/mcc-codes");
   if(!res)return;
   const data=await res.json();
-  if(!res.ok){setPageMessage(data.message||"Unable to load MCC codes.");return;}
+  if(!res.ok){setPageMessage(data.message||"Unable to load MCC risk profiles.");return;}
   mccCodes=data;mccLoaded=true;renderMccCatalog();populateMccOptions();
 }
 
@@ -502,13 +580,15 @@ function renderMccCatalog(){
   mccBody.replaceChildren();
   if(!mccCodes.length){
     const tr=document.createElement("tr"),td=document.createElement("td");
-    td.colSpan=4;td.className="empty-cell";td.textContent="No MCC codes defined.";tr.append(td);mccBody.append(tr);return;
+    td.colSpan=4;td.className="empty-cell";td.textContent="No MCC risk profiles defined.";tr.append(td);mccBody.append(tr);return;
   }
   mccCodes.forEach(m=>{
     const tr=document.createElement("tr");
-    [m.mcc_code,m.description,m.is_active?"Yes":"No"].forEach(v=>{const td=document.createElement("td");td.textContent=display(v);tr.append(td)});
+    appendHtmlCell(tr,`<span class="code-chip">${escapeHtml(m.mcc_code)}</span>`);
+    appendTextCell(tr,m.description);
+    appendHtmlCell(tr,badgeHtml("status",m.is_active?"active":"inactive"));
     const actionTd=document.createElement("td"),btn=document.createElement("button");
-    btn.className="btn btn-secondary";btn.type="button";btn.textContent="Delete";btn.addEventListener("click",()=>deleteMcc(m.mcc_code));actionTd.append(btn);tr.append(actionTd);mccBody.append(tr);
+    btn.className="btn btn-secondary";btn.type="button";btn.textContent="Deactivate";btn.addEventListener("click",()=>deleteMcc(m.mcc_code));actionTd.append(btn);tr.append(actionTd);mccBody.append(tr);
   });
 }
 
@@ -651,11 +731,11 @@ async function deleteTerminal(terminalId){
 }
 
 async function deleteMcc(code){
-  if(!confirm(`Delete MCC code ${code}?`))return;
+  if(!confirm(`Deactivate MCC risk profile ${code}? Merchants will no longer be able to select it for new profiles.`))return;
   const res=await apiFetch(`/api/mcc-codes/${encodeURIComponent(code)}`,{method:"DELETE"});
   if(!res)return;
   const data=await res.json();
-  if(!res.ok){setPageMessage(data.message||"Unable to delete MCC code.");return;}
+  if(!res.ok){setPageMessage(data.message||"Unable to deactivate MCC risk profile.");return;}
   setPageMessage(data.message,"success");loadMccCatalog();
 }
 
@@ -684,6 +764,7 @@ function downloadMerchantTemplate(){
 
 directoryToggle.addEventListener("click",()=>{location.href="/merchants.html";});
 profileToggle.addEventListener("click",()=>{if(currentMerchantId)location.href=`/merchants.html?id=${encodeURIComponent(currentMerchantId)}`;});
+document.querySelectorAll("[data-directory-mode]").forEach(button=>button.addEventListener("click",()=>setDirectoryMode(button.dataset.directoryMode)));
 merchantSearch.addEventListener("input",e=>renderMerchantDirectory(e.target.value));
 transactionSearch.addEventListener("input",e=>renderTransactions(e.target.value));
 editButton.addEventListener("click",()=>setEditing(true));
@@ -727,7 +808,7 @@ if(mccForm)mccForm.addEventListener("submit",async e=>{
     const res=await apiFetch("/api/mcc-codes",{method:"POST",body:JSON.stringify({mcc_code:mccCodeInput.value,description:mccDescInput.value})});
     if(!res)return;
     const data=await res.json();
-    if(!res.ok){setPageMessage(data.message||"Unable to add MCC code.");return;}
+    if(!res.ok){setPageMessage(data.message||"Unable to add MCC risk profile.");return;}
     mccCodeInput.value="";mccDescInput.value="";setPageMessage(data.message,"success");loadMccCatalog();
   }finally{btn.disabled=false}
 });

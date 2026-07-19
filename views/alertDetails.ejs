@@ -214,76 +214,7 @@
 
   </div>
 
-  <!-- Risk breakdown -->
-  <h3 class="mb-3">Risk Score Breakdown</h3>
-
-  <div class="violation-box mb-5">
-
-    <div class="row mb-3">
-      <div class="col-md-3">
-        <div class="label-title">Official Risk Score</div>
-        <h3><%= alert.displayed_risk_score ?? alert.risk_score ?? '-' %></h3>
-      </div>
-      <div class="col-md-3">
-        <div class="label-title">Risk Level</div>
-        <h3><%= alert.risk_level || 'Unclassified' %></h3>
-      </div>
-      <div class="col-md-3">
-        <div class="label-title">Merchant MCC Code</div>
-        <h3><%= alert.mcc_code || 'Not provided' %></h3>
-      </div>
-      <div class="col-md-3">
-        <div class="label-title">MCC Category</div>
-        <h3><%= alert.mcc_category_name || '-' %></h3>
-      </div>
-    </div>
-    <div class="row mb-3">
-      <div class="col-md-3">
-        <div class="label-title">Base Rule Score</div>
-        <h3><%= alert.base_rule_score ?? '-' %></h3>
-      </div>
-      <div class="col-md-3">
-        <div class="label-title">MCC Risk Points</div>
-        <h3><%= alert.mcc_risk_points ?? '-' %></h3>
-      </div>
-      <div class="col-md-3">
-        <div class="label-title">Investigation Priority Score</div>
-        <h3><%= alert.priority_score ?? alert.risk_score ?? '-' %></h3>
-      </div>
-      <div class="col-md-3">
-        <div class="label-title">Priority Multiplier</div>
-        <h3>x<%= alert.priority_multiplier ?? 1 %></h3>
-      </div>
-    </div>
-
-    <h3 class="text-danger">
-      ⚠ Dormant Account Activation
-    </h3>
-
-    <div class="severity-text">
-      Official Risk Score:
-      <%= alert.risk_score ?? '—' %> (<%= alert.risk_level || 'Unclassified' %>)
-    </div>
-
-    <% if (riskBreakdown.length) { %>
-      <ul class="risk-breakdown mt-3">
-        <% riskBreakdown.forEach((item) => { %>
-          <li>
-            <span class="risk-points"><%= item.points || 'Rule' %></span>
-            <div>
-              <div class="risk-rule"><%= item.text %></div>
-              <% if (item.text.toLowerCase().includes('mcc')) { %>
-                <div class="risk-note">This score comes from the merchant MCC category or merchant profile.</div>
-              <% } %>
-            </div>
-          </li>
-        <% }) %>
-      </ul>
-    <% } else { %>
-      <p class="text-muted mt-3 mb-0">No scoring rules were recorded for this alert.</p>
-    <% } %>
-
-  </div>
+  <%- include('partials/riskScoreCalculation', { record: alert }) %>
 
   <!-- Analyst Review -->
   <div class="card-box">

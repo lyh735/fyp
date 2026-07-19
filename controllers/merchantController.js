@@ -149,7 +149,11 @@ function normalizeImportRow(row) {
 async function getActiveMccCode(mccCode) {
   if (!mccCode) return null;
   const rows = await query(
-    "SELECT mcc_code FROM mcc_codes WHERE mcc_code = ? AND is_active = 1 LIMIT 1",
+    `SELECT mcc_code
+     FROM merchant_category_risk
+     WHERE mcc_code = ?
+       AND is_active = 1
+     LIMIT 1`,
     [mccCode]
   );
   return rows[0] || null;

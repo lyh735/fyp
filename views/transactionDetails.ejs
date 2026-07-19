@@ -16,6 +16,8 @@
     .violation-box { border: 1px solid #ffb3b3; background: #fff5f5; border-radius: 10px; padding: 20px; }
     .severity-text { color: #dc3545; font-weight: bold; }
     .badge-status { padding: .65em .9em; font-size: 0.95rem; }
+    .badge-status-failed { background: #f97316; color: #fff; }
+    .badge-status-declined { background: #f97316; color: #fff; }
     .no-alert { color: #475569; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px; }
     .risk-breakdown { list-style: none; padding: 0; margin: 0; }
     .risk-breakdown li { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid #e2e8f0; }
@@ -23,6 +25,54 @@
     .risk-points { min-width: 54px; text-align: center; font-weight: 800; color: #b91c1c; background: #fee2e2; border-radius: 999px; padding: 4px 10px; }
     .risk-rule { font-weight: 600; color: #0f172a; }
     .risk-note { color: #64748b; font-size: 14px; margin-top: 3px; }
+    .score-formula {
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 22px;
+    }
+    .formula-row {
+      display: flex;
+      align-items: stretch;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .formula-box {
+      min-width: 150px;
+      flex: 1;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+    .formula-label {
+      color: #64748b;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+    .formula-value {
+      color: #0f172a;
+      font-size: 26px;
+      font-weight: 800;
+      line-height: 1.1;
+    }
+    .formula-operator {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #64748b;
+      font-size: 24px;
+      font-weight: 800;
+      min-width: 24px;
+    }
+    .formula-note {
+      color: #64748b;
+      font-size: 14px;
+      margin-top: 10px;
+      line-height: 1.5;
+    }
+    .formula-note strong { color: #0f172a; }
   </style>
 </head>
 <body>
@@ -52,8 +102,13 @@
     }).filter((item) => item.text);
   }
 
-  const transactionBreakdown = formatRiskBreakdown(transaction.triggered_rules);
   const alertBreakdown = formatRiskBreakdown(alert && alert.triggered_rules);
+  const transactionStatus = String(transaction.status || '').trim().toLowerCase();
+  let statusBadgeClass = 'bg-success';
+  if (transactionStatus === 'suspicious') statusBadgeClass = 'bg-danger';
+  else if (transactionStatus === 'review') statusBadgeClass = 'bg-warning text-dark';
+  else if (transactionStatus === 'failed') statusBadgeClass = 'badge-status-failed';
+  else if (transactionStatus === 'declined') statusBadgeClass = 'badge-status-declined';
 %>
 <div class="container mt-5">
   <button type="button" class="btn btn-outline-secondary mb-3" onclick="window.history.back()">← Back</button>
@@ -102,7 +157,7 @@
     <div class="row mb-4">
       <div class="col-md-6">
         <div class="label-title">Status</div>
-        <span class="badge badge-status <%= transaction.status === 'suspicious' ? 'bg-danger' : transaction.status === 'review' ? 'bg-warning text-dark' : 'bg-success' %>"><%= transaction.status || '—' %></span>
+        <span class="badge badge-status <%= statusBadgeClass %>"><%= transaction.status || '—' %></span>
       </div>
       <div class="col-md-6">
         <div class="label-title">Transaction Time</div>
@@ -110,62 +165,7 @@
       </div>
     </div>
   </div>
-  <div class="card-box">
-    <h3 class="mb-3">Risk Score Breakdown</h3>
-    <div class="row mb-3">
-      <div class="col-md-3">
-        <div class="label-title">Official Risk Score</div>
-        <h2><%= transaction.displayed_risk_score != null ? transaction.displayed_risk_score : (transaction.risk_score != null ? transaction.risk_score : '-') %></h2>
-      </div>
-      <div class="col-md-3">
-        <div class="label-title">Final Risk Level</div>
-        <h2><%= transaction.risk_level || 'â€”' %></h2>
-      </div>
-      <div class="col-md-3">
-        <div class="label-title">Merchant MCC Code</div>
-        <h4><%= transaction.mcc_code || 'Not provided' %></h4>
-      </div>
-      <div class="col-md-3">
-        <div class="label-title">MCC Category</div>
-        <h4><%= transaction.mcc_category_name || '-' %></h4>
-      </div>
-    </div>
-    <div class="row mb-3">
-      <div class="col-md-3">
-        <div class="label-title">Base Rule Score</div>
-        <h4><%= transaction.base_rule_score != null ? transaction.base_rule_score : '-' %></h4>
-      </div>
-      <div class="col-md-3">
-        <div class="label-title">MCC Risk Points</div>
-        <h4><%= transaction.mcc_risk_points != null ? transaction.mcc_risk_points : '-' %></h4>
-      </div>
-      <div class="col-md-3">
-        <div class="label-title">Investigation Priority Score</div>
-        <h4><%= transaction.priority_score != null ? transaction.priority_score : '-' %></h4>
-      </div>
-      <div class="col-md-3">
-        <div class="label-title">Priority Multiplier</div>
-        <h4>x<%= transaction.priority_multiplier != null ? transaction.priority_multiplier : 1 %></h4>
-      </div>
-    </div>
-    <% if (transactionBreakdown.length) { %>
-      <ul class="risk-breakdown">
-        <% transactionBreakdown.forEach((item) => { %>
-          <li>
-            <span class="risk-points"><%= item.points || 'Rule' %></span>
-            <div>
-              <div class="risk-rule"><%= item.text %></div>
-              <% if (item.text.toLowerCase().includes('mcc')) { %>
-                <div class="risk-note">This score comes from the merchant MCC category or merchant profile.</div>
-              <% } %>
-            </div>
-          </li>
-        <% }) %>
-      </ul>
-    <% } else { %>
-      <p class="text-muted mb-0">No scoring rules were triggered for this transaction.</p>
-    <% } %>
-  </div>
+  <%- include('partials/riskScoreCalculation', { record: transaction }) %>
   <% if (alert) { %>
     <div class="card-box">
       <h3 class="mb-3">Related Alert</h3>
