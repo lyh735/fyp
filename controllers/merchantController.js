@@ -91,6 +91,7 @@ function normalizeMerchant(body, options = {}) {
   const riskScore = body.merchant_risk_score === "" || body.merchant_risk_score == null
     ? 0
     : Number(body.merchant_risk_score);
+  const riskLevel = optionalText(body.risk_level, 20);
   const operatingHoursStart = normalizeTime(body.operating_hours_start, "Operating start time");
   const operatingHoursEnd = normalizeTime(body.operating_hours_end, "Operating end time");
   const country = optionalText(body.country, 50);
@@ -116,6 +117,9 @@ function normalizeMerchant(body, options = {}) {
   if (!Number.isInteger(riskScore) || riskScore < 0 || riskScore > 100) {
     throw new Error("Risk score must be a whole number from 0 to 100");
   }
+  if (riskLevel && !["low", "medium", "high"].includes(riskLevel.toLowerCase())) {
+    throw new Error("Risk level must be Low, Medium, or High");
+  }
 
   return {
     merchant_id: merchantId,
@@ -127,7 +131,9 @@ function normalizeMerchant(body, options = {}) {
     merchant_risk_score: riskScore,
     operating_hours_start: operatingHoursStart,
     operating_hours_end: operatingHoursEnd,
-    risk_level: optionalText(body.risk_level, 20),
+    risk_level: riskLevel
+      ? riskLevel.charAt(0).toUpperCase() + riskLevel.slice(1).toLowerCase()
+      : null,
     country: country || "Singapore",
     has_physical_location: hasPhysicalLocation,
     status,
@@ -149,7 +155,11 @@ function normalizeImportRow(row) {
 async function getActiveMccCode(mccCode) {
   if (!mccCode) return null;
   const rows = await query(
-    "SELECT mcc_code FROM mcc_codes WHERE mcc_code = ? AND is_active = 1 LIMIT 1",
+    `SELECT mcc_code
+     FROM merchant_category_risk
+     WHERE mcc_code = ?
+       AND is_active = 1
+     LIMIT 1`,
     [mccCode]
   );
   return rows[0] || null;

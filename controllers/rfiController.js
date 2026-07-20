@@ -4,10 +4,11 @@ const path = require("path");
 const { uploadDirectory } = require("../middleware/rfiUpload");
 
 const STANDARD_DOCUMENTS = [
-  "Invoice",
-  "Receipt",
-  "Delivery Proof",
-  "Customer Authorisation (if applicable)"
+  "Proof of the transaction, such as a receipt or transaction confirmation",
+  "Customer identification information obtained during customer due diligence",
+  "Source-of-funds information or declaration",
+  "Purpose-of-remittance information or declaration",
+  "Beneficiary details"
 ];
 
 function addBusinessDays(start, days) {
@@ -31,10 +32,18 @@ function displayDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
+    day: "numeric",
+    month: "long",
     year: "numeric",
   }).format(date);
+}
+
+function displayMoney(amount, currency = "SGD") {
+  if (amount === null || amount === undefined || amount === "") return "Not specified";
+  return `${currency || "SGD"} ${Number(amount).toLocaleString("en-SG", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 function isPastDue(value) {
@@ -98,8 +107,11 @@ async function loadRfiPage(alertId) {
 
   return {
     alert: alerts[0], rfi, dueDate,
+    issuedDateDisplay: displayDate(rfi ? rfi.created_at : new Date()),
     dueDateDisplay: displayDate(rfi ? rfi.due_at : dueDate),
     sentDateDisplay: rfi && rfi.sent_at ? displayDate(rfi.sent_at) : "",
+    transactionDateDisplay: displayDate(alerts[0].txn_time),
+    transactionAmountDisplay: displayMoney(alerts[0].amount, alerts[0].currency),
     documents, referenceNo, isOverdue, caseHistory,
   };
 }
@@ -108,7 +120,11 @@ exports.showRfiPage = async (req, res) => {
   try {
     const page = await loadRfiPage(req.params.id);
     if (!page) return res.status(404).send("Alert not found");
-    res.render("rfiRequest", { ...page, standardDocuments: STANDARD_DOCUMENTS, message: req.query.message || "" });
+    res.render("rfiRequest", {
+      ...page,
+      standardDocuments: [...new Set([...STANDARD_DOCUMENTS, ...page.documents])],
+      message: req.query.message || "",
+    });
   } catch (err) {
     console.error("Error loading RFI:", err);
     res.status(500).send("Error loading RFI");
@@ -117,13 +133,16 @@ exports.showRfiPage = async (req, res) => {
 
 exports.getAnalystRfiHistory = async (req, res) => {
   try {
+    const isStro = String(req.user?.role || "").trim().toLowerCase() === "stro";
+    const ownershipClause = isStro ? "" : "WHERE r.requested_by = ?";
+    const values = isStro ? [] : [req.user.id];
     const rows = await query(`
       SELECT r.rfi_id, r.alert_id, r.reference_no, r.requested_documents,
              r.additional_remarks, r.status, r.created_at, r.updated_at,
              r.sent_at, r.due_at, r.responded_at, r.is_sent,
              r.response_attachment,
              a.transaction_id, a.risk_level, a.priority,
-             m.merchant_id, m.merchant_name,
+             m.merchant_id, m.merchant_name, u.name AS analyst_name,
              CASE
                WHEN r.status = 'Pending Merchant Response' AND DATE(r.due_at) < CURDATE()
                THEN 1 ELSE 0
@@ -131,9 +150,10 @@ exports.getAnalystRfiHistory = async (req, res) => {
       FROM rfi_requests r
       JOIN alerts a ON a.alert_id = r.alert_id
       LEFT JOIN merchants m ON m.merchant_id = a.merchant_id
-      WHERE r.requested_by = ?
+      LEFT JOIN users u ON u.user_id = r.requested_by
+      ${ownershipClause}
       ORDER BY r.created_at DESC, r.rfi_id DESC
-    `, [req.user.id]);
+    `, values);
 
     res.json(rows.map((row) => ({
       ...row,
@@ -204,7 +224,7 @@ exports.saveRfi = async (req, res) => {
     }
     if (intent === "mark_sent") {
       const rfi = await markRfiAsSent(rfiId);
-      return res.redirect(`/api/officer/alerts/${rfi.alert_id}/rfi?message=${encodeURIComponent("RFI saved and marked as sent. Status is now Pending Merchant Response.")}`);
+      return res.redirect(`/api/officer/alerts/${rfi.alert_id}`);
     }
     res.redirect(`/api/officer/alerts/${alertId}/rfi?message=${encodeURIComponent("Draft saved. Export the PDF, then mark it as sent.")}`);
   } catch (err) {
@@ -253,7 +273,7 @@ async function markRfiAsSent(rfiId) {
 exports.markAsSent = async (req, res) => {
   try {
     const rfi = await markRfiAsSent(req.params.id);
-    res.redirect(`/api/officer/alerts/${rfi.alert_id}/rfi?message=${encodeURIComponent("RFI marked as sent. Status is now Pending Merchant Response.")}`);
+    res.redirect(`/api/officer/alerts/${rfi.alert_id}`);
   } catch (err) {
     console.error("Error marking RFI as sent:", err);
     res.status(err.statusCode || 500).send(err.statusCode ? err.message : "Error marking RFI as sent");
@@ -316,7 +336,7 @@ exports.recordResponse = async (req, res) => {
       fs.unlink(previousPath, () => {});
     }
 
-    res.redirect(`/api/officer/alerts/${rfi.alert_id}/rfi?message=${encodeURIComponent("Merchant response recorded and RFI marked as responded.")}`);
+    res.redirect(`/api/officer/alerts/${rfi.alert_id}`);
   } catch (err) {
     if (!responseSaved) removeUploadedFile(req.file);
     console.error("Error recording RFI response:", err);
@@ -398,23 +418,40 @@ exports.exportPdf = async (req, res) => {
     const rfiId = Number(req.params.id);
     if (!Number.isInteger(rfiId) || rfiId <= 0) return res.status(400).send("Invalid RFI ID");
     const rows = await query(`
-      SELECT r.*, a.transaction_id, m.merchant_name
+      SELECT r.*, a.transaction_id, m.merchant_name,
+             t.amount, t.currency, t.txn_time
       FROM rfi_requests r
       JOIN alerts a ON a.alert_id = r.alert_id
       LEFT JOIN merchants m ON m.merchant_id = a.merchant_id
+      LEFT JOIN transactions t ON t.transaction_id = a.transaction_id
       WHERE r.rfi_id = ? LIMIT 1
     `, [rfiId]);
     if (!rows.length) return res.status(404).send("RFI not found");
     const rfi = rows[0];
     const documents = parseDocuments(rfi.requested_documents);
+    const documentLines = documents.flatMap((document, index) => {
+      const suffix = index === documents.length - 1 ? "." : ";";
+      return wrapText(`${index + 1}. ${document}${suffix}`, 78)
+        .map((line, lineIndex) => lineIndex ? `   ${line}` : line);
+    });
     const lines = [
-      "REQUEST FOR INFORMATION", "", `Reference No: ${rfi.reference_no}`, "", "Dear Merchant,", "",
-      ...wrapText("As part of our routine compliance review, we require additional supporting information relating to the transaction(s) listed below."),
-      "", `Merchant: ${rfi.merchant_name || "Not specified"}`, `Transaction: ${rfi.transaction_id}`,
-      "", `Please provide the following documents by ${displayDate(rfi.due_at)}:`, "",
-      ...documents.map((document) => `[X] ${document}`),
+      "REQUEST FOR INFORMATION", "",
+      `Reference No.: ${rfi.reference_no}`,
+      `Date Issued: ${displayDate(rfi.created_at)}`,
+      `Response Due Date: ${displayDate(rfi.due_at)}`, "",
+      "To:", rfi.merchant_name || "Not specified", "",
+      "From:", "Compliance Team", "Uniweb Pte. Ltd.", "Email: compliance@uniweb.com.sg", "",
+      "Dear Sir/Madam,", "",
+      ...wrapText("As part of our ongoing compliance and customer due diligence procedures, we require additional supporting information relating to the following transaction processed through our payment network."),
+      "", `Transaction Reference: ${rfi.transaction_id}`,
+      `Transaction Date: ${displayDate(rfi.txn_time) || "Not specified"}`,
+      `Transaction Amount: ${displayMoney(rfi.amount, rfi.currency)}`, "",
+      ...wrapText(`Please provide the following available information and supporting documents by ${displayDate(rfi.due_at)}:`), "",
+      ...documentLines,
       ...(rfi.additional_remarks ? ["", "Additional remarks:", ...wrapText(rfi.additional_remarks)] : []),
-      "", "Thank you.", "", "Compliance Team"
+      "", ...wrapText("Please submit the requested information through the merchant portal or email it to compliance@uniweb.com.sg."),
+      "", ...wrapText("Where any requested document is unavailable, please provide an explanation in your response. This request forms part of Uniweb Pte. Ltd.'s standard compliance review procedures. Your prompt cooperation is appreciated."),
+      "", "Yours sincerely,", "Compliance Team", "Uniweb Pte. Ltd."
     ];
     const pdf = createPdf(lines);
     res.setHeader("Content-Type", "application/pdf");

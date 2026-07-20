@@ -293,6 +293,12 @@ async function addUniqueIndexIfNoDuplicates(table, indexName, column) {
 }
 
 async function ensureCurrentSchemaCompatibility() {
+  await query(`
+    UPDATE users
+    SET role = 'admin', updated_at = NOW()
+    WHERE LOWER(TRIM(role)) = 'compliance_manager'
+  `);
+
   await addColumnIfMissing("merchants", "has_physical_location", "TINYINT(1) DEFAULT 1");
   await addColumnIfMissing("merchants", "merchant_max_transaction_amount", "DECIMAL(12,2) NULL");
   await addColumnIfMissing("merchants", "created_by", "INT NULL");
@@ -515,44 +521,34 @@ async function ensureReferenceData() {
   // Prototype category profiles for the FYP transaction-monitoring model.
   // These are operational assumptions, not official regulatory thresholds.
   const rows = [
-    ["4511", "Airlines / travel", null, "HIGH", 15, 20, 2500, 20, 30000, 4, 300],
-    ["4722", "Travel agencies / tourism", null, "HIGH", 15, 20, 2500, 20, 30000, 4, 300],
-    ["4789", "Transportation / travel services", null, "HIGH", 15, 10, 1000, 40, 20000, 6, 300],
-    ["4812", "Financial / telecom payment services", null, "HIGH", 15, 10, 10000, 50, 100000, 5, 300],
-    ["4829", "Money transfer / remittance", null, "HIGH", 15, 10, 10000, 60, 120000, 5, 300],
-    ["5311", "Retail / department stores", null, "MEDIUM", 5, 5, 1500, 80, 50000, 6, 300],
-    ["5411", "Grocery stores", null, "LOW", 0, 2, 300, 150, 25000, 8, 300],
-    ["5541", "Retail / service stations", null, "MEDIUM", 5, 5, 500, 100, 30000, 7, 300],
-    ["5611", "Retail / apparel", null, "MEDIUM", 5, 10, 1000, 60, 30000, 6, 300],
-    ["5621", "Retail / apparel", null, "MEDIUM", 5, 10, 1000, 60, 30000, 6, 300],
-    ["5631", "Retail / accessories", null, "MEDIUM", 5, 10, 1000, 60, 30000, 6, 300],
-    ["5641", "Retail / children clothing", null, "MEDIUM", 5, 10, 1000, 60, 30000, 6, 300],
-    ["5651", "Retail / clothing", null, "MEDIUM", 5, 10, 1000, 60, 30000, 6, 300],
-    ["5661", "Retail / shoes", null, "MEDIUM", 5, 10, 1000, 60, 30000, 6, 300],
-    ["5691", "Retail / clothing", null, "MEDIUM", 5, 10, 1000, 60, 30000, 6, 300],
-    ["5712", "Retail / furniture", null, "MEDIUM", 5, 20, 3000, 30, 60000, 5, 300],
-    ["5732", "Electronics", null, "MEDIUM", 5, 20, 3000, 40, 50000, 5, 300],
-    ["5812", "Restaurants", null, "LOW", 0, 2, 250, 200, 25000, 8, 300],
-    ["5813", "Bars / food and beverage", null, "MEDIUM", 5, 5, 500, 120, 30000, 7, 300],
-    ["5814", "Fast food", null, "LOW", 0, 2, 150, 250, 20000, 10, 300],
-    ["5942", "Retail / bookstores", null, "LOW", 0, 5, 300, 80, 15000, 8, 300],
-    ["5964", "Retail / direct marketing", null, "MEDIUM", 5, 5, 1000, 80, 40000, 6, 300],
-    ["5999", "Miscellaneous retail", null, "MEDIUM", 5, 5, 1000, 80, 40000, 6, 300],
-    ["6012", "Financial institutions", null, "HIGH", 15, 10, 10000, 50, 100000, 5, 300],
-    ["6051", "Money services / money orders", null, "HIGH", 15, 10, 10000, 60, 120000, 5, 300],
-    ["7011", "Hotel / lodging", null, "HIGH", 15, 20, 3000, 30, 50000, 5, 300],
-    ["7512", "Vehicle rental / travel", null, "HIGH", 15, 10, 1000, 40, 20000, 6, 300],
-    ["7995", "Gambling / betting", null, "VERY_HIGH", 20, 5, 5000, 100, 150000, 5, 300],
-    [null, "Food and beverage", "food", "LOW", 0, 2, 250, 200, 25000, 8, 300],
-    [null, "Food and beverage", "restaurant", "LOW", 0, 2, 250, 200, 25000, 8, 300],
-    [null, "Food and beverage", "dining", "LOW", 0, 2, 250, 200, 25000, 8, 300],
-    [null, "Retail", "retail", "MEDIUM", 5, 5, 1500, 80, 50000, 6, 300],
-    [null, "Electronics", "electronic", "MEDIUM", 5, 20, 3000, 40, 50000, 5, 300],
-    [null, "Travel / tourism", "travel", "HIGH", 15, 20, 2500, 20, 30000, 4, 300],
-    [null, "Hotel / lodging", "hotel", "HIGH", 15, 20, 3000, 30, 50000, 5, 300],
-    [null, "Money transfer / remittance", "remittance", "HIGH", 15, 10, 10000, 60, 120000, 5, 300],
-    [null, "Financial services", "financial", "HIGH", 15, 10, 10000, 50, 100000, 5, 300],
-    [null, "Gambling / betting", "gambling", "VERY_HIGH", 20, 5, 5000, 100, 150000, 5, 300],
+    ["4511", "Airlines / travel", "airline", "HIGH", 15, 20, 2500, 20, 30000, 4, 300],
+    ["4722", "Travel agencies / tourism", "tourism", "HIGH", 15, 20, 2500, 20, 30000, 4, 300],
+    ["4789", "Transportation / travel services", "transport", "HIGH", 15, 10, 1000, 40, 20000, 6, 300],
+    ["4812", "Financial / telecom payment services", "telecom_payment", "HIGH", 15, 10, 10000, 50, 100000, 5, 300],
+    ["4829", "Money transfer / remittance", "money_transfer", "HIGH", 15, 10, 10000, 60, 120000, 5, 300],
+    ["5311", "Retail / department stores", "department_store", "MEDIUM", 5, 5, 1500, 80, 50000, 6, 300],
+    ["5411", "Grocery stores", "grocery", "LOW", 0, 2, 300, 150, 25000, 8, 300],
+    ["5541", "Retail / service stations", "service_station", "MEDIUM", 5, 5, 500, 100, 30000, 7, 300],
+    ["5611", "Retail / apparel", "mens_apparel", "MEDIUM", 5, 10, 1000, 60, 30000, 6, 300],
+    ["5621", "Retail / apparel", "womens_apparel", "MEDIUM", 5, 10, 1000, 60, 30000, 6, 300],
+    ["5631", "Retail / accessories", "accessories", "MEDIUM", 5, 10, 1000, 60, 30000, 6, 300],
+    ["5641", "Retail / children clothing", "children_clothing", "MEDIUM", 5, 10, 1000, 60, 30000, 6, 300],
+    ["5651", "Retail / clothing", "family_clothing", "MEDIUM", 5, 10, 1000, 60, 30000, 6, 300],
+    ["5661", "Retail / shoes", "shoes", "MEDIUM", 5, 10, 1000, 60, 30000, 6, 300],
+    ["5691", "Retail / clothing", "clothing", "MEDIUM", 5, 10, 1000, 60, 30000, 6, 300],
+    ["5712", "Retail / furniture", "furniture", "MEDIUM", 5, 20, 3000, 30, 60000, 5, 300],
+    ["5732", "Electronics", "electronics", "MEDIUM", 5, 20, 3000, 40, 50000, 5, 300],
+    ["5812", "Restaurants", "restaurants", "LOW", 0, 2, 250, 200, 25000, 8, 300],
+    ["5813", "Bars / food and beverage", "bars", "MEDIUM", 5, 5, 500, 120, 30000, 7, 300],
+    ["5814", "Fast food", "fast_food", "LOW", 0, 2, 150, 250, 20000, 10, 300],
+    ["5942", "Retail / bookstores", "bookstore", "LOW", 0, 5, 300, 80, 15000, 8, 300],
+    ["5964", "Retail / direct marketing", "direct_marketing", "MEDIUM", 5, 5, 1000, 80, 40000, 6, 300],
+    ["5999", "Miscellaneous retail", "misc_retail", "MEDIUM", 5, 5, 1000, 80, 40000, 6, 300],
+    ["6012", "Financial institutions", "financial_institution", "HIGH", 15, 10, 10000, 50, 100000, 5, 300],
+    ["6051", "Money services / money orders", "money_services", "HIGH", 15, 10, 10000, 60, 120000, 5, 300],
+    ["7011", "Hotel / lodging", "lodging", "HIGH", 15, 20, 3000, 30, 50000, 5, 300],
+    ["7512", "Vehicle rental / travel", "vehicle_rental", "HIGH", 15, 10, 1000, 40, 20000, 6, 300],
+    ["7995", "Gambling / betting", "betting", "VERY_HIGH", 20, 5, 5000, 100, 150000, 5, 300],
   ];
 
   for (const [

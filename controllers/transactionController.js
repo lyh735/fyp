@@ -1054,6 +1054,7 @@ exports.uploadTransactions = async (req, res) => {
       const processed = await processTransaction(payload, req, {
         requirePaymentMethod: true,
         requireTerminalForFaceToFace: true,
+        requireIpForOnline: true,
         allowedSourceTypes: ["excel_upload", "manual"],
       });
       if (!processed.validation.isValid) {

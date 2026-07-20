@@ -17,22 +17,27 @@ const {
   dismissAlert,
   escalateAlert,
 } = require("../controllers/transactionController");
-const { authenticate, requireAdmin, requireAlertOfficer, requireSystemAdmin } = require("../middleware/authMiddleware");
+const { authenticate, authorizeRoles } = require("../middleware/authMiddleware");
 
-router.post("/transactions",       authenticate, requireSystemAdmin, createTransaction);
-router.post("/transactions/upload", authenticate, requireSystemAdmin, uploadTransactions);
-router.get ("/transactions",       authenticate, getTransactions);
-router.get ("/alerts",             authenticate, getAlerts);
-router.get ("/alerts/:id",         authenticate, getAlert);
-router.get ("/rules",              authenticate, getComplianceRules);
-router.post("/rules",              authenticate, requireAdmin, createComplianceRule);
-router.put ("/rules/:id",          authenticate, requireAdmin, updateComplianceRule);
-router.delete("/rules/:id",        authenticate, requireAdmin, deleteComplianceRule);
-router.get ("/mcc-risk",           authenticate, getMccRiskProfiles);
-router.put ("/mcc-risk/:id",       authenticate, requireAdmin, updateMccRiskProfile);
-router.post("/alerts/:id/read",    authenticate, markAlertRead);
-router.post("/alerts/:id/dismiss", authenticate, requireAlertOfficer, dismissAlert);
-router.post("/alerts/:id/escalate",authenticate, requireAlertOfficer, escalateAlert);
-router.post("/simulate",           authenticate, requireAdmin, simulate);
+const allowAllRoles = authorizeRoles("admin", "analyst", "stro");
+const allowAdmin = authorizeRoles("admin");
+const allowAnalyst = authorizeRoles("analyst");
+const allowAnalystOrStro = authorizeRoles("analyst", "stro");
+
+router.post("/transactions",        authenticate, allowAdmin, createTransaction);
+router.post("/transactions/upload", authenticate, allowAdmin, uploadTransactions);
+router.get ("/transactions",        authenticate, allowAllRoles, getTransactions);
+router.get ("/alerts",              authenticate, allowAllRoles, getAlerts);
+router.get ("/alerts/:id",          authenticate, allowAllRoles, getAlert);
+router.get ("/rules",               authenticate, allowAllRoles, getComplianceRules);
+router.post("/rules",               authenticate, allowAdmin, createComplianceRule);
+router.put ("/rules/:id",           authenticate, allowAdmin, updateComplianceRule);
+router.delete("/rules/:id",         authenticate, allowAdmin, deleteComplianceRule);
+router.get ("/mcc-risk",            authenticate, allowAllRoles, getMccRiskProfiles);
+router.put ("/mcc-risk/:id",        authenticate, allowAdmin, updateMccRiskProfile);
+router.post("/alerts/:id/read",     authenticate, allowAnalyst, markAlertRead);
+router.post("/alerts/:id/dismiss",  authenticate, allowAnalystOrStro, dismissAlert);
+router.post("/alerts/:id/escalate", authenticate, allowAnalyst, escalateAlert);
+router.post("/simulate",            authenticate, allowAdmin, simulate);
 
 module.exports = router;

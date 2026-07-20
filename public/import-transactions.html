@@ -170,7 +170,7 @@
           </div>
           <div class="template-actions">
             <button type="button" class="btn btn-secondary" onclick="downloadImportTemplate()">Download template</button>
-            <span class="template-note">Template includes required and conditionally required headers only.</span>
+            <span class="template-note">Downloads an Excel workbook with all supported columns, field instructions, and the current merchant list.</span>
           </div>
           <div id="fileMeta" class="file-meta"></div>
         </section>
@@ -204,15 +204,19 @@
           <div class="guide-item"><code>transaction_type *</code><span><code>online</code> or <code>face_to_face</code></span></div>
           <div class="guide-item"><code>payment_method *</code><span>Visa, Mastercard, Alipay, WeChat Pay, GrabPay, ShopeePay, PayNow, or SGQR</span></div>
           <div class="guide-item"><code>txn_time *</code><span>Valid date and time</span></div>
-          <div class="guide-item"><code>source_type *</code><span>Assigned automatically as <code>manual</code> or <code>excel_upload</code></span></div>
           <div class="guide-item"><code>terminal_id</code><span>Required when <code>transaction_type</code> is <code>face_to_face</code></span></div>
           <div class="guide-item"><code>ip_address</code><span>Required when <code>transaction_type</code> is <code>online</code></span></div>
-          <div class="guide-item"><code>masked_payment_ref</code><span>Masked payment reference</span></div>
+          <div class="guide-item"><code>country</code><span>Defaults to Singapore if omitted</span></div>
+          <div class="guide-item"><code>transaction_status</code><span>Optional; defaults to <code>success</code></span></div>
+          <div class="guide-item"><code>customer_risk_profile</code><span>Optional: <code>low</code>, <code>medium</code>, or <code>high</code>; defaults to <code>low</code></span></div>
+          <div class="guide-item"><code>masked_payment_ref</code><span>Generated safely if omitted</span></div>
           <div class="guide-item"><code>payment_gateway_ref</code><span>Generated safely if omitted</span></div>
           <div class="guide-item"><code>card_bin</code><span>Optional card metadata</span></div>
           <div class="guide-item"><code>masked_card_number</code><span>Optional masked PAN</span></div>
           <div class="guide-item"><code>card_presence</code><span>Optional card-present indicator</span></div>
-          <div class="guide-item"><code>country</code><span>Defaults to Singapore if omitted</span></div>
+          <div class="guide-item"><code>ip_country</code><span>Optional country derived from IP verification</span></div>
+          <div class="guide-item"><code>ip_country_verified</code><span>Optional Yes/No or 1/0 verification indicator</span></div>
+          <div class="guide-item"><code>source_type</code><span>Assigned automatically as <code>manual</code> or <code>excel_upload</code>; do not add it to the file</span></div>
         </div>
       </section>
 
@@ -253,7 +257,7 @@ document.getElementById("topbarName").textContent = user.name;
 const roleElement = document.getElementById("topbarRole");
 roleElement.textContent = user.role;
 roleElement.className = `badge badge-${user.role}`;
-if (["admin", "compliance_manager"].includes(user.role)) document.getElementById("adminNav").style.display = "block";
+if (user.role === "admin") document.getElementById("adminNav").style.display = "block";
 
 let pendingRows = [];
 let pendingValidation = { issues: [], invalidIndexes: new Set(), defaults: [] };
@@ -263,6 +267,36 @@ let merchantOptions = [];
 const fileInput = document.getElementById("fileInput");
 const dropZone = document.getElementById("dropZone");
 const merchantOptionsList = document.getElementById("merchantOptions");
+const transactionImportTemplateHeaders = [
+  "transaction_id", "merchant_id", "amount", "currency", "transaction_type",
+  "payment_method", "txn_time", "terminal_id", "ip_address", "country",
+  "transaction_status", "customer_risk_profile", "masked_payment_ref",
+  "payment_gateway_ref", "card_bin", "masked_card_number", "card_presence",
+  "ip_country", "ip_country_verified",
+];
+const transactionImportTemplateInstructions = [
+  ["Field", "Required", "Format / allowed values", "Notes"],
+  ["transaction_id", "Yes", "Text, maximum 50 characters", "Must be unique and must not already exist."],
+  ["merchant_id", "Yes", "Existing merchant ID", "Use an ID listed on the Merchants worksheet."],
+  ["amount", "Yes", "Number greater than 0", "Transaction amount."],
+  ["currency", "Yes", "Three-letter code", "For example: SGD, USD, or MYR."],
+  ["transaction_type", "Yes", "online or face_to_face", "Controls whether IP address or terminal ID is required."],
+  ["payment_method", "Yes", "Visa, Mastercard, Alipay, WeChat Pay, GrabPay, ShopeePay, PayNow, or SGQR", "Must match one of the supported values exactly."],
+  ["txn_time", "Yes", "Valid date and time", "Excel date/time values and ISO-style timestamps are accepted."],
+  ["terminal_id", "Conditional", "Existing terminal ID", "Required for face_to_face transactions."],
+  ["ip_address", "Conditional", "IPv4 or IPv6 text", "Required for online transactions; invalid values may trigger a monitoring rule."],
+  ["country", "No", "Country name", "Defaults to Singapore when blank."],
+  ["transaction_status", "No", "success, completed, cancelled, canceled, failed, declined, or voided", "Defaults to success when blank."],
+  ["customer_risk_profile", "No", "low, medium, or high", "Defaults to low when blank."],
+  ["masked_payment_ref", "No", "Masked reference", "Generated automatically when blank."],
+  ["payment_gateway_ref", "No", "Gateway reference", "Generated automatically when blank."],
+  ["card_bin", "No", "Card BIN metadata", "Optional card metadata."],
+  ["masked_card_number", "No", "Masked PAN", "Do not provide a full unmasked card number."],
+  ["card_presence", "No", "Card-presence indicator", "Optional source-system value."],
+  ["ip_country", "No", "Country name", "Country obtained from a verified IP lookup."],
+  ["ip_country_verified", "No", "Yes/No or 1/0", "Set only when ip_country came from a verified lookup."],
+  ["source_type", "System assigned", "manual or excel_upload", "Do not add this column; the system assigns it from the selected workflow."],
+];
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (character) => ({
@@ -393,28 +427,31 @@ function syncMerchantField(input, normalizeDisplay = false) {
   if (matchedMerchant) input.value = merchantOptionLabel(matchedMerchant);
 }
 
-function downloadImportTemplate() {
-  const headers = [
-    "transaction_id",
-    "merchant_id",
-    "amount",
-    "currency",
-    "transaction_type",
-    "payment_method",
-    "txn_time",
-    "terminal_id",
-    "ip_address",
-  ];
-  const content = `${headers.join(",")}\n`;
-  const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "transaction-import-template.csv";
-  document.body.append(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+async function downloadImportTemplate() {
+  if (typeof XLSX === "undefined") {
+    showPageMessage("The Excel template generator is unavailable right now.");
+    return;
+  }
+  if (!merchantOptions.length) await loadMerchantOptions();
+
+  const workbook = XLSX.utils.book_new();
+  const transactionSheet = XLSX.utils.aoa_to_sheet([transactionImportTemplateHeaders]);
+  transactionSheet["!cols"] = transactionImportTemplateHeaders.map((header) => ({ wch: Math.max(16, header.length + 2) }));
+  transactionSheet["!autofilter"] = { ref: `A1:${XLSX.utils.encode_col(transactionImportTemplateHeaders.length - 1)}1` };
+  XLSX.utils.book_append_sheet(workbook, transactionSheet, "Transactions");
+
+  const instructionSheet = XLSX.utils.aoa_to_sheet(transactionImportTemplateInstructions);
+  instructionSheet["!cols"] = [{ wch: 30 }, { wch: 16 }, { wch: 68 }, { wch: 76 }];
+  instructionSheet["!autofilter"] = { ref: `A1:D${transactionImportTemplateInstructions.length}` };
+  XLSX.utils.book_append_sheet(workbook, instructionSheet, "Instructions");
+
+  const merchantRows = [["merchant_id", "merchant_name"], ...merchantOptions.map((merchant) => [merchant.merchant_id, merchant.merchant_name])];
+  const merchantSheet = XLSX.utils.aoa_to_sheet(merchantRows);
+  merchantSheet["!cols"] = [{ wch: 28 }, { wch: 48 }];
+  merchantSheet["!autofilter"] = { ref: `A1:B${Math.max(1, merchantRows.length)}` };
+  XLSX.utils.book_append_sheet(workbook, merchantSheet, "Merchants");
+
+  XLSX.writeFile(workbook, "transaction-import-template.xlsx");
 }
 
 function validateImportRows(rows) {
@@ -462,6 +499,9 @@ function validateImportRows(rows) {
     const timestamp = row.txn_time ?? row.timestamp ?? row.transaction_time;
     const terminalId = String(row.terminal_id ?? "").trim();
     const ipAddress = String(row.ip_address ?? "").trim();
+    const transactionStatus = String(row.transaction_status ?? row.status ?? "").trim().toLowerCase();
+    const customerRiskProfile = String(row.customer_risk_profile ?? "").trim().toLowerCase();
+    const ipCountryVerified = String(row.ip_country_verified ?? "").trim().toLowerCase();
 
     if (!transactionId) rowIssues.push("transaction_id is required");
     else if (transactionId.length > 50) rowIssues.push("transaction_id exceeds 50 characters");
@@ -481,6 +521,9 @@ function validateImportRows(rows) {
     if (!timestamp || Number.isNaN(new Date(timestamp).getTime())) rowIssues.push("txn_time must be a valid date and time");
     if (transactionType === "face_to_face" && !terminalId) rowIssues.push("terminal_id is required for face_to_face transactions");
     if (transactionType === "online" && !ipAddress) rowIssues.push("ip_address is required for online transactions");
+    if (transactionStatus && !["success", "completed", "cancelled", "canceled", "failed", "declined", "voided"].includes(transactionStatus)) rowIssues.push("transaction_status is not supported");
+    if (customerRiskProfile && !["low", "medium", "high"].includes(customerRiskProfile)) rowIssues.push("customer_risk_profile must be low, medium, or high");
+    if (ipCountryVerified && !["1", "0", "yes", "no", "y", "n", "true", "false"].includes(ipCountryVerified)) rowIssues.push("ip_country_verified must be Yes/No or 1/0");
 
     if (rowIssues.length) {
       invalidIndexes.add(index);
@@ -503,7 +546,7 @@ function prepareRows(rows, name, sourceType) {
 }
 
 function renderPreview() {
-  const headers = [...new Set(pendingRows.slice(0, 10).flatMap((row) => Object.keys(row)))].slice(0, 8);
+  const headers = [...new Set(pendingRows.slice(0, 10).flatMap((row) => Object.keys(row)))].slice(0, transactionImportTemplateHeaders.length);
   document.getElementById("previewHead").innerHTML = `<tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr>`;
   document.getElementById("previewBody").innerHTML = pendingRows.slice(0, 10).map((row, index) =>
     `<tr class="${pendingValidation.invalidIndexes.has(index) ? "invalid-preview-row" : ""}">${headers.map((header) => `<td>${escapeHtml(normalizePreviewValue(row[header]))}</td>`).join("")}</tr>`

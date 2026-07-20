@@ -67,13 +67,20 @@
 
         <% } %>
 
-        <div class="mt-5">
+        <div class="mt-5 d-flex justify-content-center gap-3 flex-wrap">
 
           <a
-            href="/api/officer/alerts"
+            href="/api/officer/alerts/<%= alertId %>"
             class="btn btn-primary btn-lg"
           >
-            Back to Alerts
+            View Alert Details
+          </a>
+
+          <a
+            href="/dashboard.html"
+            class="btn btn-outline-secondary btn-lg"
+          >
+            Back to Dashboard
           </a>
 
         </div>

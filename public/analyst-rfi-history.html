@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>My RFI History - Compliance Monitoring System</title>
+  <title>RFI History - Compliance Monitoring System</title>
   <link rel="stylesheet" href="/css/style.css" />
   <style>
     .history-toolbar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
@@ -30,10 +30,10 @@
       <div class="brand-text"><div class="brand-name">Compliance Monitor</div><div class="brand-sub">Transaction Surveillance</div></div>
     </div>
     <nav class="sidebar-nav">
-      <div class="nav-section-label">Analyst</div>
+      <div class="nav-section-label" id="roleSectionLabel">Analyst</div>
       <div class="nav-item" onclick="location.href='/dashboard.html'">Overview</div>
       <div class="nav-item" onclick="location.href='/alerts.html'">Alerts</div>
-      <div class="nav-item active" onclick="location.href='/analyst-rfi-history.html'">My RFI History</div>
+      <div class="nav-item active" id="rfiHistoryNav" onclick="location.href='/analyst-rfi-history.html'">My RFI History</div>
       <div class="nav-section-label">Account</div>
       <div class="nav-item" onclick="location.href='/account.html'">My Account</div>
     </nav>
@@ -45,7 +45,7 @@
 
   <div class="main-content">
     <div class="topbar">
-      <h2>My RFI History</h2>
+      <h2 id="pageTitle">My RFI History</h2>
       <div class="topbar-right"><div class="topbar-user"><span id="topbarRole" class="badge"></span><span class="user-name" id="topbarName">-</span></div></div>
     </div>
     <main class="content-area">
@@ -75,7 +75,7 @@
         <div id="historyMessage" class="message" style="margin:16px 22px 0"></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Reference</th><th>Merchant / Transaction</th><th>Requested Documents</th><th>Status</th><th>Dates</th><th>Analyst Reminder</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Reference</th><th>Merchant / Transaction</th><th>Requested By</th><th>Requested Documents</th><th>Status</th><th>Dates</th><th>Actions</th></tr></thead>
             <tbody id="historyBody"><tr><td colspan="7"><div class="empty-state"><p>Loading RFI history...</p></div></td></tr></tbody>
           </table>
         </div>
@@ -89,9 +89,18 @@
   const user = requireAuth();
   if (!user) throw new Error('Authentication required');
   if (user.first_login) window.location.href = '/change-password.html';
-  if (String(user.role).toLowerCase() !== 'analyst') {
+  const currentRole = String(user.role).trim().toLowerCase();
+  const isStro = currentRole === 'stro';
+  if (!['analyst', 'stro'].includes(currentRole)) {
     window.location.href = '/dashboard.html';
-    throw new Error('Analyst access required');
+    throw new Error('Analyst or STRO access required');
+  }
+
+  if (isStro) {
+    document.title = 'RFI History - Compliance Monitoring System';
+    document.getElementById('roleSectionLabel').textContent = 'STRO Review';
+    document.getElementById('rfiHistoryNav').textContent = 'RFI History';
+    document.getElementById('pageTitle').textContent = 'RFI History';
   }
 
   document.getElementById('sidebarName').textContent = user.name;
@@ -126,7 +135,7 @@
     const query = document.getElementById('historySearch').value.trim().toLowerCase();
     const filter = document.getElementById('statusFilter').value;
     const rows = historyRows.filter(row => {
-      const searchable = `${row.reference_no} ${row.merchant_name} ${row.merchant_id} ${row.transaction_id}`.toLowerCase();
+      const searchable = `${row.reference_no} ${row.merchant_name} ${row.merchant_id} ${row.transaction_id} ${row.analyst_name}`.toLowerCase();
       const statusMatches = filter === 'all' || (filter === 'overdue' ? row.is_overdue : row.status === filter);
       return searchable.includes(query) && statusMatches;
     });
@@ -135,16 +144,27 @@
       body.innerHTML = '<tr><td colspan="7"><div class="empty-state"><p>No matching RFIs found.</p></div></td></tr>';
       return;
     }
-    body.innerHTML = rows.map(row => `
-      <tr class="${row.is_overdue ? 'overdue-row' : ''}">
-        <td><div class="rfi-ref">${escapeHtml(row.reference_no)}</div><div class="subtext">Alert #${Number(row.alert_id)}</div></td>
-        <td><strong>${escapeHtml(row.merchant_name || row.merchant_id || '-')}</strong><div class="subtext">${escapeHtml(row.transaction_id)}</div></td>
-        <td><div class="doc-list">${row.requested_documents.map(escapeHtml).join('<br>') || '-'}</div></td>
-        <td><span class="pill ${statusClass(row)}">${row.is_overdue ? 'Overdue' : escapeHtml(row.status)}</span></td>
-        <td><div>Created: ${escapeHtml(formatDate(row.created_at))}</div><div class="subtext">Sent: ${escapeHtml(formatDate(row.sent_at))}</div><div class="subtext">Due: ${escapeHtml(formatDate(row.due_at))}</div>${row.responded_at ? `<div class="subtext">Responded: ${escapeHtml(formatDate(row.responded_at))}</div>` : ''}</td>
-        <td><strong>${Number(row.is_sent) ? 'Completed' : 'Pending'}</strong><div class="subtext">${Number(row.is_sent) ? 'RFI marked as sent' : 'RFI must be sent'}</div></td>
-        <td><div class="history-actions"><a class="btn btn-primary small-btn" href="/api/officer/alerts/${Number(row.alert_id)}/rfi">View</a><a class="btn btn-secondary small-btn" href="/api/officer/rfi/${Number(row.rfi_id)}/pdf">PDF</a></div></td>
-      </tr>`).join('');
+    body.innerHTML = rows.map(row => {
+      const pdfPath = isStro
+        ? `/api/stro/rfi/${Number(row.rfi_id)}/pdf`
+        : `/api/officer/rfi/${Number(row.rfi_id)}/pdf`;
+      const viewAction = isStro
+        ? ''
+        : `<a class="btn btn-primary small-btn" href="/api/officer/alerts/${Number(row.alert_id)}/rfi">View</a>`;
+      const responseAction = isStro && row.response_attachment
+        ? `<a class="btn btn-secondary small-btn" href="/api/stro/rfi/${Number(row.rfi_id)}/response-file">Response</a>`
+        : '';
+      return `
+        <tr class="${row.is_overdue ? 'overdue-row' : ''}">
+          <td><div class="rfi-ref">${escapeHtml(row.reference_no)}</div><div class="subtext">Alert #${Number(row.alert_id)}</div></td>
+          <td><strong>${escapeHtml(row.merchant_name || row.merchant_id || '-')}</strong><div class="subtext">${escapeHtml(row.transaction_id)}</div></td>
+          <td>${escapeHtml(row.analyst_name || '-')}</td>
+          <td><div class="doc-list">${row.requested_documents.map(escapeHtml).join('<br>') || '-'}</div></td>
+          <td><span class="pill ${statusClass(row)}">${row.is_overdue ? 'Overdue' : escapeHtml(row.status)}</span></td>
+          <td><div>Created: ${escapeHtml(formatDate(row.created_at))}</div><div class="subtext">Sent: ${escapeHtml(formatDate(row.sent_at))}</div><div class="subtext">Due: ${escapeHtml(formatDate(row.due_at))}</div>${row.responded_at ? `<div class="subtext">Responded: ${escapeHtml(formatDate(row.responded_at))}</div>` : ''}</td>
+          <td><div class="history-actions">${viewAction}<a class="btn btn-secondary small-btn" href="${pdfPath}">PDF</a>${responseAction}</div></td>
+        </tr>`;
+    }).join('');
   }
 
   async function loadHistory() {

@@ -10,15 +10,18 @@ const {
   createTerminal,
   deleteTerminal,
 } = require("../controllers/merchantController");
-const { authenticate, requireAdmin } = require("../middleware/authMiddleware");
+const { authenticate, authorizeRoles } = require("../middleware/authMiddleware");
 
-router.get("/", authenticate, getMerchants);
-router.post("/", authenticate, requireAdmin, createMerchant);
-router.post("/upload", authenticate, requireAdmin, uploadMerchants);
-router.get("/:id", authenticate, getMerchantProfile);
-router.put("/:id", authenticate, requireAdmin, updateMerchantProfile);
-router.get("/:id/terminals", authenticate, getMerchantTerminals);
-router.post("/:id/terminals", authenticate, requireAdmin, createTerminal);
-router.delete("/:id/terminals/:terminalId", authenticate, requireAdmin, deleteTerminal);
+const allowAdmin = authorizeRoles("admin");
+const allowMerchantRead = authorizeRoles("admin", "analyst", "stro");
+
+router.get("/", authenticate, allowMerchantRead, getMerchants);
+router.post("/", authenticate, allowAdmin, createMerchant);
+router.post("/upload", authenticate, allowAdmin, uploadMerchants);
+router.get("/:id", authenticate, allowMerchantRead, getMerchantProfile);
+router.put("/:id", authenticate, allowAdmin, updateMerchantProfile);
+router.get("/:id/terminals", authenticate, allowMerchantRead, getMerchantTerminals);
+router.post("/:id/terminals", authenticate, allowAdmin, createTerminal);
+router.delete("/:id/terminals/:terminalId", authenticate, allowAdmin, deleteTerminal);
 
 module.exports = router;

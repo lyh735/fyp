@@ -1,0 +1,409 @@
+<style>
+  .risk-calc {
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    border-radius: 12px;
+    padding: 22px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+  }
+  .risk-calc h3 {
+    margin: 0 0 16px;
+    color: #0f172a;
+    font-weight: 800;
+  }
+  .risk-formula-grid {
+    display: grid;
+    grid-template-columns: minmax(140px, 1fr) 28px minmax(140px, 1fr) 28px minmax(140px, 1fr);
+    align-items: stretch;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .risk-formula-grid.priority {
+    grid-template-columns: minmax(140px, 1fr) 28px minmax(140px, 1fr) 28px minmax(140px, 1fr);
+    margin-top: 10px;
+  }
+  .risk-metric {
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    border-radius: 10px;
+    padding: 13px 14px;
+  }
+  .risk-metric span {
+    display: block;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+    margin-bottom: 4px;
+  }
+  .risk-metric strong {
+    display: block;
+    color: #0f172a;
+    font-size: 24px;
+    line-height: 1.1;
+  }
+  .risk-operator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #64748b;
+    font-weight: 900;
+    font-size: 22px;
+  }
+  .risk-note {
+    color: #475569;
+    font-size: 13.5px;
+    line-height: 1.55;
+    margin: 8px 0 0;
+  }
+  .risk-note strong { color: #0f172a; }
+  .risk-section {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 17px;
+    margin-top: 18px;
+  }
+  .risk-section h4 {
+    color: #0f172a;
+    font-size: 16px;
+    font-weight: 800;
+    margin: 0 0 10px;
+  }
+  .risk-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 13px;
+  }
+  .risk-table th {
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    padding: 10px 12px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .risk-table td {
+    vertical-align: top;
+    padding: 11px 12px;
+    border-bottom: 1px solid #e2e8f0;
+    color: #0f172a;
+  }
+  .risk-table tr:last-child td { border-bottom: 0; }
+  .risk-points-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    border-radius: 999px;
+    background: #fee2e2;
+    color: #b91c1c;
+    font-weight: 900;
+    padding: 4px 9px;
+  }
+  .risk-muted { color: #64748b; }
+  .risk-evidence-list {
+    margin: 0;
+    padding-left: 16px;
+    color: #334155;
+  }
+  .risk-evidence-list li { margin-bottom: 3px; }
+  .risk-evidence-list li:last-child { margin-bottom: 0; }
+  .risk-empty {
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #64748b;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin: 0;
+  }
+  @media (max-width: 900px) {
+    .risk-formula-grid,
+    .risk-formula-grid.priority {
+      grid-template-columns: 1fr;
+    }
+    .risk-operator { min-height: 18px; }
+    .risk-table { display: block; overflow-x: auto; white-space: nowrap; }
+    .risk-evidence-list { white-space: normal; min-width: 260px; }
+  }
+</style>
+
+<%
+  const riskRecord = record || {};
+
+  function parseRiskRules(value) {
+    if (!value) return [];
+    let items = value;
+    if (typeof value === "string") {
+      try {
+        items = JSON.parse(value);
+      } catch {
+        items = value.split(/;|,/).map((item) => item.trim()).filter(Boolean);
+      }
+    }
+    if (!Array.isArray(items)) items = [items];
+    return items.map((item) => {
+      if (item && typeof item === "object") return item;
+      return { rule_name: String(item || "").trim(), points: null, evidence: {} };
+    }).filter((item) => item.rule_name || item.rule_type || item.message);
+  }
+
+  function numberOrZero(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : 0;
+  }
+
+  function valueOrDash(value) {
+    return value === null || value === undefined || value === "" ? "-" : value;
+  }
+
+  function humanizeKey(key) {
+    return String(key)
+      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+  }
+
+  function secondsLabel(value) {
+    const seconds = Number(value);
+    if (!Number.isFinite(seconds) || seconds <= 0) return null;
+    if (seconds % 60 === 0) {
+      const minutes = seconds / 60;
+      return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+    }
+    return `${seconds} seconds`;
+  }
+
+  function ruleLabel(rule) {
+    return rule.rule_name || rule.rule_type || rule.rule || rule.name || "Rule";
+  }
+
+  function thresholdSource(rule) {
+    const evidence = rule.evidence || {};
+    return evidence.thresholdSource || evidence.threshold_source || evidence.dailyCountThresholdSource || evidence.dailyValueThresholdSource || "-";
+  }
+
+  function evidenceLines(rule) {
+    const evidence = rule.evidence || {};
+    const lines = [];
+    const add = (label, value) => {
+      if (value !== null && value !== undefined && value !== "") lines.push(`${label}: ${value}`);
+    };
+
+    add("Reason", rule.message);
+    add("Current amount", evidence.currentAmount);
+    add("Merchant average", evidence.merchantAverage || evidence.merchant_average_amount);
+    add("Merchant maximum", evidence.merchantConfiguredMaximum);
+    add("MCC expected maximum", evidence.mccExpectedMaximum || evidence.mcc_expected_maximum);
+    add("Threshold used", evidence.thresholdUsed);
+    add("Matched tier", evidence.matchedSeverityTier);
+    add("Observed count", evidence.actual_count || evidence.actualDailyCount);
+    add("Required count", evidence.required_count);
+    add("Observed value", evidence.actualDailyValue);
+    add("Repeated amount", evidence.amount);
+    add("Small amount threshold", evidence.amount_below);
+    add("Window", secondsLabel(evidence.window_seconds));
+    add("Payment identifier type", evidence.payment_identifier_type);
+    add("Previous matching transaction", evidence.previous_transaction_id);
+    add("Status condition", evidence.counted_statuses && Array.isArray(evidence.counted_statuses) ? evidence.counted_statuses.join(", ") : null);
+    add("Distinct identifiers", evidence.distinct_identifier_count);
+    add("Threshold source", thresholdSource(rule) !== "-" ? thresholdSource(rule) : null);
+    add("Overlap policy", evidence.overlapPolicy);
+
+    if (Array.isArray(evidence.matchedAmountTiers) && evidence.matchedAmountTiers.length) {
+      const tiers = evidence.matchedAmountTiers.map((tier) => {
+        const selected = tier.selected ? "selected" : "not scored";
+        return `${tier.rule_type || tier.rule_name}: +${tier.points || 0}, threshold ${tier.thresholdUsed || "-"} (${tier.thresholdSource || "-"}) - ${selected}`;
+      }).join("; ");
+      add("Matched amount candidates", tiers);
+    }
+
+    if (!lines.length) add("Evidence", "No structured evidence recorded");
+    return lines;
+  }
+
+  const riskRules = parseRiskRules(riskRecord.triggered_rules);
+  const scoredRules = riskRules.filter((rule) => String(rule.rule_type || "").toLowerCase() !== "merchant_category_risk" && numberOrZero(rule.points) > 0);
+  const mccRule = riskRules.find((rule) => String(rule.rule_type || "").toLowerCase() === "merchant_category_risk");
+  const supportingRules = [];
+  riskRules.forEach((rule) => {
+    const observations = rule.evidence && Array.isArray(rule.evidence.supportingObservations)
+      ? rule.evidence.supportingObservations
+      : [];
+    observations.forEach((observation) => supportingRules.push({ parent: rule, observation }));
+  });
+
+  const baseRuleScore = numberOrZero(riskRecord.base_rule_score);
+  const mccRiskPoints = numberOrZero(riskRecord.mcc_risk_points);
+  const officialRiskScore = numberOrZero(riskRecord.displayed_risk_score ?? riskRecord.risk_score);
+  const priorityMultiplier = Number(riskRecord.priority_multiplier ?? 1) || 1;
+  const priorityScore = numberOrZero(riskRecord.priority_score ?? officialRiskScore);
+  const mccCode = riskRecord.mcc_code || mccRule?.evidence?.matchedMcc || mccRule?.evidence?.merchantMcc || "Not provided";
+  const mccCategory = riskRecord.mcc_category_name || mccRule?.evidence?.category || "-";
+  const mccRiskLevel = riskRecord.mcc_risk_level || mccRule?.evidence?.riskLevel || "-";
+
+  let mccReason = "No MCC points applied because no MCC profile was matched.";
+  if (mccRiskPoints > 0) {
+    mccReason = "MCC points are added once after suspicious behaviour is detected.";
+  } else if (baseRuleScore <= 0) {
+    mccReason = "No MCC points applied because no non-MCC suspicious rule was triggered.";
+  } else if (String(mccRiskLevel).toUpperCase() === "LOW") {
+    mccReason = "No MCC points applied because the MCC category is low risk.";
+  } else if (mccCategory !== "-" || mccCode !== "Not provided") {
+    mccReason = "No MCC points applied because the matched MCC profile is configured with 0 points.";
+  }
+
+  const priorityApplied = priorityMultiplier > 1;
+%>
+
+<section class="risk-calc">
+  <h3>Risk Score Calculation</h3>
+
+  <div class="risk-formula-grid" aria-label="Official risk score formula">
+    <div class="risk-metric"><span>Base rule score</span><strong><%= baseRuleScore %></strong></div>
+    <div class="risk-operator">+</div>
+    <div class="risk-metric"><span>MCC risk points</span><strong><%= mccRiskPoints %></strong></div>
+    <div class="risk-operator">=</div>
+    <div class="risk-metric"><span>Official score</span><strong><%= officialRiskScore %></strong></div>
+  </div>
+  <p class="risk-note">
+    Official risk score = non-MCC triggered rule points + MCC risk points. MCC points are separate from rule points and are added once only.
+  </p>
+
+  <div class="risk-formula-grid priority" aria-label="Investigation priority score formula">
+    <div class="risk-metric"><span>Official score</span><strong><%= officialRiskScore %></strong></div>
+    <div class="risk-operator">x</div>
+    <div class="risk-metric"><span>Priority multiplier</span><strong><%= priorityMultiplier.toFixed(2) %></strong></div>
+    <div class="risk-operator">=</div>
+    <div class="risk-metric"><span>Investigation priority score</span><strong><%= priorityScore %></strong></div>
+  </div>
+  <p class="risk-note">
+    <strong>Priority score is used only for investigation queue ordering.</strong>
+    It does not change the official risk score, risk level, alert threshold, STR or RFI decisions.
+    <% if (priorityApplied) { %>
+      The multiplier was applied because this alert-qualified transaction matched a high-priority MCC profile.
+    <% } else { %>
+      No priority multiplier was applied for this transaction.
+    <% } %>
+  </p>
+
+  <div class="risk-section">
+    <h4>Rule Contribution Breakdown</h4>
+    <% if (scoredRules.length) { %>
+      <table class="risk-table">
+        <thead>
+          <tr>
+            <th>Rule</th>
+            <th>Points Added</th>
+            <th>Reason / Evidence</th>
+            <th>Threshold Source</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% scoredRules.forEach((rule) => { %>
+            <tr>
+              <td><strong><%= ruleLabel(rule) %></strong><br><span class="risk-muted"><%= rule.rule_type || "-" %></span></td>
+              <td><span class="risk-points-chip">+<%= numberOrZero(rule.points) %></span></td>
+              <td>
+                <ul class="risk-evidence-list">
+                  <% evidenceLines(rule).forEach((line) => { %>
+                    <li><%= line %></li>
+                  <% }) %>
+                </ul>
+              </td>
+              <td><%= thresholdSource(rule) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } else { %>
+      <p class="risk-empty">No non-MCC scoring rules were added to the base rule score.</p>
+    <% } %>
+  </div>
+
+  <div class="risk-section">
+    <h4>MCC Risk</h4>
+    <table class="risk-table">
+      <thead>
+        <tr>
+          <th>MCC Code</th>
+          <th>Category</th>
+          <th>Risk Level</th>
+          <th>MCC Points</th>
+          <th>Applied?</th>
+          <th>Reason</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><%= valueOrDash(mccCode) %></td>
+          <td><%= valueOrDash(mccCategory) %></td>
+          <td><%= valueOrDash(mccRiskLevel) %></td>
+          <td><span class="risk-points-chip">+<%= mccRiskPoints %></span></td>
+          <td><%= mccRiskPoints > 0 ? "Yes" : "No" %></td>
+          <td><%= mccReason %></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="risk-section">
+    <h4>Priority Explanation</h4>
+    <table class="risk-table">
+      <thead>
+        <tr>
+          <th>Official Score</th>
+          <th>Multiplier</th>
+          <th>Priority Score</th>
+          <th>Used For</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><%= officialRiskScore %></td>
+          <td>x<%= priorityMultiplier.toFixed(2) %></td>
+          <td><%= priorityScore %></td>
+          <td>Investigation queue ordering only. Official risk level and alert decisions use <%= officialRiskScore %>.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <% if (supportingRules.length) { %>
+    <div class="risk-section">
+      <h4>Suppressed / Supporting Evidence</h4>
+      <table class="risk-table">
+        <thead>
+          <tr>
+            <th>Matched Rule</th>
+            <th>Reason Not Scored</th>
+            <th>Points Not Added</th>
+            <th>Supporting Evidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% supportingRules.forEach(({ parent, observation }) => { %>
+            <tr>
+              <td><strong><%= observation.rule_name || observation.rule_type || "Rule" %></strong><br><span class="risk-muted">Attached to <%= ruleLabel(parent) %></span></td>
+              <td><%= observation.message || parent.evidence?.overlapPolicy || "Matched but not added to score to avoid double-counting." %></td>
+              <td><span class="risk-points-chip">+<%= numberOrZero(observation.points_not_added) %></span></td>
+              <td>
+                <ul class="risk-evidence-list">
+                  <% evidenceLines(observation).forEach((line) => { %>
+                    <li><%= line %></li>
+                  <% }) %>
+                </ul>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>

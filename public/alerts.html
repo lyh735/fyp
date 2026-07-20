@@ -7,6 +7,11 @@
   <link rel="stylesheet" href="/css/style.css" />
   <style>
     .unread-row { background: rgba(254, 243, 199, 0.7); }
+    .queue-help{color:var(--text-muted);font-size:12.5px;line-height:1.45;margin-top:6px}
+    .queue-legend{display:flex;align-items:center;gap:8px;color:var(--text-muted);font-size:12px;margin-top:8px}
+    .legend-swatch{width:18px;height:12px;border-radius:4px;background:rgba(254,243,199,0.9);border:1px solid #fde68a}
+    .priority-cell strong{display:block;font-size:15px}
+    .priority-cell span{display:block;color:var(--text-muted);font-size:11px;margin-top:2px}
   </style>
 </head>
 <body data-page="alerts">
@@ -129,7 +134,13 @@
 
       <div class="card">
         <div class="card-header">
-          <h3><span class="alert-dot"></span>Alert Queue</h3>
+          <div>
+            <h3><span class="alert-dot"></span>Investigation Priority Queue</h3>
+            <div class="queue-help">
+              Sorted by Investigation Priority Score, then newest alert. Select an alert to open its dedicated review page.
+            </div>
+            <div class="queue-legend"><span class="legend-swatch"></span><span>Yellow rows are unread alerts.</span></div>
+          </div>
           <div class="search-wrap">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -155,46 +166,20 @@
         <div class="table-wrap">
           <table>
             <thead>
-              <tr><th>Transaction ID</th><th>Merchant</th><th>Reason</th><th>Amount</th><th>Risk Level</th><th>Status</th><th>Read</th><th>Raised At</th></tr>
+              <tr><th>Transaction ID</th><th>Merchant</th><th>Reason</th><th>Amount</th><th>Risk Level</th><th>Investigation Priority Score</th><th>Status</th><th>Read</th><th>Raised At</th></tr>
             </thead>
             <tbody id="alertBody">
-              <tr><td colspan="8"><div class="empty-state"><p>Loading...</p></div></td></tr>
+              <tr><td colspan="9"><div class="empty-state"><p>Loading...</p></div></td></tr>
             </tbody>
             <tbody>
               <tr id="alertNoResults" style="display:none">
-                <td colspan="8"><div class="no-results">No alerts match your search.</div></td>
+                <td colspan="9"><div class="no-results">No alerts match your search.</div></td>
               </tr>
             </tbody>
           </table>
         </div>
       </div>
 
-      <div class="card" id="alertDetailCard" style="display:none; margin-top:20px;">
-        <div class="card-header">
-          <h3>Alert Review</h3>
-        </div>
-        <div class="card-body">
-          <div class="alert-detail-grid">
-            <div><strong>Transaction ID</strong><div id="detailTxnId">-</div></div>
-            <div><strong>Merchant</strong><div id="detailMerchant">-</div></div>
-            <div><strong>Amount</strong><div id="detailAmount">-</div></div>
-            <div><strong>Risk Level</strong><div id="detailRiskLevel">-</div></div>
-            <div><strong>Official Risk Score</strong><div id="detailOfficialRiskScore">-</div></div>
-            <div><strong>Base Rule Score</strong><div id="detailBaseRuleScore">-</div></div>
-            <div><strong>MCC Risk Points</strong><div id="detailMccRiskPoints">-</div></div>
-            <div><strong>Merchant MCC</strong><div id="detailMcc">-</div></div>
-            <div><strong>Investigation Priority Score</strong><div id="detailPriorityScore">-</div></div>
-            <div><strong>Priority Multiplier</strong><div id="detailPriorityMultiplier">-</div></div>
-            <div><strong>Status</strong><div id="detailAlertStatus">-</div></div>
-            <div><strong>Read Status</strong><div id="detailReadStatus">-</div></div>
-            <div><strong>Read At</strong><div id="detailReadAt">-</div></div>
-            <div><strong>Raised At</strong><div id="detailRaisedAt">-</div></div>
-            <div style="grid-column: span 3;"><strong>Triggered Rules</strong><div id="detailTriggeredRules">-</div></div>
-            <div style="grid-column: span 3;"><strong>Escalation Report</strong><div id="detailEscalationReport">-</div></div>
-          </div>
-          <div id="detailActions" style="margin-top:16px; display:flex; gap:12px;"></div>
-        </div>
-      </div>
     </div>
   </div>
 </div>
@@ -216,7 +201,7 @@ const topbarRole = document.getElementById("topbarRole");
 topbarRole.textContent = user.role;
 topbarRole.className = `badge badge-${user.role}`;
 
-if (["admin", "compliance_manager"].includes(String(user.role).toLowerCase())) {
+if (String(user.role).toLowerCase() === "admin") {
   document.getElementById("adminNav").style.display = "block";
 }
 
@@ -337,19 +322,22 @@ function renderAlerts() {
         const unread = !alert.read_at;
         const merchant = alert.merchant_name || alert.merchant_id || "-";
         const reason = alert.message || alert.reason || "-";
-        const searchable = `${alert.transaction_id || ""} ${merchant} ${reason} ${alert.risk_level || ""} ${alert.status || ""} ${alert.amount || ""}`.toLowerCase();
-        return `<tr class="${unread ? "unread-row" : ""}" data-searchable="${searchable}" onclick="showAlertDetails(${alert.id})" style="cursor:pointer">
+        const priorityScore = alert.priority_score ?? alert.risk_score ?? "-";
+        const priorityMultiplier = Number(alert.priority_multiplier ?? 1);
+        const searchable = `${alert.transaction_id || ""} ${merchant} ${reason} ${alert.risk_level || ""} ${alert.status || ""} ${alert.amount || ""} ${priorityScore}`.toLowerCase();
+        return `<tr class="${unread ? "unread-row" : ""}" data-searchable="${searchable}" onclick="openAlertReview(${alert.id})" style="cursor:pointer">
           <td style="font-family:monospace;font-size:12px">${alert.transaction_id || "-"}</td>
           <td>${merchant}</td>
           <td>${reason}</td>
           <td>${alert.amount != null ? formatMoney(alert.amount, alert.currency) : "-"}</td>
           <td>${riskPill(alert.risk_level)}</td>
+          <td class="priority-cell"><strong>${priorityScore}</strong><span>x${priorityMultiplier.toFixed(2)}</span></td>
           <td>${alert.status || "Pending"}</td>
           <td>${alert.read_at ? '<span class="pill pill-normal">Read</span>' : '<span class="pill pill-pending">Unread</span>'}</td>
           <td style="color:var(--text-muted);font-size:12px">${formatDate(alert.created_at)}</td>
         </tr>`;
       }).join("")
-    : `<tr><td colspan="8"><div class="empty-state"><p>No alerts found.</p></div></td></tr>`;
+    : `<tr><td colspan="9"><div class="empty-state"><p>No alerts found.</p></div></td></tr>`;
 
   const unreadPendingCount = currentAlertStatusFilter === "all"
     ? allAlerts.filter((alert) => alert.status === "Pending" && !alert.read_at).length
@@ -363,21 +351,12 @@ function renderAlerts() {
   filterTable("alertBody", "alertSearch", "alertNoResults");
 }
 
-async function markAlertAsRead(alertId) {
-  if (!alertId) return null;
-  const res = await apiFetch(`/api/alerts/${alertId}/read`, { method: "POST" });
-  if (!res) return null;
-  const data = await res.json();
-  return res.ok ? data.alert : null;
-}
-
 async function loadAlerts() {
   const query = currentAlertStatusFilter === "all" ? "?status=all" : "";
   const res = await apiFetch(`/api/alerts${query}`);
   if (!res) return;
   const data = await res.json();
   data.sort((a, b) => {
-    if (!!a.read_at !== !!b.read_at) return a.read_at ? 1 : -1;
     const scoreA = parseFloat(a.priority_score ?? a.risk_score) || 0;
     const scoreB = parseFloat(b.priority_score ?? b.risk_score) || 0;
     if (scoreA !== scoreB) return scoreB - scoreA;
@@ -385,60 +364,6 @@ async function loadAlerts() {
   });
   allAlerts = data;
   renderAlerts();
-}
-
-async function showAlertDetails(alertId) {
-  const res = await apiFetch(`/api/alerts/${alertId}`);
-  if (!res) return;
-  if (!res.ok) {
-    showToast("Alert Detail", "Unable to load alert details. Please try again.");
-    return;
-  }
-
-  let alert = await res.json();
-  if (!alert.read_at) {
-    await markAlertAsRead(alert.alert_id);
-    await loadAlerts();
-    const refreshed = await apiFetch(`/api/alerts/${alertId}`);
-    if (refreshed && refreshed.ok) {
-      alert = await refreshed.json();
-    }
-  }
-
-  document.getElementById("alertDetailCard").style.display = "";
-  document.getElementById("detailTxnId").textContent = alert.transaction_id || "-";
-  document.getElementById("detailMerchant").textContent = alert.merchant_name || alert.merchant_id || "-";
-  document.getElementById("detailAmount").textContent = alert.amount != null ? formatMoney(alert.amount, alert.currency) : "-";
-  document.getElementById("detailRiskLevel").textContent = alert.risk_level || "-";
-  document.getElementById("detailOfficialRiskScore").textContent = alert.displayed_risk_score ?? alert.risk_score ?? "-";
-  document.getElementById("detailBaseRuleScore").textContent = alert.base_rule_score ?? "-";
-  document.getElementById("detailMccRiskPoints").textContent = alert.mcc_risk_points ?? "-";
-  document.getElementById("detailMcc").textContent = [alert.mcc_code, alert.mcc_category_name, alert.mcc_risk_level].filter(Boolean).join(" / ") || "-";
-  document.getElementById("detailPriorityScore").textContent = alert.priority_score ?? alert.risk_score ?? "-";
-  document.getElementById("detailPriorityMultiplier").textContent = `x${alert.priority_multiplier ?? 1}`;
-  document.getElementById("detailAlertStatus").textContent = alert.status || "Pending";
-  document.getElementById("detailReadStatus").textContent = alert.read_at ? "Read" : "Unread";
-  document.getElementById("detailReadAt").textContent = alert.read_at ? formatDate(alert.read_at) : "-";
-  document.getElementById("detailRaisedAt").textContent = formatDate(alert.created_at);
-
-  let triggered = alert.triggered_rules;
-  try {
-    const parsed = JSON.parse(alert.triggered_rules);
-    if (Array.isArray(parsed)) {
-      triggered = parsed.map((item) => {
-        if (item && typeof item === "object") {
-          const evidence = item.evidence?.thresholdSource ? ` (${item.evidence.thresholdSource})` : "";
-          return `+${item.points || 0} ${item.rule_name || item.rule_type || "Rule"}${evidence}`;
-        }
-        return String(item);
-      }).join("; ");
-    }
-  } catch {}
-  document.getElementById("detailTriggeredRules").textContent = triggered || "-";
-  document.getElementById("detailEscalationReport").textContent = alert.escalation_report || "-";
-  document.getElementById("detailActions").innerHTML = alert.status === "Pending"
-    ? `<button class="btn btn-danger" onclick="goToAlertAction(${alert.id})">Take Action</button>`
-    : "";
 }
 
 function setAlertStatusFilter(filter) {
@@ -459,9 +384,9 @@ function setAlertReadFilter(filter) {
   renderAlerts();
 }
 
-function goToAlertAction(alertId) {
+function openAlertReview(alertId) {
   if (!alertId) return;
-  window.location.href = `/api/officer/alerts/${alertId}/action`;
+  window.location.href = `/api/officer/alerts/${alertId}`;
 }
 
 const socket = io();

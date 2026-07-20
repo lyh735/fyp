@@ -13,7 +13,9 @@ const {
   deleteUser,
   upgradeUser
 } = require("../controllers/authController");
-const { authenticate, requireAdmin } = require("../middleware/authMiddleware");
+const { authenticate, authorizeRoles } = require("../middleware/authMiddleware");
+
+const allowAdmin = authorizeRoles("admin");
 
 router.post("/login",           login);
 router.post("/logout",          logout);
@@ -21,11 +23,11 @@ router.post("/change-password", authenticate, changePassword);
 router.get ("/profile",         authenticate, getProfile);
 router.put ("/profile",         authenticate, updateProfile);
 
-router.post  ("/create-user",              authenticate, requireAdmin, createUser);
-router.get   ("/users",                    authenticate, requireAdmin, getUsers);
-router.get   ("/users/:id",                authenticate, requireAdmin, getUserById);
-router.put   ("/users/:id/reset-password", authenticate, requireAdmin, resetUserPassword);
-router.delete("/users/:id",                authenticate, requireAdmin, deleteUser);
-router.put   ("/users/:id/upgrade",        authenticate, requireAdmin, upgradeUser);
+router.post  ("/create-user",              authenticate, allowAdmin, createUser);
+router.get   ("/users",                    authenticate, allowAdmin, getUsers);
+router.get   ("/users/:id",                authenticate, allowAdmin, getUserById);
+router.put   ("/users/:id/reset-password", authenticate, allowAdmin, resetUserPassword);
+router.delete("/users/:id",                authenticate, allowAdmin, deleteUser);
+router.put   ("/users/:id/upgrade",        authenticate, allowAdmin, upgradeUser);
 
 module.exports = router;

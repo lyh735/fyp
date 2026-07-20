@@ -42,8 +42,9 @@ function normalizeText(value) {
 
 function normalizeBoolean(value, fallback) {
   if (value === undefined || value === null || value === "") return fallback;
-  if (value === true || value === 1 || value === "1" || value === "true") return true;
-  if (value === false || value === 0 || value === "0" || value === "false") return false;
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : value;
+  if (normalized === true || normalized === 1 || ["1", "true", "yes", "y"].includes(normalized)) return true;
+  if (normalized === false || normalized === 0 || ["0", "false", "no", "n"].includes(normalized)) return false;
   return fallback;
 }
 
@@ -51,6 +52,7 @@ function validateTransaction(payload, options = {}) {
   const {
     requirePaymentMethod = false,
     requireTerminalForFaceToFace = false,
+    requireIpForOnline = false,
     allowedSourceTypes = null,
   } = options;
   const errors = [];
@@ -111,6 +113,10 @@ function validateTransaction(payload, options = {}) {
 
   if (requireTerminalForFaceToFace && transactionType === "face_to_face" && !normalizeText(payload.terminal_id)) {
     errors.push("terminal_id is required for face_to_face transactions");
+  }
+
+  if (requireIpForOnline && transactionType === "online" && !normalizeText(payload.ip_address)) {
+    errors.push("ip_address is required for online transactions");
   }
 
   if (requirePaymentMethod && !paymentMethod) {
@@ -176,12 +182,7 @@ function validateTransaction(payload, options = {}) {
     },
     metadata: {
       missingRequiredInfo,
-      ipCountryVerified: Boolean(
-        payload.ip_country_verified === true ||
-        payload.ip_country_verified === 1 ||
-        payload.ip_country_verified === "1" ||
-        payload.ip_country_verified === "true"
-      ),
+      ipCountryVerified: normalizeBoolean(payload.ip_country_verified, false),
     },
   };
 }
