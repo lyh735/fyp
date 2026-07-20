@@ -461,3 +461,6 @@ exports.exportPdf = async (req, res) => {
     res.send(pdf);
   } catch (err) {
     console.error("Error exporting RFI PDF:", err);
+    res.status(500).send("Error exporting RFI PDF");
+  }
+};
