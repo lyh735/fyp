@@ -95,6 +95,12 @@ exports.changePassword = async (req, res) => {
   if (!newPassword || newPassword.length < 8) {
     return res.status(400).json({ message: "Password must be at least 8 characters" });
   }
+  if (!/[A-Z]/.test(newPassword)) {
+    return res.status(400).json({ message: "Password must contain at least one uppercase letter" });
+  }
+  if (!/\d/.test(newPassword)) {
+    return res.status(400).json({ message: "Password must contain at least one number" });
+  }
 
   try {
     db.query(

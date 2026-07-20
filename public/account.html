@@ -187,7 +187,7 @@
                 <div class="form-group">
                   <label for="newPw">New Password</label>
                   <div class="input-wrap">
-                    <input type="password" id="newPw" placeholder="At least 8 characters" />
+                    <input type="password" id="newPw" placeholder="Min 8 chars, 1 uppercase, 1 number" />
                     <button type="button" class="toggle-pw" onclick="toggleInput('newPw')">
                       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
@@ -672,6 +672,8 @@ if (pwForm) pwForm.addEventListener("submit", async (e) => {
 
   if (!currentPw) { showMessage("pwMsg", "Please enter your current password.", "error"); return; }
   if (newPw.length < 8) { showMessage("pwMsg", "New password must be at least 8 characters.", "error"); return; }
+  if (!/[A-Z]/.test(newPw)) { showMessage("pwMsg", "New password must contain at least one uppercase letter.", "error"); return; }
+  if (!/\d/.test(newPw)) { showMessage("pwMsg", "New password must contain at least one number.", "error"); return; }
   if (newPw !== confirmPw) { showMessage("pwMsg", "New passwords do not match.", "error"); return; }
 
   // Verify current password by attempting login first

@@ -21,7 +21,7 @@ router.post("/login",           login);
 router.post("/logout",          logout);
 router.post("/change-password", authenticate, changePassword);
 router.get ("/profile",         authenticate, getProfile);
-router.put ("/profile",         authenticate, updateProfile);
+router.put ("/profile",         authenticate, allowAdmin, updateProfile);
 
 router.post  ("/create-user",              authenticate, allowAdmin, createUser);
 router.get   ("/users",                    authenticate, allowAdmin, getUsers);
