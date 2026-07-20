@@ -1,9 +1,9 @@
 const db = require("../config/db");
 
 /**
- * Show STR drafts submitted for STRO review.
+ * Show analyst-submitted STR drafts for STRO review.
  */
-exports.showDashboard = (req, res) => {
+function showDashboard(req, res) {
   const sql = `
     SELECT
       s.str_id,
@@ -58,14 +58,10 @@ exports.showDashboard = (req, res) => {
 
   db.query(sql, (err, drafts) => {
     if (err) {
-      console.error(
-        "Error loading STRO dashboard:",
-        err
-      );
+      console.error("Error loading STRO dashboard:", err);
 
       return res.status(500).send(
-        "Error loading STRO dashboard: " +
-        err.message
+        "Error loading STRO dashboard: " + err.message
       );
     }
 
@@ -74,12 +70,12 @@ exports.showDashboard = (req, res) => {
       user: req.session?.user || null
     });
   });
-};
+}
 
 /**
  * View one STR draft.
  */
-exports.viewDraft = (req, res) => {
+function viewDraft(req, res) {
   const strId = req.params.strId;
 
   const sql = `
@@ -120,39 +116,29 @@ exports.viewDraft = (req, res) => {
 
   db.query(sql, [strId], (err, results) => {
     if (err) {
-      console.error(
-        "Error loading STR draft:",
-        err
-      );
+      console.error("Error loading STR draft:", err);
 
       return res.status(500).send(
-        "Error loading STR draft: " +
-        err.message
+        "Error loading STR draft: " + err.message
       );
     }
 
-    if (results.length === 0) {
-      return res.status(404).send(
-        "STR draft not found"
-      );
+    if (!results || results.length === 0) {
+      return res.status(404).send("STR draft not found");
     }
 
     const draft = results[0];
-
     let triggeredRules = [];
 
     try {
       if (Array.isArray(draft.triggered_rules)) {
         triggeredRules = draft.triggered_rules;
       } else if (draft.triggered_rules) {
-        const parsedRules = JSON.parse(
-          draft.triggered_rules
-        );
+        const parsedRules = JSON.parse(draft.triggered_rules);
 
-        triggeredRules =
-          Array.isArray(parsedRules)
-            ? parsedRules
-            : [String(draft.triggered_rules)];
+        triggeredRules = Array.isArray(parsedRules)
+          ? parsedRules
+          : [String(draft.triggered_rules)];
       }
     } catch (parseError) {
       triggeredRules = draft.triggered_rules
@@ -167,20 +153,14 @@ exports.viewDraft = (req, res) => {
       user: req.session?.user || null
     });
   });
-};
+}
 
 /**
- * STRO reviewer can:
- * 1. Send feedback to the analyst
- * 2. Approve the STR draft
+ * STRO can send feedback or approve the STR draft.
  */
-exports.reviewDraft = (req, res) => {
+function reviewDraft(req, res) {
   const strId = req.params.strId;
-
-  const {
-    decision,
-    stro_feedback
-  } = req.body;
+  const { decision, stro_feedback } = req.body;
 
   const allowedDecisions = [
     "send_feedback",
@@ -195,8 +175,7 @@ exports.reviewDraft = (req, res) => {
 
   if (
     decision === "send_feedback" &&
-    (!stro_feedback ||
-      stro_feedback.trim() === "")
+    (!stro_feedback || stro_feedback.trim() === "")
   ) {
     return res.status(400).send(
       "Feedback is required before returning the STR draft to the analyst"
@@ -206,6 +185,8 @@ exports.reviewDraft = (req, res) => {
   const reviewerId = Number(
     req.session?.user?.userId ||
     req.session?.user?.user_id ||
+    req.user?.userId ||
+    req.user?.user_id ||
     1
   );
 
@@ -224,8 +205,7 @@ exports.reviewDraft = (req, res) => {
       : "feedback_required";
 
   const feedback =
-    stro_feedback &&
-    stro_feedback.trim() !== ""
+    stro_feedback && stro_feedback.trim() !== ""
       ? stro_feedback.trim()
       : null;
 
@@ -236,12 +216,15 @@ exports.reviewDraft = (req, res) => {
       stro_reviewed_by = ?,
       stro_feedback = ?,
       stro_reviewed_at = NOW(),
+
       approved_at = CASE
         WHEN ? = 'approved_by_stro'
         THEN NOW()
         ELSE approved_at
       END,
+
       updated_at = NOW()
+
     WHERE str_id = ?
       AND status = 'pending_stro_review'
   `;
@@ -257,14 +240,10 @@ exports.reviewDraft = (req, res) => {
     ],
     (err, result) => {
       if (err) {
-        console.error(
-          "Error reviewing STR draft:",
-          err
-        );
+        console.error("Error reviewing STR draft:", err);
 
         return res.status(500).send(
-          "Error reviewing STR draft: " +
-          err.message
+          "Error reviewing STR draft: " + err.message
         );
       }
 
@@ -279,4 +258,16 @@ exports.reviewDraft = (req, res) => {
       );
     }
   );
+}
+
+/*
+|--------------------------------------------------------------------------
+| Export Controller Functions
+|--------------------------------------------------------------------------
+| Only export once. Do not add another module.exports below this section.
+*/
+module.exports = {
+  showDashboard,
+  viewDraft,
+  reviewDraft
 };

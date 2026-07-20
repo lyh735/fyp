@@ -230,12 +230,134 @@ exports.takeActionPage = (req, res) => {
 
 };
 
+exports.handleStrDraftSubmission = (req, res) => {
+  const alertIdInput =
+    req.params?.alertId ||
+    req.body?.alert_id ||
+    req.body?.alertId ||
+    req.body?.id;
+
+  const draftIdInput =
+    req.body?.str_id ||
+    req.body?.draft_id ||
+    req.body?.strId ||
+    req.params?.strId;
+
+  const submitAction = String(
+    req.body?.submit_action || "save_draft"
+  ).trim();
+
+  const generatedBy = Number(
+    req.user?.user_id ||
+    req.user?.id ||
+    1
+  );
+
+  console.log("STR submission:", {
+    alertIdInput,
+    draftIdInput,
+    submitAction,
+    generatedBy
+  });
+
+  const narrativeText = String(
+    req.body?.narrative_text ||
+    req.body?.narrative ||
+    req.body?.str_narrative ||
+    "Draft updated from form submission."
+  ).trim();
+
+  const desiredStatus = submitAction === "submit_approval" ? "pending_stro_review" : "draft";
+
+  const continueSubmission = (alertId) => {
+    if (!Number.isInteger(alertId) || alertId <= 0) {
+      return res.status(400).send("Alert ID is required");
+    }
+
+    const selectSql = `
+      SELECT str_id, status
+      FROM str_reports
+      WHERE alert_id = ?
+      ORDER BY updated_at DESC, str_id DESC
+      LIMIT 1
+    `;
+
+    db.query(selectSql, [alertId], (err, rows) => {
+      if (err) {
+        console.error("Error looking up STR draft for update:", err.message);
+        return res.status(500).send("Error saving STR draft: " + err.message);
+      }
+
+      const existingDraft = rows[0];
+      const saveSql = existingDraft
+        ? `
+            UPDATE str_reports
+            SET narrative_text = ?, status = ?, updated_at = NOW()
+            WHERE str_id = ?
+          `
+        : `
+            INSERT INTO str_reports
+            (alert_id, generated_by, narrative_text, status)
+            VALUES (?, ?, ?, ?)
+          `;
+
+      const saveValues = existingDraft
+        ? [narrativeText || "Draft updated from form submission.", desiredStatus, existingDraft.str_id]
+        : [alertId, generatedBy, narrativeText || "Draft updated from form submission.", desiredStatus];
+
+      db.query(saveSql, saveValues, (saveErr, saveResult) => {
+        if (saveErr) {
+          console.error("Error saving STR draft:", saveErr.message);
+          return res.status(500).send("Error saving STR draft: " + saveErr.message);
+        }
+
+        const strId = existingDraft ? existingDraft.str_id : saveResult.insertId;
+        return res.redirect(`/api/officer/str/view/${strId}`);
+      });
+    });
+  };
+
+  const resolvedAlertId = Number(alertIdInput);
+
+  if (Number.isInteger(resolvedAlertId) && resolvedAlertId > 0) {
+    return continueSubmission(resolvedAlertId);
+  }
+
+  const draftId = Number(draftIdInput);
+  if (Number.isInteger(draftId) && draftId > 0) {
+    return db.query(
+      "SELECT alert_id FROM str_reports WHERE str_id = ? LIMIT 1",
+      [draftId],
+      (err, rows) => {
+        if (err) {
+          console.error("Error resolving draft alert id:", err.message);
+          return res.status(500).send("Error resolving draft alert id: " + err.message);
+        }
+
+        if (!rows || rows.length === 0) {
+          return res.status(400).send("Alert ID is required");
+        }
+
+        return continueSubmission(Number(rows[0].alert_id));
+      }
+    );
+  }
+
+  return res.status(400).send("Alert ID is required");
+};
+
 exports.generateSTRDraft = (req, res) => {
-  const alertId = req.params.alertId;
-  const generatedBy = Number(req.user?.id || req.user?.user_id);
+  const alertId = Number(req.params.alertId);
+  const generatedBy = Number(req.user?.user_id || req.user?.id);
+
+  if (!Number.isInteger(alertId) || alertId <= 0) {
+    return res.status(400).send("Alert ID is required");
+  }
 
   if (!Number.isInteger(generatedBy) || generatedBy <= 0) {
-    return res.status(401).send("Authenticated user id is required to generate an STR draft");
+    return res.status(401).send(
+      "Authenticated user id is required to generate an STR draft"
+    );
   }
 
   const alertSql = `
@@ -281,7 +403,6 @@ Recommended Action:
 Prepare STR draft and escalate for approval.
 `;
 
-    const generatedBy = 1; // officer user_id, temporary for testing
 
     const insertSql = `
       INSERT INTO str_reports
@@ -341,8 +462,20 @@ exports.viewSTRDraft = (req, res) => {
       return res.send("STR draft not found");
     }
 
+    const draft = results[0];
+
     res.render("strDraft", {
-      str: results[0]
+      str: draft,
+      strDraft: draft,
+      alert: {
+        alert_id: draft.alert_id,
+        transaction_id: draft.transaction_id,
+        merchant_id: draft.merchant_id,
+        risk_score: draft.risk_score,
+        risk_level: draft.risk_level,
+        triggered_rules: draft.triggered_rules,
+        message: draft.message
+      }
     });
   });
 };
@@ -470,9 +603,9 @@ exports.showActionSuccessPage = (req, res) => {
 };
 
 exports.submitSTRToSTRO = (req, res) => {
-  const strId = req.params.strId;
+  const strId = Number(req.params.strId);
 
-  if (!strId) {
+  if (!Number.isInteger(strId) || strId <= 0) {
     return res.status(400).send("STR ID is required");
   }
 
@@ -480,9 +613,6 @@ exports.submitSTRToSTRO = (req, res) => {
     UPDATE str_reports
     SET
       status = 'pending_stro_review',
-      stro_feedback = NULL,
-      stro_reviewed_by = NULL,
-      stro_reviewed_at = NULL,
       updated_at = NOW()
     WHERE str_id = ?
       AND status IN (
@@ -493,8 +623,7 @@ exports.submitSTRToSTRO = (req, res) => {
 
   db.query(sql, [strId], (err, result) => {
     if (err) {
-      console.error("Error submitting STR to STRO:", err);
-
+      console.error("Error submitting STR to STRO:", err.message);
       return res.status(500).send(
         "Error submitting STR to STRO: " + err.message
       );

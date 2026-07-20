@@ -204,10 +204,14 @@ CREATE TABLE str_reports (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     approved_at DATETIME,
     rejected_at DATETIME,
+    stro_feedback TEXT,
+    stro_reviewed_by INT,
+    stro_reviewed_at DATETIME,
 
     FOREIGN KEY (alert_id) REFERENCES alerts(alert_id),
     FOREIGN KEY (generated_by) REFERENCES users(user_id),
-    FOREIGN KEY (approved_by) REFERENCES users(user_id)
+    FOREIGN KEY (approved_by) REFERENCES users(user_id),
+    FOREIGN KEY (stro_reviewed_by) REFERENCES users(user_id)
 );
 
 CREATE INDEX idx_alerts_status_assigned
