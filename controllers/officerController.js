@@ -289,18 +289,15 @@ Prepare STR draft and escalate for approval.
     `;
 
     db.query(
-      insertSql,
-      [
-<<<<<<< HEAD
-        Number(alert.alert_id),
-=======
-        alert.alert_id,
->>>>>>> f7179f043bdd8e903f356662c508a739fb60b5b0
-        generatedBy,
-        strReference,
-        narrativeText,
-        "draft"
-      ],
+  insertSql,
+  [
+    Number(alert.alert_id),
+    generatedBy,
+    strReference,
+    narrativeText,
+    "draft"
+  ],
+    
       (err, result) => {
         if (err) {
           console.error("Error generating STR draft:", err.message);
@@ -316,7 +313,7 @@ Prepare STR draft and escalate for approval.
 exports.viewSTRDraft = (req, res) => {
   const strId = req.params.strId;
 
-<<<<<<< HEAD
+
   const sql = `
     SELECT 
       s.*,
@@ -331,15 +328,7 @@ exports.viewSTRDraft = (req, res) => {
       ON s.alert_id = a.alert_id
     WHERE s.str_id = ?
   `;
-=======
-    const sql = `
-        SELECT s.*, a.transaction_id, a.merchant_id,
-               a.risk_score, a.risk_level, a.triggered_rules
-        FROM str_reports s
-        LEFT JOIN alerts a ON s.alert_id = a.alert_id
-        WHERE s.str_id = ?
-    `;
->>>>>>> f7179f043bdd8e903f356662c508a739fb60b5b0
+
 
   db.query(sql, [strId], (err, results) => {
     if (err) {
@@ -477,4 +466,47 @@ exports.showActionSuccessPage = (req, res) => {
     action
   });
 
+};
+
+exports.submitSTRToSTRO = (req, res) => {
+  const strId = req.params.strId;
+
+  if (!strId) {
+    return res.status(400).send("STR ID is required");
+  }
+
+  const sql = `
+    UPDATE str_reports
+    SET
+      status = 'pending_stro_review',
+      stro_feedback = NULL,
+      stro_reviewed_by = NULL,
+      stro_reviewed_at = NULL,
+      updated_at = NOW()
+    WHERE str_id = ?
+      AND status IN (
+        'draft',
+        'feedback_required'
+      )
+  `;
+
+  db.query(sql, [strId], (err, result) => {
+    if (err) {
+      console.error("Error submitting STR to STRO:", err);
+
+      return res.status(500).send(
+        "Error submitting STR to STRO: " + err.message
+      );
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(400).send(
+        "This STR draft cannot be submitted in its current status"
+      );
+    }
+
+    return res.redirect(
+      `/api/officer/str/view/${strId}?submitted=1`
+    );
+  });
 };

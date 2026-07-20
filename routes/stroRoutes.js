@@ -1,16 +1,23 @@
 const express = require("express");
 const router = express.Router();
-const { authenticate, requireStro } = require("../middleware/authMiddleware");
-const stroController = require("../controllers/stroController");
-const rfiController = require("../controllers/rfiController");
 
-router.use(authenticate, requireStro);
-router.get("/alerts", stroController.getEscalatedAlerts);
-router.get("/alerts/:id", stroController.getEscalatedAlert);
-router.get("/alerts/:id/str-draft", stroController.getStrDraft);
-router.post("/alerts/:id/str-draft/generate", stroController.generateStrDraftForAlert);
-router.put("/str-drafts/:id", stroController.saveStrDraft);
-router.get("/rfi/:id/pdf", rfiController.exportPdf);
-router.get("/rfi/:id/response-file", rfiController.downloadResponseFile);
+const stroController = require("../controllers/stroControllers");
+
+//middleware
+
+router.get(
+  "/dashboard",
+  stroController.showDashboard
+);
+
+router.get(
+  "/drafts/:strId",
+  stroController.viewDraft
+);
+
+router.post(
+  "/drafts/:strId/review",
+  stroController.reviewDraft
+);
 
 module.exports = router;

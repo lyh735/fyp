@@ -1593,3 +1593,34 @@ The Compliance Officer should complete the outstanding information, document the
 
 </body>
 </html>
+
+<% if (str.status === "feedback_required") { %>
+
+  <div class="alert alert-warning">
+    <h5>STRO Feedback Received</h5>
+
+    <p>
+      <strong>Feedback:</strong>
+    </p>
+
+    <p>
+      <%= str.stro_feedback || "No feedback was provided." %>
+    </p>
+
+    <p class="mb-0">
+      Please update the STR draft and submit it again for STRO review.
+    </p>
+  </div>
+
+<% } %>
+<% if (str.status === "approved_by_stro") { %>
+
+  <div class="alert alert-success">
+    <h5>Approved by STRO</h5>
+
+    <p class="mb-0">
+      This STR draft has been reviewed and approved.
+    </p>
+  </div>
+
+<% } %>

@@ -28,6 +28,7 @@ const mccCodeRoutes = require("./routes/mccCodeRoutes");
 const { ensureComplianceSchema } = require("./services/schema");
 const { showTransactionDetailsPage } = require("./controllers/transactionController");
 
+app.use("/stro", stroRoutes);
 app.use("/api", transactionRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/stro", stroRoutes);
