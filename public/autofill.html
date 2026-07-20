@@ -1,0 +1,310 @@
+<script>
+  function generateDemoSTRData() {
+    const demoData = {
+      // Section A
+      reportingEntityName: "Republic Trust Bank Ltd",
+      entityType: "Bank",
+      reportingEntityUen: "202612345N",
+      businessAddress:
+        "1 Marina Boulevard, #20-01, Singapore 018989",
+      complianceOfficerName: "Daniel Lim",
+      contactNumber: "+65 9123 4567",
+      emailAddress: "daniel.lim@rtbank.com.sg",
+
+      // Section B
+      subjectType: "Merchant",
+      merchantName: "Chan Chinatown Hawker Stall",
+      merchantId: "MRC-HAWKER-CHAN-CHINATOWN",
+      merchantUen: "53123456A",
+      merchantAddress:
+        "335 Smith Street, Chinatown Complex, Singapore 050335",
+      contactPerson: "Chan Wei Ming",
+      merchantContact: "+65 9876 4321",
+      merchantEmail: "contact@chanhawker.com.sg",
+      industry: "Food and Beverage",
+
+      // Section C
+      transactionId: "UWP-MR5838BJ-2CMM9",
+      transactionAmount: 9850,
+      currency: "SGD",
+      country: "Singapore",
+      paymentMethod: "Bank Transfer",
+      senderAccount: "123-456-789",
+      receiverAccount: "987-654-321",
+      riskScore: 85,
+      riskLevel: "High",
+
+      // Review
+      analystName: "Alice Tan",
+      recommendation: "Escalate to STRO"
+    };
+
+    // Section A
+    setFieldValue(
+      "reportingEntityName",
+      demoData.reportingEntityName
+    );
+
+    setFieldValue(
+      "entityType",
+      demoData.entityType
+    );
+
+    setFieldValue(
+      "reportingEntityUen",
+      demoData.reportingEntityUen
+    );
+
+    setFieldValue(
+      "businessAddress",
+      demoData.businessAddress
+    );
+
+    setFieldValue(
+      "complianceOfficerName",
+      demoData.complianceOfficerName
+    );
+
+    setFieldValue(
+      "contactNumber",
+      demoData.contactNumber
+    );
+
+    setFieldValue(
+      "emailAddress",
+      demoData.emailAddress
+    );
+
+    setFieldValue(
+      "reportDate",
+      getTodayDate()
+    );
+
+    setFieldValue(
+      "strReferenceNumber",
+      generateReference("STR")
+    );
+
+    setFieldValue(
+      "caseNumber",
+      generateReference("CASE")
+    );
+
+    // Section B
+    setFieldValue(
+      "subjectType",
+      demoData.subjectType
+    );
+
+    setFieldValue(
+      "merchantName",
+      demoData.merchantName
+    );
+
+    setFieldValue(
+      "merchantId",
+      demoData.merchantId
+    );
+
+    setFieldValue(
+      "merchantUen",
+      demoData.merchantUen
+    );
+
+    setFieldValue(
+      "merchantAddress",
+      demoData.merchantAddress
+    );
+
+    setFieldValue(
+      "contactPerson",
+      demoData.contactPerson
+    );
+
+    setFieldValue(
+      "merchantContact",
+      demoData.merchantContact
+    );
+
+    setFieldValue(
+      "merchantEmail",
+      demoData.merchantEmail
+    );
+
+    setFieldValue(
+      "industry",
+      demoData.industry
+    );
+
+    // Section C
+    setFieldValue(
+      "transactionId",
+      demoData.transactionId
+    );
+
+    setFieldValue(
+      "transactionDate",
+      getYesterdayDate()
+    );
+
+    setFieldValue(
+      "transactionTime",
+      "10:34"
+    );
+
+    setFieldValue(
+      "transactionAmount",
+      demoData.transactionAmount
+    );
+
+    setFieldValue(
+      "currency",
+      demoData.currency
+    );
+
+    setFieldValue(
+      "country",
+      demoData.country
+    );
+
+    setFieldValue(
+      "paymentMethod",
+      demoData.paymentMethod
+    );
+
+    setFieldValue(
+      "senderAccount",
+      demoData.senderAccount
+    );
+
+    setFieldValue(
+      "receiverAccount",
+      demoData.receiverAccount
+    );
+
+    setFieldValue(
+      "riskScore",
+      demoData.riskScore
+    );
+
+    setFieldValue(
+      "riskLevel",
+      demoData.riskLevel
+    );
+
+    // Section D checkboxes
+    setCheckbox("unusualTransactionPattern", true);
+    setCheckbox("largeTransactionAmount", true);
+    setCheckbox("highRiskMerchant", true);
+    setCheckbox("structuring", true);
+
+    // Triggered rules
+    const triggeredRules = [
+      "Merchant MCC/profile base risk score applied.",
+      "High-value transaction exceeded the monitoring threshold.",
+      "Multiple transactions were detected within a short period.",
+      "Transaction pattern was inconsistent with the merchant profile."
+    ].join("\n");
+
+    setFieldValue(
+      "triggeredRules",
+      triggeredRules
+    );
+
+    // Narrative
+    const narrative = `
+During routine transaction monitoring, the system detected unusual transaction activity involving Merchant ID ${demoData.merchantId}, operating under the name ${demoData.merchantName}.
+
+The merchant received a high-value transaction of SGD ${demoData.transactionAmount.toLocaleString(
+      "en-SG",
+      {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }
+    )}. The amount and transaction pattern were inconsistent with the expected activity of a small food and beverage merchant.
+
+The monitoring system identified several risk indicators, including an unusually large transaction amount, multiple transactions within a short period, and activity inconsistent with the merchant's historical profile.
+
+The transaction received a risk score of ${demoData.riskScore}, classified as ${demoData.riskLevel} risk. Based on the available information, the case has been escalated for STRO review and consideration for filing a Suspicious Transaction Report.
+    `.trim();
+
+    setFieldValue(
+      "narrativeText",
+      narrative
+    );
+
+    // Internal Review
+    setFieldValue(
+      "analystName",
+      demoData.analystName
+    );
+
+    setFieldValue(
+      "reviewDate",
+      getTodayDate()
+    );
+
+    setFieldValue(
+      "recommendation",
+      demoData.recommendation
+    );
+
+    alert("Demo STR information has been generated.");
+  }
+
+  function setFieldValue(elementId, value) {
+    const element = document.getElementById(elementId);
+
+    if (element) {
+      element.value = value;
+    } else {
+      console.warn(`Element not found: ${elementId}`);
+    }
+  }
+
+  function setCheckbox(elementId, checked) {
+    const checkbox = document.getElementById(elementId);
+
+    if (checkbox) {
+      checkbox.checked = checked;
+    } else {
+      console.warn(`Checkbox not found: ${elementId}`);
+    }
+  }
+
+  function getTodayDate() {
+    const today = new Date();
+    return formatDateForInput(today);
+  }
+
+  function getYesterdayDate() {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    return formatDateForInput(yesterday);
+  }
+
+  function formatDateForInput(date) {
+    const year = date.getFullYear();
+
+    const month = String(
+      date.getMonth() + 1
+    ).padStart(2, "0");
+
+    const day = String(
+      date.getDate()
+    ).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  }
+
+  function generateReference(prefix) {
+    const year = new Date().getFullYear();
+
+    const randomNumber = Math.floor(
+      1000 + Math.random() * 9000
+    );
+
+    return `${prefix}-${year}-${randomNumber}`;
+  }
+</script>

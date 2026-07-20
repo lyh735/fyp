@@ -369,6 +369,9 @@ async function ensureCurrentSchemaCompatibility() {
   await addColumnIfMissing("rfi_requests", "response_attachment", "VARCHAR(255) NULL");
   await addColumnIfMissing("rfi_requests", "is_sent", "TINYINT(1) DEFAULT 0");
   await addColumnIfMissing("str_reports", "rejected_at", "DATETIME NULL");
+  await addColumnIfMissing("str_reports", "stro_feedback", "TEXT NULL");
+  await addColumnIfMissing("str_reports", "stro_reviewed_by", "INT NULL");
+  await addColumnIfMissing("str_reports", "stro_reviewed_at", "DATETIME NULL");
 
   await addIndexIfMissing("terminals", "idx_terminals_merchant", "merchant_id");
   await addUniqueIndexIfNoDuplicates("compliance_rules", "uq_compliance_rules_rule_type", "rule_type");

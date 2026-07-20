@@ -1,20 +1,32 @@
 const express = require("express");
 const router = express.Router();
-const { authenticate, authorizeRoles } = require("../middleware/authMiddleware");
-const stroController = require("../controllers/stroController");
-const rfiController = require("../controllers/rfiController");
 
-const allowAnalyst = authorizeRoles("analyst");
-const allowStro = authorizeRoles("stro");
+const stroController = require("../controllers/stroControllers");
 
+const {
+  authenticate,
+  authorizeRoles
+} = require("../middleware/authMiddleware");
+
+// 必须先登录
 router.use(authenticate);
-router.get("/outcomes", allowAnalyst, stroController.getStroOutcomes);
-router.get("/alerts", allowStro, stroController.getEscalatedAlerts);
-router.get("/alerts/:id", allowStro, stroController.getEscalatedAlert);
-router.get("/alerts/:id/str-draft", allowStro, stroController.getStrDraft);
-router.post("/alerts/:id/str-draft/generate", allowAnalyst, stroController.generateStrDraftForAlert);
-router.put("/str-drafts/:id", allowStro, stroController.saveStrDraft);
-router.get("/rfi/:id/pdf", allowStro, rfiController.exportPdf);
-router.get("/rfi/:id/response-file", allowStro, rfiController.downloadResponseFile);
+
+// 只有 STRO 和 Admin 可以进入
+router.use(authorizeRoles("stro", "admin"));
+
+router.get(
+  "/dashboard",
+  stroController.showDashboard
+);
+
+router.get(
+  "/drafts/:strId",
+  stroController.viewDraft
+);
+
+router.post(
+  "/drafts/:strId/review",
+  stroController.reviewDraft
+);
 
 module.exports = router;

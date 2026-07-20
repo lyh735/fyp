@@ -1,43 +1,394 @@
-<% if (draft.status === "pending_stro_review") { %>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
 
-  <div class="section">
-    <div class="section-title">
-      STRO Review Decision
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>STRO Review</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 30px;
+      background: #f4f6f9;
+      font-family: Arial, sans-serif;
+      color: #222;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: auto;
+    }
+
+    .header-card,
+    .section-card,
+    .decision-card {
+      background: white;
+      border-radius: 14px;
+      padding: 24px;
+      margin-bottom: 22px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    }
+
+    h1 {
+      margin-top: 0;
+      margin-bottom: 8px;
+    }
+
+    h2 {
+      margin-top: 0;
+      border-bottom: 2px solid #e5e7eb;
+      padding-bottom: 12px;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 0;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 7px 12px;
+      border-radius: 20px;
+      background: #fff3cd;
+      color: #7a5900;
+      font-weight: bold;
+      text-transform: capitalize;
+    }
+
+    .details-grid {
+      display: grid;
+      grid-template-columns:
+        repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+    }
+
+    .detail-item {
+      border: 1px solid #e3e7ed;
+      border-radius: 8px;
+      padding: 14px;
+      background: #fafafa;
+    }
+
+    .detail-label {
+      display: block;
+      color: #666;
+      font-size: 13px;
+      font-weight: bold;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+
+    .detail-value {
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+
+    .form-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .form-table th,
+    .form-table td {
+      padding: 12px;
+      border-bottom: 1px solid #ddd;
+      vertical-align: top;
+      text-align: left;
+    }
+
+    .form-table th {
+      width: 32%;
+      background: #f4f6f8;
+      font-weight: bold;
+    }
+
+    .narrative {
+      white-space: pre-wrap;
+      line-height: 1.6;
+      background: #f8fafc;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 140px;
+      padding: 12px;
+      border: 1px solid #bbb;
+      border-radius: 8px;
+      resize: vertical;
+      font-family: Arial, sans-serif;
+      font-size: 15px;
+    }
+
+    .help-text {
+      color: #666;
+      font-size: 14px;
+      margin-top: 7px;
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .btn {
+      display: inline-block;
+      border: none;
+      border-radius: 7px;
+      padding: 11px 18px;
+      font-size: 15px;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .btn-back {
+      background: #6c757d;
+      color: white;
+    }
+
+    .btn-feedback {
+      background: #f0ad4e;
+      color: #111;
+    }
+
+    .btn-approve {
+      background: #198754;
+      color: white;
+    }
+
+    .empty-message {
+      color: #777;
+      font-style: italic;
+    }
+
+    @media (max-width: 700px) {
+      body {
+        padding: 15px;
+      }
+
+      .form-table th,
+      .form-table td {
+        display: block;
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+
+    <div class="header-card">
+      <h1>STRO Review Decision</h1>
+
+      <p class="subtitle">
+        Review all information submitted by the Compliance Officer.
+      </p>
+
+      <p>
+        <strong>Status:</strong>
+
+        <span class="status-badge">
+          <%= String(draft.status || "").replaceAll("_", " ") %>
+        </span>
+      </p>
     </div>
 
-    <div class="section-body">
+    <div class="section-card">
+      <h2>STR Summary</h2>
+
+      <div class="details-grid">
+
+        <div class="detail-item">
+          <span class="detail-label">STR ID</span>
+
+          <div class="detail-value">
+            <%= draft.str_id %>
+          </div>
+        </div>
+
+        <div class="detail-item">
+          <span class="detail-label">STR Reference</span>
+
+          <div class="detail-value">
+            <%= draft.str_reference_number || "Not generated" %>
+          </div>
+        </div>
+
+        <div class="detail-item">
+          <span class="detail-label">Alert ID</span>
+
+          <div class="detail-value">
+            <%= draft.alert_id %>
+          </div>
+        </div>
+
+        <div class="detail-item">
+          <span class="detail-label">Transaction ID</span>
+
+          <div class="detail-value">
+            <%= draft.transaction_id || "N/A" %>
+          </div>
+        </div>
+
+        <div class="detail-item">
+          <span class="detail-label">Merchant</span>
+
+          <div class="detail-value">
+            <%= draft.merchant_name || draft.merchant_id || "N/A" %>
+          </div>
+        </div>
+
+        <div class="detail-item">
+          <span class="detail-label">Amount</span>
+
+          <div class="detail-value">
+            <%= draft.currency || "" %>
+            <%= draft.amount || "N/A" %>
+          </div>
+        </div>
+
+        <div class="detail-item">
+          <span class="detail-label">Country</span>
+
+          <div class="detail-value">
+            <%= draft.country || "N/A" %>
+          </div>
+        </div>
+
+        <div class="detail-item">
+          <span class="detail-label">Risk Level</span>
+
+          <div class="detail-value">
+            <%= draft.risk_level || "N/A" %>
+            <% if (draft.risk_score !== null) { %>
+              (<%= draft.risk_score %>)
+            <% } %>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="section-card">
+      <h2>Submitted STR Form Information</h2>
+
+      <% const ignoredFields = [
+        "alert_id",
+        "str_id",
+        "submit_action"
+      ]; %>
+
+      <% const submittedFields = Object.entries(formData || {})
+        .filter(([key, value]) => {
+          if (ignoredFields.includes(key)) {
+            return false;
+          }
+
+          if (value === undefined || value === null) {
+            return false;
+          }
+
+          if (Array.isArray(value)) {
+            return value.length > 0;
+          }
+
+          return String(value).trim() !== "";
+        }); %>
+
+      <% if (submittedFields.length > 0) { %>
+
+        <table class="form-table">
+          <tbody>
+
+            <% submittedFields.forEach(([key, value]) => { %>
+
+              <tr>
+                <th>
+                  <%= key
+                    .replaceAll("_", " ")
+                    .replace(/\b\w/g, character =>
+                      character.toUpperCase()
+                    )
+                  %>
+                </th>
+
+                <td>
+                  <% if (Array.isArray(value)) { %>
+                    <%= value.join(", ") %>
+                  <% } else if (
+                    typeof value === "object"
+                  ) { %>
+                    <pre><%= JSON.stringify(value, null, 2) %></pre>
+                  <% } else { %>
+                    <%= value %>
+                  <% } %>
+                </td>
+              </tr>
+
+            <% }); %>
+
+          </tbody>
+        </table>
+
+      <% } else { %>
+
+        <p class="empty-message">
+          No detailed STR form information was saved for this draft.
+          The analyst needs to open and submit the draft again.
+        </p>
+
+      <% } %>
+    </div>
+
+    <div class="section-card">
+      <h2>Suspicious Transaction Narrative</h2>
+
+      <div class="narrative">
+        <%= draft.narrative_text || "No narrative provided." %>
+      </div>
+    </div>
+
+    <div class="decision-card">
+      <h2>STRO Review Decision</h2>
 
       <form
         action="/stro/drafts/<%= draft.str_id %>/review"
         method="POST"
       >
 
-        <div class="mb-3">
-          <label
-            for="stroFeedback"
-            class="form-label fw-bold"
-          >
-            Feedback to Analyst
-          </label>
+        <label for="stro_feedback">
+          <strong>Feedback to Analyst</strong>
+        </label>
 
-          <textarea
-            id="stroFeedback"
-            name="stro_feedback"
-            class="form-control"
-            rows="5"
-            placeholder="Enter amendments, missing information, or clarification required from the analyst"
-          ></textarea>
+        <textarea
+          id="stro_feedback"
+          name="stro_feedback"
+          placeholder="Enter amendments, missing information, or clarification required from the analyst"
+        ><%= draft.stro_feedback || "" %></textarea>
 
-          <div class="form-text">
-            Feedback is required when returning the draft to the analyst.
-          </div>
-        </div>
+        <p class="help-text">
+          Feedback is required when returning the draft to the analyst.
+        </p>
 
-        <div class="d-flex justify-content-end gap-2">
+        <div class="button-row">
 
           <a
             href="/stro/dashboard"
-            class="btn btn-outline-secondary"
+            class="btn btn-back"
           >
             Back
           </a>
@@ -45,9 +396,8 @@
           <button
             type="submit"
             name="decision"
-            value="send_feedback"
-            class="btn btn-warning"
-            onclick="return validateFeedback();"
+            value="feedback"
+            class="btn btn-feedback"
           >
             Send Feedback to Analyst
           </button>
@@ -56,65 +406,35 @@
             type="submit"
             name="decision"
             value="approve"
-            class="btn btn-success"
-            onclick="return confirm(
-              'Approve this STR draft?'
-            );"
+            class="btn btn-approve"
           >
             Approve Draft
           </button>
 
         </div>
-
       </form>
-
     </div>
+
   </div>
 
-<% } %>
-
-<script>
-  function validateFeedback() {
-    const feedback = document
-      .getElementById("stroFeedback")
-      .value
-      .trim();
-
-    if (!feedback) {
-      alert(
-        "Please enter feedback before returning the STR draft to the analyst."
-      );
-
-      return false;
-    }
-
-    return confirm(
-      "Send this feedback back to the analyst?"
+  <script>
+    const reviewForm = document.querySelector("form");
+    const feedbackBox = document.getElementById("stro_feedback");
+    const feedbackButton = document.querySelector(
+      'button[value="feedback"]'
     );
-  }
-</script>
 
-<% if (draft.status === "feedback_required") { %>
+    feedbackButton.addEventListener("click", function (event) {
+      if (!feedbackBox.value.trim()) {
+        event.preventDefault();
 
-  <div class="alert alert-warning">
-    <h5>Feedback Sent to Analyst</h5>
+        alert(
+          "Please enter feedback before returning the draft."
+        );
 
-    <p class="mb-0">
-      <strong>Feedback:</strong>
-      <%= draft.stro_feedback || "No feedback provided." %>
-    </p>
-  </div>
-
-<% } %>
-
-<% if (draft.status === "approved_by_stro") { %>
-
-  <div class="alert alert-success">
-    <h5>STR Draft Approved</h5>
-
-    <p class="mb-0">
-      This STR draft has been approved by the STRO reviewer.
-    </p>
-  </div>
-
-<% } %>
+        feedbackBox.focus();
+      }
+    });
+  </script>
+</body>
+</html>

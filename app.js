@@ -56,12 +56,19 @@ app.set("io", io);
 
 const PORT = process.env.PORT || 3006;
 
+// Start the web server immediately
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
+
+// Run database schema setup separately
 ensureComplianceSchema()
-  .catch((err) => {
-    console.error("Compliance schema setup failed:", err);
+  .then(() => {
+    console.log("Compliance schema setup completed");
   })
-  .finally(() => {
-    server.listen(PORT, () => {
-      console.log(`Server running on http://localhost:${PORT}`);
-    });
+  .catch((err) => {
+    console.error(
+      "Compliance schema setup failed:",
+      err.message
+    );
   });
