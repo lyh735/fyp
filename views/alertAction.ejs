@@ -121,7 +121,7 @@
 <body>
   <div class="container py-4">
     <div class="back-link">
-      <a href="javascript:history.back()">&larr; Back to Alert Details</a>
+      <a href="/api/officer/alerts/<%= alert.id || alert.alert_id %>">&larr; Back to Alert Details</a>
     </div>
 
     <div class="card-box">
@@ -185,7 +185,7 @@
           <button type="submit" name="action_type" value="escalate_to_stro" class="btn btn-danger">
             Escalate to STRO
           </button>
-          <button type="button" onclick="history.back()" class="btn btn-light">
+          <button type="button" onclick="window.location.href='/api/officer/alerts/<%= alert.id || alert.alert_id %>'" class="btn btn-light">
             Cancel
           </button>
         </div>

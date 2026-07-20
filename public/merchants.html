@@ -248,7 +248,7 @@
             <p class="helper-text">These active profiles provide the selectable MCC codes for merchants and the category defaults used by the risk engine.</p>
             <div class="table-wrap">
               <table>
-                <thead><tr><th>MCC Code</th><th>Description</th><th>Active</th><th>Actions</th></tr></thead>
+                <thead><tr><th>MCC Code</th><th>Description</th><th>Active</th><th id="mccActionsHead">Actions</th></tr></thead>
                 <tbody id="mccBody"><tr><td colspan="4" class="empty-cell">Loading...</td></tr></tbody>
               </table>
             </div>
@@ -297,7 +297,7 @@
             <div class="table-wrap">
               <table>
                 <thead><tr><th>Terminal ID</th><th>Label</th><th>Status</th><th>Created</th><th id="terminalActionsHead" hidden>Actions</th></tr></thead>
-                <tbody id="terminalBody"><tr><td colspan="5" class="empty-cell">Loading...</td></tr></tbody>
+                <tbody id="terminalBody"><tr><td colspan="4" class="empty-cell">Loading...</td></tr></tbody>
               </table>
             </div>
             <form id="terminalForm" class="admin-form" hidden style="margin-top:14px">
@@ -311,8 +311,8 @@
           <div class="card-header"><h3>Related Transactions</h3><div class="search-wrap"><input id="transactionSearch" class="search-input" style="padding-left:12px" placeholder="Search transactions"></div></div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Transaction ID</th><th>Date / Time</th><th>Payment</th><th>Amount</th><th>Country</th><th>Risk</th><th>Status</th><th>Source</th></tr></thead>
-              <tbody id="transactionBody"><tr><td colspan="8" class="empty-cell">Loading...</td></tr></tbody>
+              <thead><tr><th>Transaction ID</th><th>Terminal ID</th><th>Date / Time</th><th>Payment</th><th>Amount</th><th>Country</th><th>Risk</th><th>Status</th><th>Source</th></tr></thead>
+              <tbody id="transactionBody"><tr><td colspan="9" class="empty-cell">Loading...</td></tr></tbody>
             </table>
           </div>
         </section>
@@ -325,7 +325,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
 const user=requireAuth();if(!user)throw new Error("Authentication required");if(user.first_login)location.href="/change-password.html";
-const canEdit=["admin","compliance_manager"].includes(String(user.role).toLowerCase());
+const canEdit=String(user.role).toLowerCase()==="admin";
 const pageParams=new URLSearchParams(location.search);
 let currentMerchantId=pageParams.get("id");
 let merchants=[],merchant=null,transactions=[],terminals=[],mccCodes=[],mccLoaded=false;
@@ -334,7 +334,7 @@ let pendingMerchantRows=[],pendingMerchantValidation={issues:[],invalidIndexes:n
 const merchantImportTemplateHeaders=["merchant_id","merchant_name","business_category","mcc_code","merchant_average_amount","merchant_max_transaction_amount","operating_hours_start","operating_hours_end","country","has_physical_location","status"];
 
 sidebarName.textContent=user.name;sidebarRole.textContent=user.role;sidebarAvatar.textContent=user.name.charAt(0).toUpperCase();topbarName.textContent=user.name;topbarRole.textContent=user.role;topbarRole.className=`badge badge-${canEdit?"admin":"user"}`;
-merchantAdminTools.hidden=!canEdit;createMerchantTab.hidden=!canEdit;importMerchantTab.hidden=!canEdit;mccProfileTab.hidden=!canEdit;editButton.hidden=!canEdit;terminalForm.hidden=!canEdit;terminalActionsHead.hidden=!canEdit;
+merchantAdminTools.hidden=!canEdit;createMerchantTab.hidden=!canEdit;importMerchantTab.hidden=!canEdit;mccProfileTab.hidden=false;editButton.hidden=!canEdit;terminalForm.hidden=!canEdit;terminalActionsHead.hidden=!canEdit;mccActionsHead.hidden=!canEdit;mccForm.hidden=!canEdit;
 
 function display(v,f="-"){return v===null||v===undefined||v===""?f:String(v)}
 function money(v,c="SGD"){return new Intl.NumberFormat("en-SG",{style:"currency",currency:c||"SGD"}).format(Number(v)||0)}
@@ -415,12 +415,12 @@ async function readMerchantFile(file){
 }
 
 function setDirectoryMode(mode){
-  const nextMode=canEdit?mode:"list";
+  const nextMode=canEdit||mode==="mcc"?mode:"list";
   directoryMode=nextMode;
   merchantListPanel.hidden=nextMode!=="list";
   createMerchantPanel.hidden=!canEdit||nextMode!=="create";
   importMerchantPanel.hidden=!canEdit||nextMode!=="import";
-  mccSection.hidden=!canEdit||nextMode!=="mcc";
+  mccSection.hidden=nextMode!=="mcc";
   if(nextMode==="import"){
     if(pendingMerchantRows.length)merchantImportPreviewCard.hidden=false;
     if(merchantImportResultStats.innerHTML.trim())merchantImportResultCard.hidden=false;
@@ -431,7 +431,7 @@ function setDirectoryMode(mode){
   document.querySelectorAll("[data-directory-mode]").forEach(button=>{
     button.classList.toggle("active",button.dataset.directoryMode===nextMode);
   });
-  if(nextMode==="mcc"&&canEdit&&!mccLoaded)loadMccCatalog().catch(()=>setPageMessage("Network error."));
+  if(nextMode==="mcc"&&!mccLoaded)loadMccCatalog().catch(()=>setPageMessage("Network error."));
 }
 
 function setView(view){
@@ -543,12 +543,12 @@ function renderTransactions(filter=""){
   const rows=transactions.filter(txn=>Object.values(txn).some(v=>String(v??"").toLowerCase().includes(q)));
   if(!rows.length){
     const tr=document.createElement("tr"),td=document.createElement("td");
-    td.colSpan=8;td.className="empty-cell";td.textContent=q?"No matching transactions.":"No transactions found for this merchant.";tr.append(td);transactionBody.append(tr);return;
+    td.colSpan=9;td.className="empty-cell";td.textContent=q?"No matching transactions.":"No transactions found for this merchant.";tr.append(td);transactionBody.append(tr);return;
   }
   rows.forEach(txn=>{
     const tr=document.createElement("tr"),idCell=document.createElement("td"),link=document.createElement("a");
     link.className="transaction-link";link.href=`/transaction/${encodeURIComponent(txn.transaction_id)}`;link.textContent=txn.transaction_id;
-    idCell.append(link);tr.append(idCell);
+    idCell.append(link);tr.append(idCell);appendTextCell(tr,txn.terminal_id);
     [dateTime(txn.txn_time||txn.created_at),display(txn.payment_method),money(txn.amount,txn.currency),display(txn.country),`${display(txn.risk_level)} (${display(txn.risk_score,"0")})`,display(txn.transaction_status),display(txn.source_type)].forEach(v=>{const td=document.createElement("td");td.textContent=v;tr.append(td)});
     transactionBody.append(tr);
   });
@@ -568,7 +568,6 @@ function populateMccOptions(){
 }
 
 async function loadMccCatalog(){
-  if(!canEdit)return;
   const res=await apiFetch("/api/mcc-codes");
   if(!res)return;
   const data=await res.json();
@@ -580,15 +579,18 @@ function renderMccCatalog(){
   mccBody.replaceChildren();
   if(!mccCodes.length){
     const tr=document.createElement("tr"),td=document.createElement("td");
-    td.colSpan=4;td.className="empty-cell";td.textContent="No MCC risk profiles defined.";tr.append(td);mccBody.append(tr);return;
+    td.colSpan=canEdit?4:3;td.className="empty-cell";td.textContent="No MCC risk profiles defined.";tr.append(td);mccBody.append(tr);return;
   }
   mccCodes.forEach(m=>{
     const tr=document.createElement("tr");
     appendHtmlCell(tr,`<span class="code-chip">${escapeHtml(m.mcc_code)}</span>`);
     appendTextCell(tr,m.description);
     appendHtmlCell(tr,badgeHtml("status",m.is_active?"active":"inactive"));
-    const actionTd=document.createElement("td"),btn=document.createElement("button");
-    btn.className="btn btn-secondary";btn.type="button";btn.textContent="Deactivate";btn.addEventListener("click",()=>deleteMcc(m.mcc_code));actionTd.append(btn);tr.append(actionTd);mccBody.append(tr);
+    if(canEdit){
+      const actionTd=document.createElement("td"),btn=document.createElement("button");
+      btn.className="btn btn-secondary";btn.type="button";btn.textContent="Deactivate";btn.addEventListener("click",()=>deleteMcc(m.mcc_code));actionTd.append(btn);tr.append(actionTd);
+    }
+    mccBody.append(tr);
   });
 }
 
@@ -681,17 +683,18 @@ function renderTerminals(){
   terminalBody.replaceChildren();
   if(!terminals.length){
     const tr=document.createElement("tr"),td=document.createElement("td");
-    td.colSpan=5;td.className="empty-cell";td.textContent="No terminals registered for this merchant.";tr.append(td);terminalBody.append(tr);return;
+    td.colSpan=canEdit?5:4;td.className="empty-cell";td.textContent="No terminals registered for this merchant.";tr.append(td);terminalBody.append(tr);return;
   }
   terminals.forEach(t=>{
     const tr=document.createElement("tr");
     [t.terminal_id,t.label,t.status,dateTime(t.created_at)].forEach(v=>{const td=document.createElement("td");td.textContent=display(v);tr.append(td)});
-    const actionTd=document.createElement("td");
     if(canEdit){
+      const actionTd=document.createElement("td");
       const btn=document.createElement("button");
       btn.className="btn btn-secondary";btn.type="button";btn.textContent="Delete";btn.addEventListener("click",()=>deleteTerminal(t.terminal_id));actionTd.append(btn);
+      tr.append(actionTd);
     }
-    tr.append(actionTd);terminalBody.append(tr);
+    terminalBody.append(tr);
   });
 }
 

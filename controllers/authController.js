@@ -239,14 +239,14 @@ exports.upgradeUser = (req, res) => {
   const targetId = req.params.id;
 
   db.query(
-    "UPDATE users SET role = 'compliance_manager', updated_at = NOW() WHERE user_id = ? AND role = 'analyst'",
+    "UPDATE users SET role = 'admin', updated_at = NOW() WHERE user_id = ? AND role = 'analyst'",
     [targetId],
     (err, result) => {
       if (err) return res.status(500).json({ message: "Server error" });
       if (result.affectedRows === 0) {
-        return res.status(404).json({ message: "Analyst not found or is already a compliance manager" });
+        return res.status(404).json({ message: "Analyst not found or is already an admin" });
       }
-      res.json({ message: "Analyst promoted to compliance manager successfully" });
+      res.json({ message: "Analyst promoted to admin successfully" });
     }
   );
 };

@@ -1,5 +1,10 @@
 const jwt = require("jsonwebtoken");
 const JWT_SECRET = process.env.JWT_SECRET || "compliance_jwt_secret_2024";
+const VALID_ROLES = new Set(["admin", "analyst", "stro"]);
+
+function normalizeRole(role) {
+  return String(role || "").trim().toLowerCase();
+}
 
 exports.authenticate = (req, res, next) => {
   const authHeader = req.headers["authorization"];
@@ -18,38 +23,23 @@ exports.authenticate = (req, res, next) => {
   });
 };
 
-exports.requireAdmin = (req, res, next) => {
-  if (!["admin", "compliance_manager"].includes(req.user.role)) {
-    return res.status(403).json({ message: "Compliance manager access required" });
+exports.authorizeRoles = (...roles) => {
+  const allowedRoles = new Set(roles.map(normalizeRole));
+  const invalidRoles = [...allowedRoles].filter((role) => !VALID_ROLES.has(role));
+
+  if (invalidRoles.length) {
+    throw new Error(`Invalid RBAC role(s): ${invalidRoles.join(", ")}`);
   }
-  next();
+
+  return (req, res, next) => {
+    const role = normalizeRole(req.user?.role);
+    if (!allowedRoles.has(role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    next();
+  };
 };
 
-exports.requireSystemAdmin = (req, res, next) => {
-  if (String(req.user.role || "").trim().toLowerCase() !== "admin") {
-    return res.status(403).json({ message: "Admin access required" });
-  }
-  next();
-};
-
-exports.requireStro = (req, res, next) => {
-  if (String(req.user.role || "").trim().toLowerCase() !== "stro") {
-    return res.status(403).json({ message: "STRO access required" });
-  }
-  next();
-};
-
-exports.requireAnalyst = (req, res, next) => {
-  if (String(req.user.role || "").trim().toLowerCase() !== "analyst") {
-    return res.status(403).json({ message: "Analyst access required" });
-  }
-  next();
-};
-
-exports.requireAlertOfficer = (req, res, next) => {
-  const role = String(req.user.role || "").trim().toLowerCase();
-  if (!["admin", "compliance_manager", "analyst"].includes(role)) {
-    return res.status(403).json({ message: "Compliance officer access required" });
-  }
-  next();
-};
+exports.requireAdmin = exports.authorizeRoles("admin");
+exports.requireAnalyst = exports.authorizeRoles("analyst");
+exports.requireStro = exports.authorizeRoles("stro");

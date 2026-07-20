@@ -293,6 +293,12 @@ async function addUniqueIndexIfNoDuplicates(table, indexName, column) {
 }
 
 async function ensureCurrentSchemaCompatibility() {
+  await query(`
+    UPDATE users
+    SET role = 'admin', updated_at = NOW()
+    WHERE LOWER(TRIM(role)) = 'compliance_manager'
+  `);
+
   await addColumnIfMissing("merchants", "has_physical_location", "TINYINT(1) DEFAULT 1");
   await addColumnIfMissing("merchants", "merchant_max_transaction_amount", "DECIMAL(12,2) NULL");
   await addColumnIfMissing("merchants", "created_by", "INT NULL");

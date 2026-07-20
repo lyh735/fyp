@@ -19,10 +19,11 @@
     .card-body { padding:24px; }
     .document { min-height:700px; padding:54px 58px; color:#111827; line-height:1.65; }
     .document h1 { text-align:center; font-size:22px; letter-spacing:1.2px; margin:0 0 30px; }
-    .document .reference { font-weight:700; margin-bottom:28px; }
-    .document ul { list-style:none; padding:0; margin:15px 0 26px; }
+    .document .reference { margin-bottom:24px; }
+    .document .address-block { margin:20px 0; }
+    .document .address-block strong { display:block; }
+    .document ol { padding-left:24px; margin:15px 0 26px; }
     .document li { margin:7px 0; }
-    .document li::before { content:'☑'; margin-right:9px; }
     label { display:block; font-size:13px; font-weight:700; margin-bottom:7px; }
     input[type=text],input[type=date],textarea { width:100%; padding:11px 12px; border:1px solid #cbd5e1; border-radius:8px; font:inherit; }
     textarea { resize:vertical; min-height:95px; }
@@ -57,7 +58,7 @@
 <body>
   <main class="page">
     <div class="topbar">
-      <a class="back" href="/api/officer/alerts/<%= alert.alert_id %>/action">&larr; Back to case review</a>
+      <a class="back" href="/api/officer/alerts/<%= alert.alert_id %>">&larr; Back to Alert Details</a>
       <span class="status"><%= rfi ? rfi.status : 'New RFI' %></span>
     </div>
 
@@ -73,19 +74,30 @@
       <section class="card">
         <div class="document" id="rfiDocument">
           <h1>REQUEST FOR INFORMATION</h1>
-          <div class="reference">Reference No: <span data-preview="reference"><%= referenceNo %></span></div>
-          <p>Dear Merchant,</p>
-          <p>As part of our routine compliance review, we require additional supporting information relating to the transaction(s) listed below.</p>
-          <div class="meta">
-            <div><strong>Merchant</strong><%= alert.merchant_name || alert.merchant_id %></div>
-            <div><strong>Transaction</strong><%= alert.transaction_id %></div>
+          <div class="reference">
+            <div><strong>Reference No.:</strong> <span data-preview="reference"><%= referenceNo %></span></div>
+            <div><strong>Date Issued:</strong> <%= issuedDateDisplay %></div>
+            <div><strong>Response Due Date:</strong> <span data-preview="due"><%= dueDateDisplay %></span></div>
           </div>
-          <p>Please provide the following documents by <strong data-preview="due"><%= dueDateDisplay %></strong>:</p>
-          <ul id="previewDocuments">
+
+          <div class="address-block"><strong>To:</strong><%= alert.merchant_name || alert.merchant_id %></div>
+          <div class="address-block"><strong>From:</strong>Compliance Team<br>Uniweb Pte. Ltd.<br>Email: <a href="mailto:compliance@uniweb.com.sg">compliance@uniweb.com.sg</a></div>
+
+          <p>Dear Sir/Madam,</p>
+          <p>As part of our ongoing compliance and customer due diligence procedures, we require additional supporting information relating to the following transaction processed through our payment network:</p>
+
+          <p><strong>Transaction Reference:</strong> <%= alert.transaction_id %><br>
+          <strong>Transaction Date:</strong> <%= transactionDateDisplay || 'Not specified' %><br>
+          <strong>Transaction Amount:</strong> <%= transactionAmountDisplay %></p>
+
+          <p>Please provide the following available information and supporting documents by <strong data-preview="due"><%= dueDateDisplay %></strong>:</p>
+          <ol id="previewDocuments">
             <% documents.forEach(function(document) { %><li><%= document %></li><% }) %>
-          </ul>
+          </ol>
           <div id="previewRemarks"><% if (rfi && rfi.additional_remarks) { %><p><strong>Additional remarks:</strong><br><%= rfi.additional_remarks %></p><% } %></div>
-          <p>Thank you.</p><p>Compliance Team</p>
+          <p>Please submit the requested information through the merchant portal or email it to <strong><a href="mailto:compliance@uniweb.com.sg">compliance@uniweb.com.sg</a></strong>.</p>
+          <p>Where any requested document is unavailable, please provide an explanation in your response. This request forms part of Uniweb Pte. Ltd.&rsquo;s standard compliance review procedures. Your prompt cooperation is appreciated.</p>
+          <p>Yours sincerely,<br><strong>Compliance Team</strong><br><strong>Uniweb Pte. Ltd.</strong></p>
         </div>
       </section>
 
@@ -163,10 +175,13 @@
     const checkboxes = [...document.querySelectorAll('input[name="documents"]')];
     function formatDateValue(value) {
       const parts = String(value || '').split('-');
-      return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : '—';
+      const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+      return parts.length === 3 ? `${Number(parts[2])} ${months[Number(parts[1]) - 1]} ${parts[0]}` : '—';
     }
     function updatePreview() {
-      document.querySelector('[data-preview="due"]').textContent = formatDateValue(dueInput.value);
+      document.querySelectorAll('[data-preview="due"]').forEach(element => {
+        element.textContent = formatDateValue(dueInput.value);
+      });
       document.getElementById('previewDocuments').innerHTML = checkboxes.filter(c => c.checked).map(c => `<li>${c.value.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}</li>`).join('');
       const remarks = remarksInput.value.trim();
       document.getElementById('previewRemarks').innerHTML = remarks ? `<p><strong>Additional remarks:</strong><br>${remarks.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])).replace(/\n/g,'<br>')}</p>` : '';

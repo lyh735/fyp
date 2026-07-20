@@ -3,18 +3,20 @@ const router = express.Router();
 
 const officerController = require("../controllers/officerController");
 const rfiController = require("../controllers/rfiController");
-const { authenticate, requireAlertOfficer } = require("../middleware/authMiddleware");
+const { authenticate, authorizeRoles } = require("../middleware/authMiddleware");
 const { handleResponseUpload } = require("../middleware/rfiUpload");
+
+const allowAllRoles = authorizeRoles("admin", "analyst", "stro");
 
 router.use(authenticate);
 
 router.get("/audit-logs", officerController.showAuditLogsPage);
 router.get("/report", officerController.showReportPage);
+router.get("/alerts/:id", allowAllRoles, officerController.showAlertDetails);
 
-router.use(requireAlertOfficer);
+router.use(authorizeRoles("analyst"));
 
 router.get("/alerts", officerController.showAlertsPage);
-router.get("/alerts/:id", officerController.showAlertDetails);
 router.get("/alerts/:id/action", officerController.showAlertActionPage);
 router.get("/alerts/:id/rfi", rfiController.showRfiPage);
 router.post("/alerts/:id/rfi", rfiController.saveRfi);

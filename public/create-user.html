@@ -85,7 +85,7 @@
         <div class="sidebar-avatar" id="sidebarAvatar">—</div>
         <div>
           <div class="user-name" id="sidebarName">—</div>
-          <div class="user-role">Compliance Manager</div>
+          <div class="user-role">Admin</div>
         </div>
       </div>
       <button class="btn-logout" onclick="logout()">
@@ -105,7 +105,7 @@
       <h2>Manage Users</h2>
       <div class="topbar-right">
         <div class="topbar-user">
-          <span class="badge badge-admin">Compliance Manager</span>
+          <span class="badge badge-admin">Admin</span>
           <span class="user-name" id="topbarName">—</span>
         </div>
       </div>
@@ -250,9 +250,9 @@
 <div class="modal-overlay" id="upgradeModal">
   <div class="modal">
     <button class="modal-close" onclick="closeModal('upgradeModal')">&#x2715;</button>
-    <h3>Promote to Compliance Manager</h3>
+    <h3>Promote to Admin</h3>
     <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px">
-      Promote <strong id="upgradeName">—</strong> to compliance manager?
+      Promote <strong id="upgradeName">—</strong> to admin?
     </p>
     <div id="upgradeMsg" class="message"></div>
     <div class="modal-actions">
@@ -285,7 +285,7 @@
 <script src="/js/auth.js"></script>
 <script>
   const user = requireAdminRole();
-  if (!user) throw new Error("Compliance manager access required");
+  if (!user) throw new Error("Admin access required");
 
   document.getElementById("sidebarName").textContent   = user.name;
   document.getElementById("sidebarAvatar").textContent = user.name.charAt(0).toUpperCase();
@@ -340,7 +340,7 @@
 
     body.innerHTML = data.map((u, i) => {
       const created = formatDate(u.created_at);
-      const roleLabel = u.role === "compliance_manager" ? "Compliance Manager" : u.role.toUpperCase();
+      const roleLabel = u.role.toUpperCase();
       const rolePill = `<span class="pill" style="background:#eff6ff;color:#1d4ed8">${roleLabel}</span>`;
       const statusPill = u.first_login
         ? `<span class="pill pill-pending">Pending</span>`

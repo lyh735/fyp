@@ -5,7 +5,7 @@ CREATE TABLE users (
     name VARCHAR(100) NOT NULL,
     email VARCHAR(100) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
-    role VARCHAR(50) NOT NULL, -- compliance_manager, analyst, stro
+    role VARCHAR(50) NOT NULL, -- admin, analyst, stro
     first_login TINYINT DEFAULT 1,
     status VARCHAR(30) DEFAULT 'active',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

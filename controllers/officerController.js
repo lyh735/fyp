@@ -34,7 +34,7 @@ exports.showAlertDetails = (req, res) => {
 
   const sql = `
     SELECT a.*, a.alert_id AS id, COALESCE(a.message, a.triggered_rules) AS reason,
-           m.merchant_name, t.amount, t.currency, t.ip_address, t.country,
+           m.merchant_name, t.amount, t.currency, t.ip_address, t.country, t.terminal_id,
            m.mcc_code, m.merchant_risk_score,
            mcr.category_name AS mcc_category_name,
            COALESCE(mcr.risk_level, 'LOW') AS mcc_risk_level,
@@ -60,7 +60,8 @@ exports.showAlertDetails = (req, res) => {
     }
 
     res.render("alertDetails", {
-      alert: results[0]
+      alert: results[0],
+      canTakeAction: String(req.user?.role || "").trim().toLowerCase() === "analyst"
     });
 
   });

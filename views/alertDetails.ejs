@@ -128,7 +128,7 @@
 
 <div class="container mt-5">
 
-  <button type="button" class="btn btn-outline-secondary mb-3" onclick="window.history.back()">← Back</button>
+  <a class="btn btn-outline-secondary mb-3" href="/alerts.html">← Back to Alert Queue</a>
 
   <h2 class="mb-4">Transaction Information</h2>
 
@@ -161,6 +161,20 @@
       <div class="col-md-6">
         <div class="label-title">Merchant Name</div>
         <h2><%= alert.merchant_name || '—' %></h2>
+      </div>
+
+    </div>
+
+    <div class="row mb-4">
+
+      <div class="col-md-6">
+        <div class="label-title">MCC Code</div>
+        <h2><%= alert.mcc_code || '—' %></h2>
+      </div>
+
+      <div class="col-md-6">
+        <div class="label-title">Terminal ID</div>
+        <h2><%= alert.terminal_id || '—' %></h2>
       </div>
 
     </div>
@@ -221,8 +235,10 @@
 
     <h3 class="mb-4">Analyst Review</h3>
 
-    <% if(['Pending', 'Pending Review', 'open'].includes(alert.status)) { %>
+    <% if(canTakeAction && ['Pending', 'Pending Review', 'open'].includes(alert.status)) { %>
       <button type="button" class="btn btn-danger" onclick="goToAlertAction(<%= alert.id %>)">Take Action</button>
+    <% } else if(['Pending', 'Pending Review', 'open'].includes(alert.status)) { %>
+      <p class="text-muted">You have view-only access to this alert.</p>
     <% } else { %>
       <p class="text-muted">This alert has already been reviewed and cannot be modified.</p>
     <% } %>

@@ -136,6 +136,16 @@
     </div>
     <div class="row mb-4">
       <div class="col-md-6">
+        <div class="label-title">MCC Code</div>
+        <h2><%= transaction.mcc_code || '—' %></h2>
+      </div>
+      <div class="col-md-6">
+        <div class="label-title">Terminal ID</div>
+        <h2><%= transaction.terminal_id || '—' %></h2>
+      </div>
+    </div>
+    <div class="row mb-4">
+      <div class="col-md-6">
         <div class="label-title">Payment Reference</div>
         <h2><%= transaction.masked_payment_ref || '—' %></h2>
       </div>

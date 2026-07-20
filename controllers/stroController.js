@@ -21,6 +21,27 @@ const alertSelect = `
          r.response_attachment,
          r.additional_remarks AS analyst_remarks,
          (
+           SELECT s.status
+           FROM str_reports s
+           WHERE s.alert_id = a.alert_id
+           ORDER BY s.updated_at DESC, s.str_id DESC
+           LIMIT 1
+         ) AS str_status,
+         (
+           SELECT s.approved_at
+           FROM str_reports s
+           WHERE s.alert_id = a.alert_id
+           ORDER BY s.updated_at DESC, s.str_id DESC
+           LIMIT 1
+         ) AS str_approved_at,
+         (
+           SELECT s.rejected_at
+           FROM str_reports s
+           WHERE s.alert_id = a.alert_id
+           ORDER BY s.updated_at DESC, s.str_id DESC
+           LIMIT 1
+         ) AS str_rejected_at,
+         (
            SELECT ca.remarks
            FROM case_actions ca
            WHERE ca.alert_id = a.alert_id
@@ -34,6 +55,35 @@ const alertSelect = `
   LEFT JOIN users reviewer ON reviewer.user_id = a.reviewed_by
   LEFT JOIN rfi_requests r ON r.alert_id = a.alert_id
 `;
+
+exports.getStroOutcomes = async (req, res) => {
+  try {
+    const outcomes = await query(`${alertSelect}
+      WHERE a.escalated_at IS NOT NULL
+      ORDER BY a.escalated_at DESC, a.created_at DESC
+      LIMIT 200`);
+
+    res.json(outcomes.map((outcome) => ({
+      id: outcome.id,
+      alert_id: outcome.alert_id,
+      transaction_id: outcome.transaction_id,
+      merchant_id: outcome.merchant_id,
+      merchant_name: outcome.merchant_name,
+      amount: outcome.amount,
+      currency: outcome.currency,
+      risk_score: outcome.risk_score,
+      risk_level: outcome.risk_level,
+      priority: outcome.priority,
+      escalated_at: outcome.escalated_at,
+      str_status: outcome.str_status,
+      str_approved_at: outcome.str_approved_at,
+      str_rejected_at: outcome.str_rejected_at,
+    })));
+  } catch (err) {
+    console.error("Unable to load STRO outcomes:", err);
+    res.status(500).json({ message: "Unable to load STRO outcomes" });
+  }
+};
 
 exports.getEscalatedAlerts = async (req, res) => {
   try {

@@ -87,6 +87,7 @@
         <div class="nav-section-label">STRO Review</div>
         <div class="nav-item" onclick="window.location.href='/stro-alerts.html'">Escalated Alerts</div>
         <div class="nav-item" onclick="window.location.href='/str-draft.html'">STR Drafting</div>
+        <div class="nav-item" onclick="window.location.href='/analyst-rfi-history.html'">RFI History</div>
         <div class="nav-item" onclick="window.location.href='/api/officer/report'">Reports</div>
         <div class="nav-item" onclick="window.location.href='/api/officer/audit-logs'">Audit Trail</div>
       </div>
@@ -190,7 +191,7 @@ const user = requireAuth();
 if (!user) throw new Error("not authenticated");
 if (user.first_login) window.location.href = "/change-password.html";
 const currentPage = document.body.dataset.page || "overview";
-if (currentPage === "simulator" && !["admin", "compliance_manager"].includes(user.role)) {
+if (currentPage === "simulator" && user.role !== "admin") {
   window.location.href = "/dashboard.html";
   throw new Error("admin required");
 }
@@ -204,7 +205,7 @@ const roleEl = document.getElementById("topbarRole");
 roleEl.textContent = user.role;
 roleEl.className   = `badge badge-${user.role}`;
 
-if (["admin", "compliance_manager"].includes(user.role)) {
+if (user.role === "admin") {
   const adminNav = document.getElementById("adminNav");
   const statUsersCard = document.getElementById("statUsersCard");
   if (adminNav) adminNav.style.display = "block";
@@ -597,7 +598,7 @@ async function escalateCurrentAlert() {
 }
 
 async function loadUsers() {
-  if (!["admin", "compliance_manager"].includes(user.role)) return;
+  if (user.role !== "admin") return;
   const statUsers = document.getElementById("statUsers");
   if (!statUsers) return;
   const res = await apiFetch("/api/auth/users");
@@ -618,7 +619,7 @@ async function loadProfile() {
   document.getElementById("viewRole").textContent  = data.role ? (data.role.charAt(0).toUpperCase() + data.role.slice(1)) : "—";
 
   // Admin also gets the editable form
-  if (["admin", "compliance_manager"].includes(user.role)) {
+  if (user.role === "admin") {
     document.getElementById("profileView").style.display  = "none";
     document.getElementById("profileForm").style.display  = "";
     document.getElementById("profName").value  = data.name  || "";

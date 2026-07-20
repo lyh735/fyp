@@ -473,14 +473,14 @@ document.getElementById("topbarName").textContent = user.name;
 const roleEl = document.getElementById("topbarRole");
 roleEl.textContent = user.role;
 roleEl.className = `badge badge-${user.role}`;
-if (["admin", "compliance_manager"].includes(user.role)) document.getElementById("adminNav").style.display = "block";
+if (user.role === "admin") document.getElementById("adminNav").style.display = "block";
 
 let rules = [];
 let mccProfiles = [];
 let statusFilter = "all";
 let editingRuleId = null;
 let currentRulesView = "rules";
-const canManageRules = ["admin", "compliance_manager"].includes(user.role);
+const canManageRules = user.role === "admin";
 const tableColspan = canManageRules ? 9 : 8;
 
 if (canManageRules) {

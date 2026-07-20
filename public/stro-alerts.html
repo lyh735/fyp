@@ -52,25 +52,26 @@
   <header class="stro-header">
     <div class="stro-brand">
       <div class="stro-brand-mark"><svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg></div>
-      <div><h1>Compliance Monitor</h1><p>Suspicious Transaction Reporting Officer</p></div>
+      <div><h1>Compliance Monitor</h1><p id="workspaceLabel">Suspicious Transaction Reporting Officer</p></div>
     </div>
     <nav class="stro-nav" aria-label="STRO navigation">
       <a href="/dashboard.html">Overview</a>
       <a href="/transactions.html">Past Transactions</a>
       <a class="active" href="/stro-alerts.html">Escalated Alerts</a>
-      <a href="/str-draft.html">STR Drafting</a>
+      <a id="stroDraftNav" href="/str-draft.html">STR Drafting</a>
+      <a href="/analyst-rfi-history.html">RFI History</a>
       <a href="/api/officer/report">Reports</a>
       <a href="/api/officer/audit-logs">Audit Trail</a>
     </nav>
     <div class="stro-user">
-      <div class="hide-mobile"><strong id="userName"></strong><div style="font-size:12px;color:var(--text-muted);text-align:right">STRO</div></div>
+      <div class="hide-mobile"><strong id="userName"></strong><div id="userRoleLabel" style="font-size:12px;color:var(--text-muted);text-align:right">STRO</div></div>
       <button class="btn btn-secondary" onclick="logout()">Sign Out</button>
     </div>
   </header>
 
   <main class="stro-main">
     <div class="page-heading">
-      <div><h2>Escalated Alerts</h2><p>Alerts referred by compliance officers for your review.</p></div>
+      <div><h2 id="pageHeading">Escalated Alerts</h2><p id="pageDescription">Alerts referred by compliance officers for your review.</p></div>
       <div class="summary-chip"><span id="alertCount">0</span> escalated</div>
     </div>
     <div id="errorBox" class="error-box"></div>
@@ -84,7 +85,7 @@
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Alert</th><th>Transaction</th><th>Merchant</th><th>Amount</th><th>Risk</th><th>Escalated At</th><th>Status</th><th>Action</th></tr></thead>
+          <thead><tr><th>Alert</th><th>Transaction</th><th>Merchant</th><th>Amount</th><th>Risk</th><th>Escalated At</th><th>STRO Outcome</th><th>Action</th></tr></thead>
           <tbody id="alertRows"><tr><td colspan="8"><div class="empty">Loading escalated alerts...</div></td></tr></tbody>
         </table>
       </div>
@@ -99,10 +100,25 @@
 
 <script src="/js/auth.js"></script>
 <script>
-  const user = requireStroRole();
-  if (!user) throw new Error("STRO access required");
+  const user = requireAuth();
+  if (!user) throw new Error("Authentication required");
+  const currentRole = String(user.role || "").trim().toLowerCase();
+  const isStro = currentRole === "stro";
+  const isAnalyst = currentRole === "analyst";
+  if (!isStro && !isAnalyst) {
+    window.location.href = "/dashboard.html";
+    throw new Error("Analyst or STRO access required");
+  }
   if (user.first_login) window.location.href = "/change-password.html";
   document.getElementById("userName").textContent = user.name;
+  document.getElementById("userRoleLabel").textContent = isStro ? "STRO" : "Analyst · read only";
+  if (isAnalyst) {
+    document.title = "STRO Outcomes - Compliance Monitoring System";
+    document.getElementById("workspaceLabel").textContent = "Analyst read-only view";
+    document.getElementById("pageHeading").textContent = "STRO Outcomes";
+    document.getElementById("pageDescription").textContent = "Read-only visibility of escalated cases and STRO outcomes.";
+    document.getElementById("stroDraftNav").style.display = "none";
+  }
 
   let alerts = [];
   const rows = document.getElementById("alertRows");
@@ -111,6 +127,14 @@
   const escapeHtml = (value) => String(value ?? "-").replace(/[&<>'"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]));
   const formatDate = (value) => value ? new Date(value).toLocaleString("en-SG", { dateStyle: "medium", timeStyle: "short" }) : "-";
   const formatMoney = (alert) => alert.amount == null ? "-" : `${escapeHtml(alert.currency || "SGD")} ${Number(alert.amount).toLocaleString("en-SG", { minimumFractionDigits: 2 })}`;
+  const outcomeLabel = (alert) => {
+    const status = String(alert.str_status || "").trim().toLowerCase();
+    if (alert.str_rejected_at || status === "rejected") return "Rejected";
+    if (alert.str_approved_at || status === "approved") return "Approved";
+    if (status === "closed") return "Closed";
+    if (status === "draft") return "Pending STRO decision";
+    return "No STR draft";
+  };
 
   function renderAlerts(items) {
     if (!items.length) {
@@ -125,8 +149,10 @@
         <td>${formatMoney(a)}</td>
         <td><span class="risk risk-${String(a.risk_level || "low").toLowerCase()}">${escapeHtml(a.risk_level)}</span></td>
         <td>${escapeHtml(formatDate(a.escalated_at))}</td>
-        <td><span class="status-escalated">${escapeHtml(a.status)}</span></td>
-        <td><button class="btn btn-secondary draft-link" type="button" data-id="${a.id}">Draft STR</button></td>
+        <td><span class="status-escalated">${escapeHtml(outcomeLabel(a))}</span></td>
+        <td>${isStro
+          ? `<button class="btn btn-secondary draft-link" type="button" data-id="${a.id}">Draft STR</button>`
+          : `<button class="btn btn-secondary detail-link" type="button" data-id="${a.id}">View details</button>`}</td>
       </tr>`).join("");
     document.querySelectorAll(".alert-row").forEach(row => {
       row.addEventListener("click", () => showDetail(row.dataset.id));
@@ -138,6 +164,12 @@
         window.location.href = `/str-draft.html?alert_id=${encodeURIComponent(btn.dataset.id)}`;
       });
     });
+    document.querySelectorAll(".detail-link").forEach(btn => {
+      btn.addEventListener("click", e => {
+        e.stopPropagation();
+        showDetail(btn.dataset.id);
+      });
+    });
   }
 
   function rulesText(value) {
@@ -147,15 +179,32 @@
   }
 
   async function showDetail(id) {
-    const res = await apiFetch(`/api/stro/alerts/${id}`);
-    if (!res) return;
-    const a = await res.json();
-    if (!res.ok) return showError(a.message || "Unable to load alert details");
+    let a;
+    if (isAnalyst) {
+      a = alerts.find(alert => String(alert.id) === String(id));
+      if (!a) return showError("Outcome not found");
+    } else {
+      const res = await apiFetch(`/api/stro/alerts/${id}`);
+      if (!res) return;
+      a = await res.json();
+      if (!res.ok) return showError(a.message || "Unable to load alert details");
+    }
     const fields = [
       ["Alert ID", `#${a.id}`], ["Transaction ID", a.transaction_id], ["Merchant", a.merchant_name || a.merchant_id], ["Amount", `${a.currency || "SGD"} ${a.amount == null ? "-" : Number(a.amount).toFixed(2)}`],
       ["Risk score", a.risk_score], ["Risk level", a.risk_level], ["Priority", a.priority], ["Escalated at", formatDate(a.escalated_at)],
-      ["Escalated by", a.escalated_by], ["Transaction type", a.transaction_type], ["Payment method", a.payment_method], ["Country", a.country]
+      ["STRO outcome", outcomeLabel(a)], ["Approved at", formatDate(a.str_approved_at)], ["Rejected at", formatDate(a.str_rejected_at)]
     ];
+    if (isAnalyst) {
+      document.getElementById("detailGrid").innerHTML = fields.map(([label, value]) => `<div class="detail-field"><label>${escapeHtml(label)}</label><div>${escapeHtml(value)}</div></div>`).join("") +
+        `<div class="detail-field detail-wide"><label>Access</label><div class="detail-report">Read-only outcome. STRO decision controls are not available to analysts.</div></div>`;
+      detailPanel.classList.add("visible");
+      detailPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    fields.splice(8, 0,
+      ["Escalated by", a.escalated_by], ["Transaction type", a.transaction_type],
+      ["Payment method", a.payment_method], ["Country", a.country]
+    );
     const rfiSection = a.rfi_id ? `
       <div class="detail-field detail-wide"><label>Request for Information</label><div class="detail-report">
         <strong>${escapeHtml(a.rfi_reference_no)}</strong><br>
@@ -165,14 +214,14 @@
         Responded: ${escapeHtml(formatDate(a.rfi_responded_at))}<br><br>
         <strong>Analyst remarks</strong><br>${escapeHtml(a.analyst_remarks || "No remarks recorded.")}<br><br>
         <strong>Merchant response</strong><br>${escapeHtml(a.response_message || "No merchant response recorded.")}<br><br>
-        <button class="btn btn-secondary" onclick="downloadProtected('/api/stro/rfi/${Number(a.rfi_id)}/pdf', 'rfi.pdf')">Download RFI PDF</button>
-        ${a.response_attachment ? `<button class="btn btn-secondary" onclick="downloadProtected('/api/stro/rfi/${Number(a.rfi_id)}/response-file', 'merchant-response')">Download Merchant Response</button>` : ""}
+        ${isStro ? `<button class="btn btn-secondary" onclick="downloadProtected('/api/stro/rfi/${Number(a.rfi_id)}/pdf', 'rfi.pdf')">Download RFI PDF</button>` : ""}
+        ${isStro && a.response_attachment ? `<button class="btn btn-secondary" onclick="downloadProtected('/api/stro/rfi/${Number(a.rfi_id)}/response-file', 'merchant-response')">Download Merchant Response</button>` : ""}
       </div></div>` : `<div class="detail-field detail-wide"><label>Request for Information</label><div>No RFI is linked to this case.</div></div>`;
     const history = Array.isArray(a.case_history) && a.case_history.length
       ? `<ul class="case-history">${a.case_history.map(item => `<li><strong>${escapeHtml(String(item.action_type || "").replaceAll("_", " "))}</strong> - ${escapeHtml(item.status_after_action || "No status change")}<div>${escapeHtml(item.remarks || "")}</div><small>${escapeHtml(item.actor_name || "System")} · ${escapeHtml(formatDate(item.created_at))}</small></li>`).join("")}</ul>`
       : "No case activity recorded.";
     document.getElementById("detailGrid").innerHTML = fields.map(([label, value]) => `<div class="detail-field"><label>${escapeHtml(label)}</label><div>${escapeHtml(value)}</div></div>`).join("") +
-      `<div class="detail-field detail-wide"><label>STR Drafting</label><div><a class="btn btn-primary" href="/str-draft.html?alert_id=${encodeURIComponent(a.alert_id)}">Open STR Draft</a></div></div>` +
+      (isStro ? `<div class="detail-field detail-wide"><label>STR Drafting</label><div><a class="btn btn-primary" href="/str-draft.html?alert_id=${encodeURIComponent(a.alert_id)}">Open STR Draft</a></div></div>` : "") +
       `<div class="detail-field detail-wide"><label>Triggered rules</label><div>${escapeHtml(rulesText(a.triggered_rules))}</div></div>` +
       `<div class="detail-field detail-wide"><label>Escalation report / officer remarks</label><div class="detail-report">${escapeHtml(a.escalation_report || a.message || "No escalation remarks were provided.")}</div></div>` + rfiSection +
       `<div class="detail-field detail-wide"><label>Case history</label>${history}</div>`;
@@ -203,7 +252,7 @@
 
   (async function loadAlerts() {
     try {
-      const res = await apiFetch("/api/stro/alerts");
+      const res = await apiFetch(isAnalyst ? "/api/stro/outcomes" : "/api/stro/alerts");
       if (!res) return;
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Unable to load escalated alerts");
