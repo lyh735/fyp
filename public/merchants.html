@@ -180,7 +180,7 @@
               <p class="helper-text">Upload an XLSX, XLS, CSV, TSV, or TXT file with the required merchant columns. The first worksheet and first row of headings will be used.</p>
               <div class="import-tool-row">
                 <button id="downloadMerchantTemplateButton" class="btn btn-secondary" type="button">Download template</button>
-                <span class="helper-text">Downloads a header-only Excel file with the required merchant columns.</span>
+                <span class="helper-text">Downloads an Excel workbook with all supported merchant columns, field instructions, and the active MCC catalog.</span>
               </div>
               <input id="merchantImportFileInput" type="file" accept=".xlsx,.xls,.csv,.tsv,.txt" hidden>
               <div id="merchantImportDropZone" class="import-drop-zone" tabindex="0">
@@ -193,7 +193,10 @@
                 <div class="guide-item"><code>merchant_name *</code><span>Merchant name cannot be blank</span></div>
                 <div class="guide-item"><code>business_category *</code><span>Supported business label</span></div>
                 <div class="guide-item"><code>mcc_code *</code><span>Must exist in the active MCC risk profiles</span></div>
+                <div class="guide-item"><code>merchant_average_amount</code><span>Optional non-negative average transaction amount</span></div>
                 <div class="guide-item"><code>merchant_max_transaction_amount</code><span>Optional configured maximum transaction amount</span></div>
+                <div class="guide-item"><code>merchant_risk_score</code><span>Optional whole number from 0 to 100; defaults to 0</span></div>
+                <div class="guide-item"><code>risk_level</code><span>Optional: <code>Low</code>, <code>Medium</code>, or <code>High</code></span></div>
                 <div class="guide-item"><code>operating_hours_start *</code><span>HH:MM or HH:MM:SS</span></div>
                 <div class="guide-item"><code>operating_hours_end *</code><span>Must be later than start time</span></div>
                 <div class="guide-item"><code>country *</code><span>Cannot be blank</span></div>
@@ -331,7 +334,23 @@ let currentMerchantId=pageParams.get("id");
 let merchants=[],merchant=null,transactions=[],terminals=[],mccCodes=[],mccLoaded=false;
 let directoryMode="list";
 let pendingMerchantRows=[],pendingMerchantValidation={issues:[],invalidIndexes:new Set(),defaults:[]},merchantImportSourceName="";
-const merchantImportTemplateHeaders=["merchant_id","merchant_name","business_category","mcc_code","merchant_average_amount","merchant_max_transaction_amount","operating_hours_start","operating_hours_end","country","has_physical_location","status"];
+const merchantImportTemplateHeaders=["merchant_id","merchant_name","business_category","mcc_code","merchant_average_amount","merchant_max_transaction_amount","merchant_risk_score","risk_level","operating_hours_start","operating_hours_end","country","has_physical_location","status"];
+const merchantImportTemplateInstructions=[
+  ["Field","Required","Format / allowed values","Notes"],
+  ["merchant_id","Yes","Text, maximum 50 characters","Must be unique and must not already exist."],
+  ["merchant_name","Yes","Text, maximum 100 characters","Merchant name cannot be blank."],
+  ["business_category","Yes","Text, maximum 100 characters","Business label used for the merchant profile."],
+  ["mcc_code","Yes","Active MCC code","Use a code listed on the Active MCC Codes worksheet."],
+  ["merchant_average_amount","No","Non-negative number","Leave blank when no historical average is available."],
+  ["merchant_max_transaction_amount","No","Non-negative number","Merchant-specific large-transaction threshold; leave blank to use the MCC fallback."],
+  ["merchant_risk_score","No","Whole number from 0 to 100","Defaults to 0 when blank."],
+  ["risk_level","No","Low, Medium, or High","Leave blank when the merchant risk level has not been assigned."],
+  ["operating_hours_start","Yes","HH:MM or HH:MM:SS","Must be earlier than operating_hours_end."],
+  ["operating_hours_end","Yes","HH:MM or HH:MM:SS","Overnight operating hours are not supported."],
+  ["country","Yes","Text, maximum 50 characters","For example: Singapore."],
+  ["has_physical_location","Yes","Yes/No or 1/0","Also accepts Y/N and true/false."],
+  ["status","Yes","active or inactive","Controls whether the merchant is active."],
+];
 
 sidebarName.textContent=user.name;sidebarRole.textContent=user.role;sidebarAvatar.textContent=user.name.charAt(0).toUpperCase();topbarName.textContent=user.name;topbarRole.textContent=user.role;topbarRole.className=`badge badge-${canEdit?"admin":"user"}`;
 merchantAdminTools.hidden=!canEdit;createMerchantTab.hidden=!canEdit;importMerchantTab.hidden=!canEdit;mccProfileTab.hidden=false;editButton.hidden=!canEdit;terminalForm.hidden=!canEdit;terminalActionsHead.hidden=!canEdit;mccActionsHead.hidden=!canEdit;mccForm.hidden=!canEdit;
@@ -364,8 +383,8 @@ function sanitizeMerchantImportRow(row){
 }
 function activeMccSet(){return new Set(mccCodes.filter(m=>m.is_active).map(m=>String(m.mcc_code)))}
 function validateMerchantValues(row,{requireId=true}={}){
-  const issues=[],merchantId=String(row.merchant_id??"").trim(),merchantName=String(row.merchant_name??"").trim(),businessCategory=String(row.business_category??"").trim(),mccCode=String(row.mcc_code??"").trim(),countryValue=String(row.country??"").trim(),locationValue=String(row.has_physical_location??"").trim().toLowerCase(),statusValue=String(row.status??"").trim().toLowerCase(),rawStart=String(row.operating_hours_start??"").trim(),rawEnd=String(row.operating_hours_end??"").trim(),start=normalizeMerchantTimeValue(row.operating_hours_start),end=normalizeMerchantTimeValue(row.operating_hours_end),supportedMcc=activeMccSet();
-  const averageAmount=row.merchant_average_amount==null||String(row.merchant_average_amount).trim()===""?null:Number(row.merchant_average_amount),maxTransactionAmount=row.merchant_max_transaction_amount==null||String(row.merchant_max_transaction_amount).trim()===""?null:Number(row.merchant_max_transaction_amount);
+  const issues=[],merchantId=String(row.merchant_id??"").trim(),merchantName=String(row.merchant_name??"").trim(),businessCategory=String(row.business_category??"").trim(),mccCode=String(row.mcc_code??"").trim(),countryValue=String(row.country??"").trim(),locationValue=String(row.has_physical_location??"").trim().toLowerCase(),statusValue=String(row.status??"").trim().toLowerCase(),riskLevelValue=String(row.risk_level??"").trim().toLowerCase(),rawStart=String(row.operating_hours_start??"").trim(),rawEnd=String(row.operating_hours_end??"").trim(),start=normalizeMerchantTimeValue(row.operating_hours_start),end=normalizeMerchantTimeValue(row.operating_hours_end),supportedMcc=activeMccSet();
+  const averageAmount=row.merchant_average_amount==null||String(row.merchant_average_amount).trim()===""?null:Number(row.merchant_average_amount),maxTransactionAmount=row.merchant_max_transaction_amount==null||String(row.merchant_max_transaction_amount).trim()===""?null:Number(row.merchant_max_transaction_amount),riskScore=row.merchant_risk_score==null||String(row.merchant_risk_score).trim()===""?null:Number(row.merchant_risk_score);
   if(requireId&&!merchantId)issues.push("merchant_id is required");else if(merchantId.length>50)issues.push("merchant_id exceeds 50 characters");
   if(!merchantName)issues.push("merchant_name is required");else if(merchantName.length>100)issues.push("merchant_name exceeds 100 characters");
   if(!businessCategory)issues.push("business_category is required");
@@ -378,6 +397,8 @@ function validateMerchantValues(row,{requireId=true}={}){
   if(!["active","inactive"].includes(statusValue))issues.push("status must be active or inactive");
   if(averageAmount!==null&&(!Number.isFinite(averageAmount)||averageAmount<0))issues.push("merchant_average_amount must be a non-negative number");
   if(maxTransactionAmount!==null&&(!Number.isFinite(maxTransactionAmount)||maxTransactionAmount<0))issues.push("merchant_max_transaction_amount must be a non-negative number");
+  if(riskScore!==null&&(!Number.isInteger(riskScore)||riskScore<0||riskScore>100))issues.push("merchant_risk_score must be a whole number from 0 to 100");
+  if(riskLevelValue&&!['low','medium','high'].includes(riskLevelValue))issues.push("risk_level must be Low, Medium, or High");
   return issues;
 }
 
@@ -618,7 +639,7 @@ function validateMerchantImportRows(rows){
 }
 
 function renderMerchantImportPreview(){
-  const headers=[...new Set(pendingMerchantRows.slice(0,10).flatMap(row=>Object.keys(row)))].slice(0,9);
+  const headers=[...new Set(pendingMerchantRows.slice(0,10).flatMap(row=>Object.keys(row)))].slice(0,merchantImportTemplateHeaders.length);
   merchantImportPreviewHead.innerHTML=`<tr>${headers.map(header=>`<th>${escapeHtml(header)}</th>`).join("")}</tr>`;
   merchantImportPreviewBody.innerHTML=pendingMerchantRows.slice(0,10).map((row,index)=>
     `<tr class="${pendingMerchantValidation.invalidIndexes.has(index)?"invalid-preview-row":""}">${headers.map(header=>`<td>${escapeHtml(normalizePreviewValue(row[header]))}</td>`).join("")}</tr>`
@@ -754,14 +775,30 @@ async function prepareMerchantFile(file){
   }
 }
 
-function downloadMerchantTemplate(){
+async function downloadMerchantTemplate(){
   if(typeof XLSX==="undefined"){
     setPageMessage("The Excel template generator is unavailable right now.");
     return;
   }
+  if(!mccLoaded)await loadMccCatalog();
+  if(!mccLoaded){
+    setPageMessage("The active MCC catalog could not be loaded for the merchant template.");
+    return;
+  }
   const workbook=XLSX.utils.book_new();
   const sheet=XLSX.utils.aoa_to_sheet([merchantImportTemplateHeaders]);
+  sheet["!cols"]=merchantImportTemplateHeaders.map(header=>({wch:Math.max(16,header.length+2)}));
+  sheet["!autofilter"]={ref:`A1:${XLSX.utils.encode_col(merchantImportTemplateHeaders.length-1)}1`};
   XLSX.utils.book_append_sheet(workbook,sheet,"Merchants");
+  const instructions=XLSX.utils.aoa_to_sheet(merchantImportTemplateInstructions);
+  instructions["!cols"]=[{wch:34},{wch:12},{wch:30},{wch:74}];
+  instructions["!autofilter"]={ref:`A1:D${merchantImportTemplateInstructions.length}`};
+  XLSX.utils.book_append_sheet(workbook,instructions,"Instructions");
+  const activeMccRows=[["mcc_code","description"],...mccCodes.filter(item=>item.is_active).map(item=>[item.mcc_code,item.description])];
+  const activeMccSheet=XLSX.utils.aoa_to_sheet(activeMccRows);
+  activeMccSheet["!cols"]=[{wch:14},{wch:52}];
+  activeMccSheet["!autofilter"]={ref:`A1:B${Math.max(1,activeMccRows.length)}`};
+  XLSX.utils.book_append_sheet(workbook,activeMccSheet,"Active MCC Codes");
   XLSX.writeFile(workbook,"merchant-import-template.xlsx");
 }
 
