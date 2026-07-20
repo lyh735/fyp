@@ -1,5 +1,5 @@
 require("dotenv").config();
-const mysql = require("mysql2/promise");
+const mysql = require("mysql2");
 
 function normalizeDatabaseName(name) {
   if (!name) return name;
@@ -22,7 +22,7 @@ const db = mysql.createPool({
 
 async function verifyConnection() {
   try {
-    const connection = await db.getConnection();
+    const connection = await db.promise().getConnection();
     connection.release();
     console.log("Connected to MySQL");
   } catch (err) {
