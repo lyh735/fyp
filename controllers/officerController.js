@@ -1,4 +1,41 @@
 const db = require("../config/db");
+const {
+  buildCompletedStrNarrative,
+  buildStrNarrative,
+  submitStrDraftAndEscalate,
+} = require("../services/strEscalation");
+
+function normalizeDraftData(body = {}) {
+  const ignoredFields = new Set(["str_id", "submit_action"]);
+  return Object.fromEntries(
+    Object.entries(body)
+      .filter(([key]) => !ignoredFields.has(key))
+      .map(([key, value]) => [
+        key.replace(/\[\]$/, ""),
+        Array.isArray(value)
+          ? value.map((item) => String(item).trim()).filter(Boolean)
+          : String(value ?? "").trim(),
+      ])
+  );
+}
+
+function parseDraftData(value) {
+  if (!value) return {};
+  if (typeof value === "object") return value;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function firstFormValue(value) {
+  if (Array.isArray(value)) {
+    return value.find((item) => String(item ?? "").trim() !== "");
+  }
+  return value;
+}
 
 exports.showAlertsPage = (req, res) => {
 
@@ -27,10 +64,8 @@ exports.showAlertsPage = (req, res) => {
 
 };
 
-exports.showAlertDetails = (req, res) => {
-
+exports.showAlertDetails = async (req, res) => {
   const alertId = req.params.id;
-
 
   const sql = `
     SELECT a.*, a.alert_id AS id, COALESCE(a.message, a.triggered_rules) AS reason,
@@ -48,12 +83,16 @@ exports.showAlertDetails = (req, res) => {
     LIMIT 1
   `;
 
-  db.query(sql, [alertId], (err, results) => {
+  try {
+    // Opening the review page counts as reading the alert for every role that
+    // is authorised to view it. COALESCE preserves the original read time.
+    await db.promise().query(`
+      UPDATE alerts
+      SET read_at = COALESCE(read_at, NOW())
+      WHERE alert_id = ?
+    `, [alertId]);
 
-    if (err) {
-      console.error(err);
-      return res.send("Database error");
-    }
+    const [results] = await db.promise().query(sql, [alertId]);
 
     if (results.length === 0) {
       return res.send("Alert not found");
@@ -63,9 +102,10 @@ exports.showAlertDetails = (req, res) => {
       alert: results[0],
       canTakeAction: String(req.user?.role || "").trim().toLowerCase() === "analyst"
     });
-
-  });
-
+  } catch (err) {
+    console.error("Error loading alert details:", err);
+    return res.status(500).send("Database error");
+  }
 };
 
 exports.showAlertActionPage = (req, res) => {
@@ -104,7 +144,6 @@ exports.takeActionPage = (req, res) => {
 
   const {
     alert_id,
-    officer_name,
     action_type: requestedActionType,
     remarks
   } = req.body;
@@ -122,6 +161,10 @@ exports.takeActionPage = (req, res) => {
     return res.status(400).send("Unsupported case action");
   }
 
+  if (action_type === "escalate_to_stro") {
+    return res.redirect(`/api/officer/str/prepare/${Number(alert_id)}`);
+  }
+
   // First, fetch the alert details
   const selectAlertSql = "SELECT * FROM alerts WHERE alert_id = ? LIMIT 1";
   
@@ -137,7 +180,8 @@ exports.takeActionPage = (req, res) => {
 
     const alert = alerts[0];
 
-    if (["close_case", "escalate_to_stro"].includes(action_type) && alert.status !== "Pending") {
+    const actionableStatuses = new Set(["Pending", "Pending Review"]);
+    if (action_type === "close_case" && !actionableStatuses.has(alert.status)) {
       const actionLabel = action_type === "close_case" ? "dismissed" : "escalated";
       return res.status(400).send(`Only pending alerts can be ${actionLabel}`);
     }
@@ -152,15 +196,6 @@ exports.takeActionPage = (req, res) => {
       newStatus = "Closed";
     }
 
-    if (action_type === "escalate_to_stro") {
-      newStatus = "Escalated to STRO";
-    }
-
-    const findOfficerSql = `
-      SELECT user_id FROM users
-      WHERE name = ? AND role = 'analyst' AND status = 'active'
-      LIMIT 1
-    `;
     const updateAlertSql = `
       UPDATE alerts
       SET status = ?, reviewed_by = ?, reviewed_at = NOW(),
@@ -180,20 +215,12 @@ exports.takeActionPage = (req, res) => {
       VALUES (?, ?, ?, ?, ?)
     `;
 
-    db.query(findOfficerSql, [officer_name], (err, officers) => {
+    const officerId = Number(req.user?.id || req.user?.user_id);
+    if (!Number.isInteger(officerId) || officerId <= 0) {
+      return res.status(401).send("Authenticated analyst account is required");
+    }
 
-      if (err) {
-        console.error(err);
-        return res.status(500).send("Error finding officer");
-      }
-
-      if (officers.length === 0) {
-        return res.status(400).send("Analyst name must match an active analyst account");
-      }
-
-      const officerId = officers[0].user_id;
-
-      db.query(updateAlertSql, [newStatus, officerId, newStatus, alert_id], (err) => {
+    db.query(updateAlertSql, [newStatus, officerId, newStatus, alert_id], (err) => {
 
         if (err) {
           console.error(err);
@@ -223,224 +250,249 @@ exports.takeActionPage = (req, res) => {
         }
       );
 
-      });
     });
 
   });
 
 };
 
-exports.handleStrDraftSubmission = (req, res) => {
-  const alertIdInput =
-    req.params?.alertId ||
-    req.body?.alert_id ||
-    req.body?.alertId ||
-    req.body?.id;
-
-  const draftIdInput =
-    req.body?.str_id ||
-    req.body?.draft_id ||
-    req.body?.strId ||
-    req.params?.strId;
-
-  const submitAction = String(
-    req.body?.submit_action || "save_draft"
-  ).trim();
-
-  const generatedBy = Number(
-    req.user?.user_id ||
-    req.user?.id ||
-    1
-  );
-
-  console.log("STR submission:", {
-    alertIdInput,
-    draftIdInput,
-    submitAction,
-    generatedBy
-  });
-
-  const narrativeText = String(
-    req.body?.narrative_text ||
-    req.body?.narrative ||
-    req.body?.str_narrative ||
-    "Draft updated from form submission."
-  ).trim();
-
-  const desiredStatus = submitAction === "submit_approval" ? "pending_stro_review" : "draft";
-
-  const continueSubmission = (alertId) => {
-    if (!Number.isInteger(alertId) || alertId <= 0) {
-      return res.status(400).send("Alert ID is required");
-    }
-
-    const selectSql = `
-      SELECT str_id, status
-      FROM str_reports
-      WHERE alert_id = ?
-      ORDER BY updated_at DESC, str_id DESC
-      LIMIT 1
-    `;
-
-    db.query(selectSql, [alertId], (err, rows) => {
-      if (err) {
-        console.error("Error looking up STR draft for update:", err.message);
-        return res.status(500).send("Error saving STR draft: " + err.message);
-      }
-
-      const existingDraft = rows[0];
-      const saveSql = existingDraft
-        ? `
-            UPDATE str_reports
-            SET narrative_text = ?, status = ?, updated_at = NOW()
-            WHERE str_id = ?
-          `
-        : `
-            INSERT INTO str_reports
-            (alert_id, generated_by, narrative_text, status)
-            VALUES (?, ?, ?, ?)
-          `;
-
-      const saveValues = existingDraft
-        ? [narrativeText || "Draft updated from form submission.", desiredStatus, existingDraft.str_id]
-        : [alertId, generatedBy, narrativeText || "Draft updated from form submission.", desiredStatus];
-
-      db.query(saveSql, saveValues, (saveErr, saveResult) => {
-        if (saveErr) {
-          console.error("Error saving STR draft:", saveErr.message);
-          return res.status(500).send("Error saving STR draft: " + saveErr.message);
-        }
-
-        const strId = existingDraft ? existingDraft.str_id : saveResult.insertId;
-        return res.redirect(`/api/officer/str/view/${strId}`);
-      });
-    });
-  };
-
-  const resolvedAlertId = Number(alertIdInput);
-
-  if (Number.isInteger(resolvedAlertId) && resolvedAlertId > 0) {
-    return continueSubmission(resolvedAlertId);
-  }
-
-  const draftId = Number(draftIdInput);
-  if (Number.isInteger(draftId) && draftId > 0) {
-    return db.query(
-      "SELECT alert_id FROM str_reports WHERE str_id = ? LIMIT 1",
-      [draftId],
-      (err, rows) => {
-        if (err) {
-          console.error("Error resolving draft alert id:", err.message);
-          return res.status(500).send("Error resolving draft alert id: " + err.message);
-        }
-
-        if (!rows || rows.length === 0) {
-          return res.status(400).send("Alert ID is required");
-        }
-
-        return continueSubmission(Number(rows[0].alert_id));
-      }
-    );
-  }
-
-  return res.status(400).send("Alert ID is required");
-};
-
-exports.generateSTRDraft = (req, res) => {
+exports.prepareSTRDraft = async (req, res) => {
   const alertId = Number(req.params.alertId);
-  const generatedBy = Number(req.user?.user_id || req.user?.id);
-
   if (!Number.isInteger(alertId) || alertId <= 0) {
     return res.status(400).send("Alert ID is required");
   }
 
-  if (!Number.isInteger(generatedBy) || generatedBy <= 0) {
-    return res.status(401).send(
-      "Authenticated user id is required to generate an STR draft"
-    );
-  }
+  try {
+    const [alerts] = await db.promise().query(`
+      SELECT
+        a.*,
+        a.alert_id AS id,
+        t.amount, t.currency, t.transaction_type, t.payment_method,
+        t.masked_payment_ref, t.masked_card_number, t.terminal_id,
+        t.ip_address, t.country AS transaction_country, t.txn_time,
+        t.transaction_status,
+        m.merchant_name, m.business_category, m.mcc_code,
+        m.merchant_average_amount, m.merchant_risk_score,
+        m.operating_hours_start, m.operating_hours_end,
+        m.risk_level AS merchant_risk_level,
+        m.country AS merchant_country, m.status AS merchant_status,
+        r.reference_no AS rfi_reference_no, r.status AS rfi_status,
+        r.requested_documents, r.request_message, r.additional_remarks,
+        r.response_message, r.response_attachment,
+        r.sent_at AS rfi_sent_at, r.due_at AS rfi_due_at,
+        r.responded_at AS rfi_responded_at
+      FROM alerts a
+      LEFT JOIN transactions t ON t.transaction_id = a.transaction_id
+      LEFT JOIN merchants m ON m.merchant_id = a.merchant_id
+      LEFT JOIN rfi_requests r ON r.alert_id = a.alert_id
+      WHERE a.alert_id = ?
+      LIMIT 1
+    `, [alertId]);
 
-  const alertSql = `
-    SELECT * FROM alerts
-    WHERE alert_id = ?
-  `;
-
-  db.query(alertSql, [alertId], (err, results) => {
-    if (err) {
-      console.error("Error fetching alert:", err.message);
-      return res.send("Error fetching alert: " + err.message);
+    if (alerts.length === 0) {
+      return res.status(404).send("Alert not found");
     }
 
-    if (results.length === 0) {
-      return res.send("Alert not found");
-    }
-
-    const alert = results[0];
-
-    if (alert.status !== "Escalated to STRO") {
+    const alert = alerts[0];
+    const currentStatus = String(alert.status || "").trim().toLowerCase();
+    if (!["pending", "pending review"].includes(currentStatus)) {
       return res.status(400).send(
-        "STR draft can only be generated for escalated cases."
+        "Only pending alerts can be prepared for STRO escalation"
       );
     }
 
-    const strReference = "STR-" + new Date().getFullYear() + "-" + Date.now();
+    const [[drafts], [actions]] = await Promise.all([
+      db.promise().query(`
+        SELECT * FROM str_reports
+        WHERE alert_id = ?
+        ORDER BY updated_at DESC, str_id DESC
+        LIMIT 1
+      `, [alertId]),
+      db.promise().query(`
+        SELECT action_type, status_after_action, remarks, created_at
+        FROM case_actions
+        WHERE alert_id = ?
+        ORDER BY created_at ASC, action_id ASC
+      `, [alertId]),
+    ]);
 
-    const narrativeText = `
-Suspicious Transaction Report Draft
+    const existingDraft = drafts[0] || null;
+    if (existingDraft && !["draft", "feedback_required"].includes(existingDraft.status)) {
+      return res.status(400).send("This STR has already entered STRO review");
+    }
 
-Transaction ID: ${alert.transaction_id || "N/A"}
-Merchant ID: ${alert.merchant_id || "N/A"}
-Risk Level: ${alert.risk_level || "N/A"}
-Risk Score: ${alert.risk_score || "N/A"}
+    const savedData = parseDraftData(existingDraft?.draft_data);
+    const reportDate = new Date(Date.now() + (8 * 60 * 60 * 1000))
+      .toISOString()
+      .slice(0, 10);
+    const initialData = {
+      alert_id: alertId,
+      status: "draft",
+      report_date: reportDate,
+      reporting_officer_name: req.user?.name || "",
+      merchant_name: alert.merchant_name || "",
+      merchant_id: alert.merchant_id || "",
+      business_type: alert.business_category || "",
+      transaction_id: alert.transaction_id || "",
+      transaction_amount: alert.amount ?? "",
+      currency: alert.currency || "SGD",
+      transaction_datetime: alert.txn_time || "",
+      transaction_status: alert.transaction_status || "",
+      payment_method: alert.payment_method || "",
+      detection_method: "Automated transaction monitoring",
+      risk_level: alert.risk_level || "",
+      risk_score: alert.risk_score ?? "",
+      investigation_findings: [
+        alert.additional_remarks,
+        alert.response_message,
+      ].filter(Boolean).join("\n\n"),
+      other_supporting_evidence: alert.requested_documents || "",
+      narrative_text: buildStrNarrative(alert, actions, ""),
+    };
 
-Reason for Suspicion:
-This transaction was flagged by the AML monitoring system due to a ${alert.risk_level || "suspicious"} risk rating with a risk score of ${alert.risk_score || "N/A"}.
+    const strDraft = {
+      ...initialData,
+      ...savedData,
+      ...(existingDraft || {}),
+      draft_data: undefined,
+      narrative_text: existingDraft?.narrative_text || initialData.narrative_text,
+    };
 
-Triggered Rule(s):
-${alert.triggered_rules || "No triggered rules recorded."}
-
-Alert Message:
-${alert.message || "No alert message recorded."}
-
-Compliance Assessment:
-Based on the risk indicators, this transaction appears unusual and may require further investigation by the compliance officer. The case is recommended for STR review before submission to STRO.
-
-Recommended Action:
-Prepare STR draft and escalate for approval.
-`;
-
-
-    const insertSql = `
-      INSERT INTO str_reports
-      (alert_id, generated_by, str_reference_number, narrative_text, status)
-      VALUES (?, ?, ?, ?, ?)
-    `;
-
-    db.query(
-  insertSql,
-  [
-    Number(alert.alert_id),
-    generatedBy,
-    strReference,
-    narrativeText,
-    "draft"
-  ],
-    
-      (err, result) => {
-        if (err) {
-          console.error("Error generating STR draft:", err.message);
-          return res.send("Error generating STR draft: " + err.message);
-        }
-
-        res.redirect("/api/officer/str/view/" + result.insertId);
-      }
-    );
-  });
+    return res.render("strDraft", { alert, strDraft, str: strDraft });
+  } catch (error) {
+    console.error("Error preparing STR draft:", error);
+    return res.status(500).send("Error preparing STR draft");
+  }
 };
 
-exports.viewSTRDraft = (req, res) => {
-  const strId = req.params.strId;
+exports.handleStrDraftSubmission = async (req, res) => {
+  let alertId = Number(
+    firstFormValue(
+      req.params?.alertId || req.body?.alert_id || req.body?.alertId || req.body?.id
+    )
+  );
+  const draftId = Number(
+    firstFormValue(
+      req.body?.str_id || req.body?.draft_id || req.body?.strId || req.params?.strId
+    )
+  );
+  const submitAction = String(req.body?.submit_action || "save_draft").trim();
+  const analystId = Number(req.user?.id || req.user?.user_id);
 
+  if (!Number.isInteger(analystId) || analystId <= 0) {
+    return res.status(401).send("Authenticated analyst account is required");
+  }
+
+  try {
+    if ((!Number.isInteger(alertId) || alertId <= 0) && Number.isInteger(draftId)) {
+      const [draftRows] = await db.promise().query(
+        "SELECT alert_id FROM str_reports WHERE str_id = ? LIMIT 1",
+        [draftId]
+      );
+      alertId = Number(draftRows[0]?.alert_id);
+    }
+
+    if (!Number.isInteger(alertId) || alertId <= 0) {
+      return res.status(400).send("Alert ID is required");
+    }
+
+    const draftData = normalizeDraftData(req.body);
+    const narrative = String(draftData.narrative_text || "").trim();
+    if (!narrative) {
+      return res.status(400).send("Complete the STR narrative before saving");
+    }
+
+    const completedNarrative = buildCompletedStrNarrative(draftData);
+
+    if (submitAction === "submit_approval") {
+      if (!String(draftData.recommended_action || "").trim()) {
+        return res.status(400).send(
+          "Select a recommended outcome before escalation"
+        );
+      }
+
+      await submitStrDraftAndEscalate(db, {
+        alertId,
+        analystId,
+        analystRemarks: String(draftData.recommendation_remarks || "").trim(),
+        narrativeText: completedNarrative,
+        draftData,
+      });
+
+      return res.redirect(
+        `/api/officer/action-success/${alertId}?action=escalate_to_stro`
+      );
+    }
+
+    const [[alerts], [drafts]] = await Promise.all([
+      db.promise().query(
+        "SELECT status FROM alerts WHERE alert_id = ? LIMIT 1",
+        [alertId]
+      ),
+      db.promise().query(`
+        SELECT str_id, status, str_reference_number
+        FROM str_reports
+        WHERE alert_id = ?
+        ORDER BY updated_at DESC, str_id DESC
+        LIMIT 1
+      `, [alertId]),
+    ]);
+
+    if (alerts.length === 0) {
+      return res.status(404).send("Alert not found");
+    }
+
+    const existingDraft = drafts[0] || null;
+    const alertStatus = String(alerts[0].status || "").trim().toLowerCase();
+    const isPendingAlert = ["pending", "pending review"].includes(alertStatus);
+    const isReturnedDraft = ["feedback_required", "draft"].includes(existingDraft?.status);
+    if (!isPendingAlert && !isReturnedDraft) {
+      return res.status(403).send("This case is no longer available to the analyst");
+    }
+
+    if (existingDraft && !isReturnedDraft) {
+      return res.status(403).send(
+        "The analyst cannot modify an STR after it has entered STRO review"
+      );
+    }
+
+    let savedDraftId;
+    if (existingDraft) {
+      await db.promise().query(`
+        UPDATE str_reports
+        SET narrative_text = ?, draft_data = ?, status = 'draft', updated_at = NOW()
+        WHERE str_id = ?
+      `, [completedNarrative, JSON.stringify(draftData), existingDraft.str_id]);
+      savedDraftId = existingDraft.str_id;
+    } else {
+      const reference = String(draftData.str_reference_number || "").trim() || null;
+      const [insert] = await db.promise().query(`
+        INSERT INTO str_reports
+          (alert_id, generated_by, str_reference_number, narrative_text, draft_data, status)
+        VALUES (?, ?, ?, ?, ?, 'draft')
+      `, [alertId, analystId, reference, completedNarrative, JSON.stringify(draftData)]);
+      savedDraftId = insert.insertId;
+    }
+
+    return res.redirect(`/api/officer/str/view/${savedDraftId}`);
+  } catch (error) {
+    console.error("Error saving STR draft:", error);
+    const statusCode = Number(error.statusCode) || 500;
+    const message = statusCode < 500 ? error.message : "Error saving STR draft";
+    return res.status(statusCode).send(message);
+  }
+};
+
+exports.viewSTRDraft = async (req, res) => {
+  const strId = Number(req.params.strId);
+  const analystId = Number(req.user?.id || req.user?.user_id);
+
+  if (!Number.isInteger(strId) || strId <= 0) {
+    return res.status(400).send("A valid STR draft ID is required");
+  }
+  if (!Number.isInteger(analystId) || analystId <= 0) {
+    return res.status(401).send("Authenticated analyst account is required");
+  }
 
   const sql = `
     SELECT 
@@ -455,24 +507,30 @@ exports.viewSTRDraft = (req, res) => {
     LEFT JOIN alerts a 
       ON s.alert_id = a.alert_id
     WHERE s.str_id = ?
+      AND s.generated_by = ?
+    LIMIT 1
   `;
 
-
-  db.query(sql, [strId], (err, results) => {
-    if (err) {
-      console.error("Error fetching STR draft:", err.message);
-      return res.send("Error fetching STR draft: " + err.message);
-    }
+  try {
+    const [results] = await db.promise().query(sql, [strId, analystId]);
 
     if (results.length === 0) {
-      return res.send("STR draft not found");
+      return res.status(404).send("STR draft not found or it was not submitted by your account");
     }
 
-    const draft = results[0];
+    const draftRecord = results[0];
+    const readOnly = !["feedback_required", "draft"].includes(draftRecord.status);
+
+    const draft = {
+      ...parseDraftData(draftRecord.draft_data),
+      ...draftRecord,
+      draft_data: undefined,
+    };
 
     res.render("strDraft", {
       str: draft,
       strDraft: draft,
+      readOnly,
       alert: {
         alert_id: draft.alert_id,
         transaction_id: draft.transaction_id,
@@ -483,7 +541,10 @@ exports.viewSTRDraft = (req, res) => {
         message: draft.message
       }
     });
-  });
+  } catch (err) {
+    console.error("Error fetching STR draft:", err.message);
+    return res.status(500).send("Error fetching STR draft");
+  }
 };
 
 exports.showAuditLogsPage = (req, res) => {
@@ -589,7 +650,8 @@ exports.showReportPage = (req, res) => {
     }
 
     res.render("officerReport", {
-      report: result[0]
+      report: result[0],
+      user: req.user || null
     });
 
   });
@@ -606,43 +668,4 @@ exports.showActionSuccessPage = (req, res) => {
     action
   });
 
-};
-
-exports.submitSTRToSTRO = (req, res) => {
-  const strId = Number(req.params.strId);
-
-  if (!Number.isInteger(strId) || strId <= 0) {
-    return res.status(400).send("STR ID is required");
-  }
-
-  const sql = `
-    UPDATE str_reports
-    SET
-      status = 'pending_stro_review',
-      updated_at = NOW()
-    WHERE str_id = ?
-      AND status IN (
-        'draft',
-        'feedback_required'
-      )
-  `;
-
-  db.query(sql, [strId], (err, result) => {
-    if (err) {
-      console.error("Error submitting STR to STRO:", err.message);
-      return res.status(500).send(
-        "Error submitting STR to STRO: " + err.message
-      );
-    }
-
-    if (result.affectedRows === 0) {
-      return res.status(400).send(
-        "This STR draft cannot be submitted in its current status"
-      );
-    }
-
-    return res.redirect(
-      `/api/officer/str/view/${strId}?submitted=1`
-    );
-  });
 };

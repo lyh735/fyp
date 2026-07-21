@@ -116,7 +116,35 @@
     .btn-light:hover {
       background-color: #dee2e6;
     }
+
+    .close-confirmation {
+      margin-top: 18px;
+      padding: 18px;
+      border: 1px solid #f87171;
+      border-left: 5px solid #b91c1c;
+      border-radius: 10px;
+      background: #fef2f2;
+      color: #7f1d1d;
+    }
+
+    .close-confirmation h3 {
+      margin: 0 0 6px;
+      color: #7f1d1d;
+      font-size: 17px;
+    }
+
+    .close-confirmation p {
+      margin: 0 0 14px;
+      color: #7f1d1d;
+    }
+
+    .confirmation-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
   </style>
+  <link rel="stylesheet" href="/css/workflow.css">
 </head>
 <body>
   <div class="container py-4">
@@ -163,36 +191,86 @@
         <input type="hidden" name="alert_id" value="<%= alert.id %>" />
 
         <div class="form-group">
-          <label class="form-label">Analyst Name *</label>
-          <input type="text" name="officer_name" placeholder="Enter your full name" required />
+          <label class="form-label">Case Action Remarks / Notes</label>
+          <textarea name="remarks" placeholder="Enter notes for non-escalation case actions..."></textarea>
         </div>
 
-        <div class="form-group">
-          <label class="form-label">Remarks / Notes</label>
-          <textarea name="remarks" placeholder="Enter any remarks or observations about this alert..."></textarea>
+        <div style="margin-bottom:20px;padding:14px 16px;background:#eef5ff;border:1px solid #c9dcff;border-radius:8px;color:#173b6c;">
+          Before escalation, you must complete the STR draft. The alert remains
+          pending until you select a recommended outcome and submit the completed
+          draft for STRO approval.
         </div>
 
         <div class="btn-container">
-          <button type="submit" name="action_type" value="close_case" class="btn btn-secondary">
+          <button
+            type="button"
+            id="openCloseConfirmation"
+            class="btn btn-secondary"
+            aria-controls="closeConfirmation"
+            aria-expanded="false"
+          >
             Close Case
           </button>
           <a href="/api/officer/alerts/<%= alert.id %>/rfi" class="btn" style="background:#0d6efd;color:white;text-decoration:none;">
             Request Information (RFI)
           </a>
-          <% if (alert.status === 'Escalated to STRO') { %>
-            <a href="/api/officer/str/generate/<%= alert.id || alert.alert_id %>" class="btn btn-danger">
-              Generate STR Draft
-            </a>
-          <% } %>
-          <button type="submit" name="action_type" value="escalate_to_stro" class="btn btn-danger">
-            Escalate to STRO
-          </button>
+          <a href="/api/officer/str/prepare/<%= alert.id || alert.alert_id %>" class="btn btn-danger" style="text-decoration:none;">
+            Draft STR &amp; Escalate to STRO
+          </a>
           <button type="button" onclick="window.location.href='/api/officer/alerts/<%= alert.id || alert.alert_id %>'" class="btn btn-light">
             Cancel
           </button>
         </div>
+
+        <div
+          id="closeConfirmation"
+          class="close-confirmation"
+          role="alertdialog"
+          aria-labelledby="closeConfirmationTitle"
+          aria-describedby="closeConfirmationMessage"
+          hidden
+        >
+          <h3 id="closeConfirmationTitle">Confirm case closure</h3>
+          <p id="closeConfirmationMessage">
+            Closing this case will remove it from the analyst's active queue.
+            Confirm only after the investigation is complete.
+          </p>
+          <div class="confirmation-actions">
+            <button
+              type="submit"
+              id="confirmCloseCase"
+              name="action_type"
+              value="close_case"
+              class="btn btn-danger"
+            >
+              Confirm Close Case
+            </button>
+            <button type="button" id="cancelCloseCase" class="btn btn-light">
+              Keep Case Open
+            </button>
+          </div>
+        </div>
       </form>
     </div>
   </div>
+  <script>
+    const closeConfirmation = document.getElementById("closeConfirmation");
+    const openCloseConfirmation = document.getElementById("openCloseConfirmation");
+    const confirmCloseCase = document.getElementById("confirmCloseCase");
+    const cancelCloseCase = document.getElementById("cancelCloseCase");
+
+    openCloseConfirmation.addEventListener("click", () => {
+      closeConfirmation.hidden = false;
+      openCloseConfirmation.setAttribute("aria-expanded", "true");
+      confirmCloseCase.focus();
+      closeConfirmation.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+
+    cancelCloseCase.addEventListener("click", () => {
+      closeConfirmation.hidden = true;
+      openCloseConfirmation.setAttribute("aria-expanded", "false");
+      openCloseConfirmation.focus();
+    });
+  </script>
 </body>
 </html>

@@ -34,7 +34,7 @@ router.put ("/rules/:id",           authenticate, allowAdmin, updateComplianceRu
 router.delete("/rules/:id",         authenticate, allowAdmin, deleteComplianceRule);
 router.get ("/mcc-risk",            authenticate, allowAllRoles, getMccRiskProfiles);
 router.put ("/mcc-risk/:id",        authenticate, allowAdmin, updateMccRiskProfile);
-router.post("/alerts/:id/read",     authenticate, allowAnalyst, markAlertRead);
+router.post("/alerts/:id/read",     authenticate, allowAllRoles, markAlertRead);
 router.post("/alerts/:id/dismiss",  authenticate, allowAnalyst, dismissAlert);
 router.post("/alerts/:id/escalate", authenticate, allowAnalyst, escalateAlert);
 router.post("/simulate",            authenticate, allowAdmin, simulate);

@@ -4,7 +4,7 @@ const db = require("../config/db").promise();
  * Show analyst-submitted STR drafts for STRO review.
  */
 async function showDashboard(req, res) {
-  const sql = 
+  const sql = `
     SELECT
       s.str_id,
       s.alert_id,
@@ -54,7 +54,7 @@ async function showDashboard(req, res) {
         ELSE 4
       END,
       s.updated_at DESC
-  ;
+  `;
 
   try {
     const [drafts] = await db.query(sql);
@@ -78,7 +78,7 @@ async function showDashboard(req, res) {
 async function viewDraft(req, res) {
   const strId = req.params.strId;
 
-  const sql = 
+  const sql = `
     SELECT
       s.*,
 
@@ -112,7 +112,7 @@ async function viewDraft(req, res) {
 
     WHERE s.str_id = ?
     LIMIT 1
-  ;
+  `;
 
   try {
     const [results] = await db.query(sql, [strId]);
@@ -123,6 +123,21 @@ async function viewDraft(req, res) {
 
     const draft = results[0];
     let triggeredRules = [];
+    let formData = {};
+
+    try {
+      if (draft.draft_data && typeof draft.draft_data === "object") {
+        formData = draft.draft_data;
+      } else if (draft.draft_data) {
+        const parsedFormData = JSON.parse(draft.draft_data);
+        formData = parsedFormData && typeof parsedFormData === "object"
+          ? parsedFormData
+          : {};
+      }
+    } catch (parseError) {
+      console.warn("Unable to parse saved STR form data:", parseError.message);
+      formData = {};
+    }
 
     try {
       if (Array.isArray(draft.triggered_rules)) {
@@ -142,9 +157,10 @@ async function viewDraft(req, res) {
 
     return res.render("stroReviewDraft", {
       draft,
+      formData,
       triggeredRules,
       reviewed: req.query.reviewed === "1",
-      user: req.session?.user || null
+      user: req.user || req.session?.user || null
     });
   } catch (err) {
     console.error("Error loading STR draft:", err);
@@ -209,7 +225,7 @@ async function reviewDraft(req, res) {
       ? stro_feedback.trim()
       : null;
 
-  const sql = 
+  const sql = `
     UPDATE str_reports
     SET
       status = ?,
@@ -227,7 +243,7 @@ async function reviewDraft(req, res) {
 
     WHERE str_id = ?
       AND status = 'pending_stro_review'
-  ;
+  `;
 
   try {
     const [result] = await db.query(sql, [
@@ -245,7 +261,7 @@ async function reviewDraft(req, res) {
     }
 
     return res.redirect(
-      /stro/drafts/${strId}?reviewed=1
+      `/stro/drafts/${strId}?reviewed=1`
     );
   } catch (err) {
     console.error("Error reviewing STR draft:", err);

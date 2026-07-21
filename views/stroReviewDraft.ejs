@@ -186,6 +186,7 @@
       }
     }
   </style>
+  <link rel="stylesheet" href="/css/workflow.css">
 </head>
 
 <body>
@@ -292,7 +293,9 @@
         "submit_action"
       ]; %>
 
-      <% const submittedFields = Object.entries(formData || {})
+      <% const submittedFormData =
+        typeof formData !== "undefined" && formData ? formData : {};
+      const submittedFields = Object.entries(submittedFormData)
         .filter(([key, value]) => {
           if (ignoredFields.includes(key)) {
             return false;

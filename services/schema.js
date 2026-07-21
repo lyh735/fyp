@@ -227,6 +227,7 @@ async function ensureComplianceSchema() {
       approved_by INT,
       str_reference_number VARCHAR(100) UNIQUE,
       narrative_text TEXT NOT NULL,
+      draft_data JSON,
       status VARCHAR(30) DEFAULT 'draft',
       generated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -370,6 +371,7 @@ async function ensureCurrentSchemaCompatibility() {
   await addColumnIfMissing("rfi_requests", "is_sent", "TINYINT(1) DEFAULT 0");
   await addColumnIfMissing("str_reports", "rejected_at", "DATETIME NULL");
   await addColumnIfMissing("str_reports", "stro_feedback", "TEXT NULL");
+  await addColumnIfMissing("str_reports", "draft_data", "JSON NULL");
   await addColumnIfMissing("str_reports", "stro_reviewed_by", "INT NULL");
   await addColumnIfMissing("str_reports", "stro_reviewed_at", "DATETIME NULL");
 

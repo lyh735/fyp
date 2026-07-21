@@ -196,6 +196,7 @@
       }
     }
   </style>
+  <link rel="stylesheet" href="/css/workflow.css">
 </head>
 
 <body>
@@ -204,9 +205,12 @@
   const currentAlert = typeof alert !== "undefined" && alert ? alert : {};
   const currentDraft =
     typeof strDraft !== "undefined" && strDraft ? strDraft : {};
+  const isReadOnly =
+    typeof readOnly !== "undefined" && Boolean(readOnly);
 
   const alertId =
     currentAlert.alert_id ||
+    currentAlert.id ||
     currentDraft.alert_id ||
     "";
 
@@ -312,6 +316,17 @@ The Compliance Officer should complete the outstanding information, document the
     >
 
     <div class="report-body">
+
+      <% if (isReadOnly) { %>
+        <div class="alert alert-info">
+          <h5>Submitted STR Draft — Read Only</h5>
+          <p class="mb-0">
+            Current status:
+            <strong><%= String(currentDraft.status || "submitted").replaceAll("_", " ") %></strong>.
+            You can review or print this submission, but it can no longer be edited.
+          </p>
+        </div>
+      <% } %>
 
       <% if (currentDraft.status === "feedback_required") { %>
         <div class="alert alert-warning">
@@ -833,7 +848,6 @@ The Compliance Officer should complete the outstanding information, document the
               </label>
               <input
                 type="text"
-                name="alert_id"
                 class="form-control readonly-field"
                 value="<%= alertId %>"
                 readonly
@@ -1569,19 +1583,21 @@ The Compliance Officer should complete the outstanding information, document the
       <div class="button-group no-print">
 
         <a
-          href="/api/officer/alerts/<%= alertId %>"
+          href="<%= isReadOnly ? '/stro-alerts.html' : `/api/officer/alerts/${alertId}` %>"
           class="btn btn-outline-secondary"
         >
-          Back to Alert
+          <%= isReadOnly ? "Back to STRO Outcomes" : "Back to Alert" %>
         </a>
 
-        <button
-          type="button"
-          class="btn btn-success"
-          onclick="generateDemoSTRData()"
-        >
-          Auto Fill Demo Data
-        </button>
+        <% if (!isReadOnly) { %>
+          <button
+            type="button"
+            class="btn btn-success"
+            onclick="generateDemoSTRData()"
+          >
+            Auto Fill Demo Data
+          </button>
+        <% } %>
 
         <button
           type="button"
@@ -1591,23 +1607,25 @@ The Compliance Officer should complete the outstanding information, document the
           Print Draft
         </button>
 
-        <button
-          type="submit"
-          name="submit_action"
-          value="save_draft"
-          class="btn btn-primary"
-        >
-          Save Draft
-        </button>
+        <% if (!isReadOnly) { %>
+          <button
+            type="submit"
+            name="submit_action"
+            value="save_draft"
+            class="btn btn-primary"
+          >
+            Save Draft
+          </button>
 
-        <button
-          type="submit"
-          name="submit_action"
-          value="submit_approval"
-          class="btn btn-danger"
-        >
-          Submit for Approval
-        </button>
+          <button
+            type="submit"
+            name="submit_action"
+            value="submit_approval"
+            class="btn btn-danger"
+          >
+            Submit &amp; Escalate to STRO
+          </button>
+        <% } %>
 
       </div>
 
@@ -1630,6 +1648,16 @@ The Compliance Officer should complete the outstanding information, document the
 
 
 <script>
+  const strDraftReadOnly = <%- JSON.stringify(isReadOnly) %>;
+  if (strDraftReadOnly) {
+    document.querySelectorAll(
+      'form input:not([type="hidden"]), form select, form textarea'
+    ).forEach((field) => {
+      field.disabled = true;
+      field.setAttribute("aria-readonly", "true");
+    });
+  }
+
   function generateDemoSTRData() {
     const form = document.querySelector("form");
 

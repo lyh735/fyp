@@ -1,5 +1,4 @@
 const db = require("../config/db");
-const { generateStrDraft } = require("../services/strDrafting");
 
 function query(sql, values = []) {
   return new Promise((resolve, reject) => {
@@ -20,27 +19,15 @@ const alertSelect = `
          r.responded_at AS rfi_responded_at, r.response_message,
          r.response_attachment,
          r.additional_remarks AS analyst_remarks,
-         (
-           SELECT s.status
-           FROM str_reports s
-           WHERE s.alert_id = a.alert_id
-           ORDER BY s.updated_at DESC, s.str_id DESC
-           LIMIT 1
-         ) AS str_status,
-         (
-           SELECT s.approved_at
-           FROM str_reports s
-           WHERE s.alert_id = a.alert_id
-           ORDER BY s.updated_at DESC, s.str_id DESC
-           LIMIT 1
-         ) AS str_approved_at,
-         (
-           SELECT s.rejected_at
-           FROM str_reports s
-           WHERE s.alert_id = a.alert_id
-           ORDER BY s.updated_at DESC, s.str_id DESC
-           LIMIT 1
-         ) AS str_rejected_at,
+         latest_str.str_id,
+         latest_str.generated_by AS str_generated_by,
+         latest_str.str_reference_number,
+         latest_str.status AS str_status,
+         latest_str.approved_at AS str_approved_at,
+         latest_str.rejected_at AS str_rejected_at,
+         latest_str.stro_feedback,
+         latest_str.stro_reviewed_at,
+         latest_str.updated_at AS str_updated_at,
          (
            SELECT ca.remarks
            FROM case_actions ca
@@ -54,14 +41,72 @@ const alertSelect = `
   LEFT JOIN merchants m ON m.merchant_id = a.merchant_id
   LEFT JOIN users reviewer ON reviewer.user_id = a.reviewed_by
   LEFT JOIN rfi_requests r ON r.alert_id = a.alert_id
+  LEFT JOIN str_reports latest_str ON latest_str.str_id = (
+    SELECT s.str_id
+    FROM str_reports s
+    WHERE s.alert_id = a.alert_id
+    ORDER BY s.updated_at DESC, s.str_id DESC
+    LIMIT 1
+  )
 `;
+
+exports.getNotificationSummary = async (req, res) => {
+  try {
+    const role = String(req.user?.role || "").trim().toLowerCase();
+
+    if (role === "stro") {
+      const rows = await query(`
+        SELECT COUNT(*) AS notification_count
+        FROM str_reports
+        WHERE status = 'pending_stro_review'
+      `);
+
+      return res.json({
+        role,
+        type: "pending_stro_review",
+        count: Number(rows[0]?.notification_count || 0),
+      });
+    }
+
+    if (role === "analyst") {
+      const analystId = Number(req.user?.id || req.user?.user_id);
+      if (!Number.isInteger(analystId) || analystId <= 0) {
+        return res.status(401).json({ message: "A valid analyst account is required" });
+      }
+
+      const rows = await query(`
+        SELECT COUNT(*) AS notification_count
+        FROM str_reports
+        WHERE status = 'feedback_required'
+          AND generated_by = ?
+      `, [analystId]);
+
+      return res.json({
+        role,
+        type: "feedback_required",
+        count: Number(rows[0]?.notification_count || 0),
+      });
+    }
+
+    return res.status(403).json({ message: "Forbidden" });
+  } catch (err) {
+    console.error("Unable to load STR notifications:", err);
+    return res.status(500).json({ message: "Unable to load STR notifications" });
+  }
+};
 
 exports.getStroOutcomes = async (req, res) => {
   try {
+    const analystId = Number(req.user?.id || req.user?.user_id);
+    if (!Number.isInteger(analystId) || analystId <= 0) {
+      return res.status(401).json({ message: "A valid analyst account is required" });
+    }
+
     const outcomes = await query(`${alertSelect}
       WHERE a.escalated_at IS NOT NULL
+        AND latest_str.generated_by = ?
       ORDER BY a.escalated_at DESC, a.created_at DESC
-      LIMIT 200`);
+      LIMIT 200`, [analystId]);
 
     res.json(outcomes.map((outcome) => ({
       id: outcome.id,
@@ -75,16 +120,20 @@ exports.getStroOutcomes = async (req, res) => {
       risk_level: outcome.risk_level,
       priority: outcome.priority,
       escalated_at: outcome.escalated_at,
+      str_id: outcome.str_id,
+      str_reference_number: outcome.str_reference_number,
       str_status: outcome.str_status,
       str_approved_at: outcome.str_approved_at,
       str_rejected_at: outcome.str_rejected_at,
+      stro_feedback: outcome.stro_feedback,
+      stro_reviewed_at: outcome.stro_reviewed_at,
+      str_updated_at: outcome.str_updated_at,
     })));
   } catch (err) {
     console.error("Unable to load STRO outcomes:", err);
     res.status(500).json({ message: "Unable to load STRO outcomes" });
   }
 };
-
 exports.getEscalatedAlerts = async (req, res) => {
   try {
     const alerts = await query(`${alertSelect}
@@ -121,140 +170,5 @@ exports.getEscalatedAlert = async (req, res) => {
   } catch (err) {
     console.error("Unable to load STRO alert:", err);
     res.status(500).json({ message: "Unable to load escalated alert" });
-  }
-};
-
-async function loadEscalatedAlert(alertId) {
-  const alerts = await query(`${alertSelect}
-    WHERE a.alert_id = ?
-      AND a.status IN ('Escalated', 'Escalated to STRO')
-    LIMIT 1`, [alertId]);
-  return alerts[0] || null;
-}
-
-async function loadLatestDraft(alertId) {
-  const drafts = await query(`
-    SELECT s.str_id, s.alert_id, s.generated_by, s.approved_by,
-           s.str_reference_number, s.narrative_text, s.status,
-           s.generated_at, s.updated_at, s.approved_at, s.rejected_at,
-           u.name AS generated_by_name
-    FROM str_reports s
-    LEFT JOIN users u ON u.user_id = s.generated_by
-    WHERE s.alert_id = ?
-    ORDER BY s.updated_at DESC, s.str_id DESC
-    LIMIT 1
-  `, [alertId]);
-  return drafts[0] || null;
-}
-
-exports.getStrDraft = async (req, res) => {
-  try {
-    const alert = await loadEscalatedAlert(req.params.id);
-    if (!alert) {
-      return res.status(404).json({ message: "Escalated alert not found" });
-    }
-
-    const draft = await loadLatestDraft(alert.alert_id);
-    res.json({ alert, draft });
-  } catch (err) {
-    console.error("Unable to load STR draft:", err);
-    res.status(500).json({ message: "Unable to load STR draft" });
-  }
-};
-
-exports.generateStrDraftForAlert = async (req, res) => {
-  try {
-    const alert = await loadEscalatedAlert(req.params.id);
-    if (!alert) {
-      return res.status(404).json({ message: "Escalated alert not found" });
-    }
-
-    if (alert.status !== "Escalated to STRO") {
-      return res.status(400).json({
-        message: "STR draft can only be generated for escalated cases."
-      });
-    }
-
-    const result = await generateStrDraft(alert);
-    const existing = await loadLatestDraft(alert.alert_id);
-    let draftId;
-
-    if (existing) {
-      await query(`
-        UPDATE str_reports
-        SET narrative_text = ?, generated_by = ?, status = 'draft', updated_at = NOW()
-        WHERE str_id = ?
-      `, [result.narrative, req.user.id || req.user.user_id, existing.str_id]);
-      draftId = existing.str_id;
-    } else {
-      const insert = await query(`
-        INSERT INTO str_reports (alert_id, generated_by, narrative_text, status)
-        VALUES (?, ?, ?, 'draft')
-      `, [alert.alert_id, req.user.id || req.user.user_id, result.narrative]);
-      draftId = insert.insertId;
-    }
-
-    await query(`
-      INSERT INTO case_actions (alert_id, user_id, action_type, status_after_action, remarks)
-      VALUES (?, ?, 'str_draft_generated', ?, ?)
-    `, [
-      alert.alert_id,
-      req.user.id || req.user.user_id,
-      alert.status,
-      result.aiUsed ? "AI-assisted STR draft generated" : result.note
-    ]);
-
-    const draft = await loadLatestDraft(alert.alert_id);
-    res.json({ draft: { ...draft, str_id: draftId }, ai_used: result.aiUsed, note: result.note });
-  } catch (err) {
-    console.error("Unable to generate STR draft:", err);
-    res.status(500).json({ message: "Unable to generate STR draft" });
-  }
-};
-
-exports.saveStrDraft = async (req, res) => {
-  try {
-    const narrative = String(req.body.narrative_text || "").trim();
-    if (!narrative) {
-      return res.status(400).json({ message: "Narrative text is required" });
-    }
-
-    const drafts = await query(`
-      SELECT str_id, alert_id, status
-      FROM str_reports
-      WHERE str_id = ?
-      LIMIT 1
-    `, [req.params.id]);
-
-    if (!drafts.length) {
-      return res.status(404).json({ message: "STR draft not found" });
-    }
-
-    if (drafts[0].status !== "draft") {
-      return res.status(400).json({ message: "Only draft STR reports can be edited" });
-    }
-
-    await query(`
-      UPDATE str_reports
-      SET narrative_text = ?, updated_at = NOW()
-      WHERE str_id = ?
-    `, [narrative, req.params.id]);
-
-    await query(`
-      INSERT INTO case_actions (alert_id, user_id, action_type, status_after_action, remarks)
-      VALUES (?, ?, 'str_draft_updated', 'draft', 'STR draft narrative updated')
-    `, [drafts[0].alert_id, req.user.id || req.user.user_id]);
-
-    const updated = await query(`
-      SELECT str_id, alert_id, narrative_text, status, generated_at, updated_at
-      FROM str_reports
-      WHERE str_id = ?
-      LIMIT 1
-    `, [req.params.id]);
-
-    res.json({ draft: updated[0], message: "STR draft saved" });
-  } catch (err) {
-    console.error("Unable to save STR draft:", err);
-    res.status(500).json({ message: "Unable to save STR draft" });
   }
 };

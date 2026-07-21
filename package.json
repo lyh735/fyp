@@ -4,7 +4,7 @@
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
-    "test": "node tests/riskEngine.test.js"
+    "test": "node tests/riskEngine.test.js && node tests/strEscalation.test.js && node tests/stroNotifications.test.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
@@ -15,7 +15,6 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.2.0",
     "mysql2": "^3.22.2",
-    "openai": "^6.39.0",
     "socket.io": "^4.8.3"
   }
 }

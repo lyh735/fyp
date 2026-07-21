@@ -198,6 +198,7 @@ CREATE TABLE str_reports (
 
     str_reference_number VARCHAR(100) UNIQUE,
     narrative_text TEXT NOT NULL,
+    draft_data JSON,
 
     status VARCHAR(30) DEFAULT 'draft', -- draft / approved / closed
     generated_at DATETIME DEFAULT CURRENT_TIMESTAMP,

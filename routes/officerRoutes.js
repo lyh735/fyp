@@ -90,6 +90,11 @@ router.post(
   officerController.takeActionPage
 );
 
+router.get(
+  "/str/prepare/:alertId",
+  officerController.prepareSTRDraft
+);
+
 router.post(
   "/str-draft",
   officerController.handleStrDraftSubmission
@@ -98,11 +103,6 @@ router.post(
 router.post(
   "/str-draft/:alertId",
   officerController.handleStrDraftSubmission
-);
-
-router.get(
-  "/str/generate/:alertId",
-  officerController.generateSTRDraft
 );
 
 router.get(

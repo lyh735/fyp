@@ -12,20 +12,21 @@ const {
 
 const allowAnalyst = authorizeRoles("analyst");
 const allowStro = authorizeRoles("stro");
+const allowAnalystOrStro = authorizeRoles("analyst", "stro");
 const allowStroOrAdmin = authorizeRoles("stro", "admin");
 
 router.use(authenticate);
 
+// Role-aware actionable notification count.
+router.get("/notifications", allowAnalystOrStro, stroController.getNotificationSummary);
+
 // Analysts can see STRO outcomes, but cannot access STRO case controls.
 router.get("/outcomes", allowAnalyst, stroController.getStroOutcomes);
 
-// STRO case review and STR drafting API.
+// STRO case review API.
 router.get("/alerts", allowStro, stroController.getEscalatedAlerts);
 router.get("/alerts/:id", allowStro, stroController.getEscalatedAlert);
 router.post("/alerts/:id/close", allowStro, closeAlert);
-router.get("/alerts/:id/str-draft", allowStro, stroController.getStrDraft);
-router.post("/alerts/:id/str-draft/generate", allowStro, stroController.generateStrDraftForAlert);
-router.put("/str-drafts/:id", allowStro, stroController.saveStrDraft);
 router.get("/rfi/:id/pdf", allowStro, rfiController.exportPdf);
 router.get("/rfi/:id/response-file", allowStro, rfiController.downloadResponseFile);
 

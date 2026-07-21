@@ -54,7 +54,7 @@
           <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
         </svg>
         Alerts
-        <span id="alertCount" class="badge badge-admin" style="margin-left:auto;display:none"></span>
+        <span id="alertCount" class="badge notification-badge" style="margin-left:auto;display:none" aria-label="Unread alerts"></span>
       </div>
       <div class="nav-item" onclick="window.location.href='/rules.html'">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -86,9 +86,7 @@
       <div id="stroNav" style="display:none">
         <div class="nav-section-label">STRO Review</div>
         <div class="nav-item" onclick="window.location.href='/stro-alerts.html'">Escalated Alerts</div>
-        <div class="nav-item" onclick="window.location.href='/str-draft.html'">STR Drafting</div>
         <div class="nav-item" onclick="window.location.href='/analyst-rfi-history.html'">RFI History</div>
-        <div class="nav-item" onclick="window.location.href='/api/officer/report'">Reports</div>
         <div class="nav-item" onclick="window.location.href='/api/officer/audit-logs'">Audit Trail</div>
       </div>
 
@@ -381,10 +379,15 @@ function navigateToAlertDetails(alertId) {
 }
 
 async function markAlertAsRead(alertId) {
-  if (!alertId) return;
+  if (!alertId) return false;
   const res = await apiFetch(`/api/alerts/${alertId}/read`, { method: "POST" });
-  if (!res) return;
-  await res.json();
+  if (!res) return false;
+  const data = await res.json();
+  if (!res.ok) {
+    showToast("Alert", data.message || "Unable to mark alert as read.");
+    return false;
+  }
+  return true;
 }
 
 function renderTransactions() {
@@ -519,10 +522,12 @@ async function loadAlerts() {
   const badge = document.getElementById("alertCount");
   if (!badge) return;
   if (unreadCount > 0) {
-    badge.textContent = unreadCount;
-    badge.style.display = "";
+    badge.textContent = unreadCount > 99 ? "99+" : String(unreadCount);
+    badge.style.display = "inline-flex";
+    badge.title = `${unreadCount} unread alert${unreadCount === 1 ? "" : "s"}`;
   } else {
     badge.style.display = "none";
+    badge.title = "No unread alerts";
   }
 }
 

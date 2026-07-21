@@ -71,9 +71,18 @@
       padding: 25px;
     }
   </style>
+  <link rel="stylesheet" href="/css/workflow.css">
 </head>
 
 <body>
+
+<%
+  const currentRole = String(
+    typeof user !== "undefined" && user ? user.role : ""
+  ).trim().toLowerCase();
+  const isAnalyst = currentRole === "analyst";
+  const isStro = currentRole === "stro";
+%>
 
 <script src="/js/auth.js"></script>
 <script>if (!requireAuth()) throw new Error("Authentication required");</script>
@@ -107,9 +116,20 @@
         Audit Logs
       </a>
 
-      <a href="/stro-alerts.html" class="btn btn-outline-primary ms-2">
-        STRO Alerts
-      </a>
+      <% if (isAnalyst) { %>
+        <a href="/stro-alerts.html" class="btn btn-outline-primary ms-2">
+          STRO Outcomes
+        </a>
+      <% } %>
+
+      <% if (isStro) { %>
+        <a href="/stro/dashboard" class="btn btn-outline-primary ms-2">
+          STR Review
+        </a>
+        <a href="/stro-alerts.html" class="btn btn-outline-primary ms-2">
+          Escalated Alerts
+        </a>
+      <% } %>
     </div>
   </div>
 

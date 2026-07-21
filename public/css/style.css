@@ -536,6 +536,7 @@ body {
 
 .badge-admin { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
 .badge-user  { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.notification-badge { min-width: 22px; justify-content: center; padding: 3px 7px; background: #dc2626; color: #fff; border: 1px solid #fecaca; }
 
 .content-area {
   padding: 28px;
@@ -785,6 +786,9 @@ tbody tr {
 
 tbody tr:nth-child(even) { background: #fafbfd; }
 tbody tr:hover { background: #eff6ff !important; }
+tbody tr.unread-row,
+tbody tr.unread-row:nth-child(even) { background: #fef3c7; }
+tbody tr.unread-row:hover { background: #fde68a !important; }
 tbody tr:last-child { border-bottom: none; }
 
 tbody td {

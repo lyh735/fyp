@@ -18,6 +18,8 @@
     .stro-nav a { color: var(--text-muted); text-decoration: none; font-weight: 600; font-size: 13px; padding: 8px 10px; border-radius: 7px; }
     .stro-nav a:hover { color: var(--primary); background: var(--accent-light); }
     .stro-nav a.active { color: #fff; background: var(--primary); }
+    .notification-count { display: none; min-width: 20px; height: 20px; margin-left: 5px; padding: 0 6px; align-items: center; justify-content: center; border-radius: 999px; background: #dc2626; color: #fff; font-size: 11px; font-weight: 800; line-height: 1; }
+    .stro-nav a.active .notification-count { background: #fff; color: #b91c1c; }
     .stro-main { max-width: 1240px; margin: 0 auto; padding: 30px 24px 48px; }
     .page-heading { display: flex; justify-content: space-between; align-items: end; margin-bottom: 20px; gap: 20px; }
     .page-heading h2 { margin: 0 0 5px; font-size: 25px; }
@@ -30,6 +32,7 @@
     .risk-medium { background: #fef3c7; color: #92400e; }
     .risk-low { background: #dcfce7; color: #166534; }
     .status-escalated { display: inline-flex; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #ede9fe; color: #6d28d9; }
+    .row-actions { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
     .detail-panel { margin-top: 20px; display: none; }
     .detail-panel.visible { display: block; }
     .detail-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
@@ -57,10 +60,9 @@
     <nav class="stro-nav" aria-label="STRO navigation">
       <a href="/dashboard.html">Overview</a>
       <a href="/transactions.html">Past Transactions</a>
-      <a class="active" href="/stro-alerts.html">Escalated Alerts</a>
-      <a id="stroDraftNav" href="/str-draft.html">STR Drafting</a>
+      <a id="stroReviewNav" href="/stro/dashboard" style="display:none">STR Review <span id="stroReviewPageBadge" class="notification-count" aria-label="STR drafts awaiting review"></span></a>
+      <a class="active" href="/stro-alerts.html">Escalated Alerts <span id="analystFeedbackPageBadge" class="notification-count" aria-label="STR drafts returned with feedback"></span></a>
       <a href="/analyst-rfi-history.html">RFI History</a>
-      <a href="/api/officer/report">Reports</a>
       <a href="/api/officer/audit-logs">Audit Trail</a>
     </nav>
     <div class="stro-user">
@@ -111,16 +113,36 @@
   }
   if (user.first_login) window.location.href = "/change-password.html";
   document.getElementById("userName").textContent = user.name;
-  document.getElementById("userRoleLabel").textContent = isStro ? "STRO" : "Analyst · read only";
+  document.getElementById("userRoleLabel").textContent = isStro ? "STRO" : "Analyst · outcomes";
   if (isAnalyst) {
     document.title = "STRO Outcomes - Compliance Monitoring System";
-    document.getElementById("workspaceLabel").textContent = "Analyst read-only view";
+    document.getElementById("workspaceLabel").textContent = "Analyst outcomes and STRO feedback";
     document.getElementById("pageHeading").textContent = "STRO Outcomes";
-    document.getElementById("pageDescription").textContent = "Read-only visibility of escalated cases and STRO outcomes.";
-    document.getElementById("stroDraftNav").style.display = "none";
+    document.getElementById("pageDescription").textContent = "Track submitted STRs, STRO decisions, and requested changes.";
+  } else {
+    document.getElementById("stroReviewNav").style.display = "inline-flex";
+  }
+
+  async function loadStrNotifications() {
+    const badge = document.getElementById(isStro ? "stroReviewPageBadge" : "analystFeedbackPageBadge");
+    try {
+      const res = await apiFetch("/api/stro/notifications");
+      if (!res || !res.ok) return;
+      const data = await res.json();
+      const count = Number(data.count || 0);
+      badge.textContent = count > 99 ? "99+" : String(count);
+      badge.style.display = count > 0 ? "inline-flex" : "none";
+      badge.title = isStro
+        ? `${count} STR draft${count === 1 ? "" : "s"} awaiting review`
+        : `${count} STR draft${count === 1 ? "" : "s"} returned with feedback`;
+    } catch (err) {
+      console.error("Unable to refresh STR notifications:", err);
+    }
   }
 
   let alerts = [];
+  let selectedAlertId = null;
+  let refreshInProgress = false;
   const rows = document.getElementById("alertRows");
   const detailPanel = document.getElementById("detailPanel");
 
@@ -130,9 +152,12 @@
   const outcomeLabel = (alert) => {
     const status = String(alert.str_status || "").trim().toLowerCase();
     if (alert.str_rejected_at || status === "rejected") return "Rejected";
-    if (alert.str_approved_at || status === "approved") return "Approved";
+    if (alert.str_approved_at || ["approved", "approved_by_stro"].includes(status)) return "Approved by STRO";
     if (status === "closed") return "Closed";
-    if (status === "draft") return "Pending STRO decision";
+    if (status === "feedback_required") return "Changes requested by STRO";
+    if (status === "pending_stro_review") return "Pending STRO review";
+    if (status === "draft" && alert.stro_feedback) return "Revision draft saved";
+    if (status === "draft") return "Draft not submitted";
     return "No STR draft";
   };
 
@@ -150,25 +175,25 @@
         <td><span class="risk risk-${String(a.risk_level || "low").toLowerCase()}">${escapeHtml(a.risk_level)}</span></td>
         <td>${escapeHtml(formatDate(a.escalated_at))}</td>
         <td><span class="status-escalated">${escapeHtml(outcomeLabel(a))}</span></td>
-        <td>${isStro
-          ? `<button class="btn btn-secondary draft-link" type="button" data-id="${a.id}">Draft STR</button>`
-          : `<button class="btn btn-secondary detail-link" type="button" data-id="${a.id}">View details</button>`}</td>
+        <td><div class="row-actions">
+          <button class="btn btn-secondary detail-link" type="button" data-id="${a.id}">View details</button>
+          ${isAnalyst && Number(a.str_id) > 0
+            ? `<a class="btn btn-primary draft-link" href="/api/officer/str/view/${Number(a.str_id)}">View STR Draft</a>`
+            : ""}
+        </div></td>
       </tr>`).join("");
     document.querySelectorAll(".alert-row").forEach(row => {
       row.addEventListener("click", () => showDetail(row.dataset.id));
       row.addEventListener("keydown", e => { if (e.key === "Enter") showDetail(row.dataset.id); });
-    });
-    document.querySelectorAll(".draft-link").forEach(btn => {
-      btn.addEventListener("click", e => {
-        e.stopPropagation();
-        window.location.href = `/str-draft.html?alert_id=${encodeURIComponent(btn.dataset.id)}`;
-      });
     });
     document.querySelectorAll(".detail-link").forEach(btn => {
       btn.addEventListener("click", e => {
         e.stopPropagation();
         showDetail(btn.dataset.id);
       });
+    });
+    document.querySelectorAll(".draft-link").forEach(link => {
+      link.addEventListener("click", e => e.stopPropagation());
     });
   }
 
@@ -179,6 +204,7 @@
   }
 
   async function showDetail(id) {
+    selectedAlertId = id;
     let a;
     if (isAnalyst) {
       a = alerts.find(alert => String(alert.id) === String(id));
@@ -192,11 +218,26 @@
     const fields = [
       ["Alert ID", `#${a.id}`], ["Transaction ID", a.transaction_id], ["Merchant", a.merchant_name || a.merchant_id], ["Amount", `${a.currency || "SGD"} ${a.amount == null ? "-" : Number(a.amount).toFixed(2)}`],
       ["Risk score", a.risk_score], ["Risk level", a.risk_level], ["Priority", a.priority], ["Escalated at", formatDate(a.escalated_at)],
-      ["STRO outcome", outcomeLabel(a)], ["Approved at", formatDate(a.str_approved_at)], ["Rejected at", formatDate(a.str_rejected_at)]
+      ["STR reference", a.str_reference_number], ["STRO outcome", outcomeLabel(a)],
+      ["STR updated at", formatDate(a.str_updated_at)], ["STRO reviewed at", formatDate(a.stro_reviewed_at)],
+      ["Approved at", formatDate(a.str_approved_at)], ["Rejected at", formatDate(a.str_rejected_at)]
     ];
     if (isAnalyst) {
+      const status = String(a.str_status || "").trim().toLowerCase();
+      const feedbackSection = a.stro_feedback
+        ? `<div class="detail-field detail-wide"><label>STRO feedback</label><div class="detail-report">${escapeHtml(a.stro_feedback)}</div></div>`
+        : `<div class="detail-field detail-wide"><label>STRO feedback</label><div>No feedback has been submitted.</div></div>`;
+      const hasDraft = Number(a.str_id) > 0;
+      const draftActionLabel = status === "feedback_required"
+        ? "Revise STR Draft"
+        : status === "draft"
+          ? "Continue STR Draft"
+          : "View Submitted STR Draft";
+      const draftAction = hasDraft
+        ? `<div class="detail-field detail-wide"><label>STR draft</label><div><a class="btn btn-primary" href="/api/officer/str/view/${Number(a.str_id)}">${draftActionLabel}</a></div></div>`
+        : "";
       document.getElementById("detailGrid").innerHTML = fields.map(([label, value]) => `<div class="detail-field"><label>${escapeHtml(label)}</label><div>${escapeHtml(value)}</div></div>`).join("") +
-        `<div class="detail-field detail-wide"><label>Access</label><div class="detail-report">Read-only outcome. STRO decision controls are not available to analysts.</div></div>`;
+        feedbackSection + draftAction;
       detailPanel.classList.add("visible");
       detailPanel.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
@@ -221,7 +262,6 @@
       ? `<ul class="case-history">${a.case_history.map(item => `<li><strong>${escapeHtml(String(item.action_type || "").replaceAll("_", " "))}</strong> - ${escapeHtml(item.status_after_action || "No status change")}<div>${escapeHtml(item.remarks || "")}</div><small>${escapeHtml(item.actor_name || "System")} · ${escapeHtml(formatDate(item.created_at))}</small></li>`).join("")}</ul>`
       : "No case activity recorded.";
     document.getElementById("detailGrid").innerHTML = fields.map(([label, value]) => `<div class="detail-field"><label>${escapeHtml(label)}</label><div>${escapeHtml(value)}</div></div>`).join("") +
-      (isStro ? `<div class="detail-field detail-wide"><label>STR Drafting</label><div><a class="btn btn-primary" href="/str-draft.html?alert_id=${encodeURIComponent(a.alert_id)}">Open STR Draft</a></div></div>` : "") +
       `<div class="detail-field detail-wide"><label>Triggered rules</label><div>${escapeHtml(rulesText(a.triggered_rules))}</div></div>` +
       `<div class="detail-field detail-wide"><label>Escalation report / officer remarks</label><div class="detail-report">${escapeHtml(a.escalation_report || a.message || "No escalation remarks were provided.")}</div></div>` + rfiSection +
       `<div class="detail-field detail-wide"><label>Case history</label>${history}</div>`;
@@ -244,13 +284,18 @@
   }
 
   function showError(message) { const el = document.getElementById("errorBox"); el.textContent = message; el.style.display = "block"; }
-  document.getElementById("closeDetail").addEventListener("click", () => detailPanel.classList.remove("visible"));
+  document.getElementById("closeDetail").addEventListener("click", () => {
+    selectedAlertId = null;
+    detailPanel.classList.remove("visible");
+  });
   document.getElementById("searchInput").addEventListener("input", e => {
     const term = e.target.value.trim().toLowerCase();
     renderAlerts(alerts.filter(a => [a.id, a.transaction_id, a.merchant_name, a.merchant_id].some(v => String(v || "").toLowerCase().includes(term))));
   });
 
-  (async function loadAlerts() {
+  async function loadAlerts(refreshDetails = false) {
+    if (refreshInProgress) return;
+    refreshInProgress = true;
     try {
       const res = await apiFetch(isAnalyst ? "/api/stro/outcomes" : "/api/stro/alerts");
       if (!res) return;
@@ -259,8 +304,30 @@
       alerts = data;
       document.getElementById("alertCount").textContent = alerts.length;
       renderAlerts(alerts);
-    } catch (err) { rows.innerHTML = '<tr><td colspan="8"><div class="empty">Alerts could not be loaded.</div></td></tr>'; showError(err.message); }
-  })();
+      if (refreshDetails && selectedAlertId && alerts.some(a => String(a.id) === String(selectedAlertId))) {
+        await showDetail(selectedAlertId);
+      }
+    } catch (err) {
+      rows.innerHTML = '<tr><td colspan="8"><div class="empty">Alerts could not be loaded.</div></td></tr>';
+      showError(err.message);
+    } finally {
+      refreshInProgress = false;
+    }
+  }
+
+  loadAlerts();
+  loadStrNotifications();
+  const refreshTimer = setInterval(() => {
+    loadAlerts(true);
+    loadStrNotifications();
+  }, 30000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      loadAlerts(true);
+      loadStrNotifications();
+    }
+  });
+  window.addEventListener("beforeunload", () => clearInterval(refreshTimer));
 </script>
 </body>
 </html>
