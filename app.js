@@ -25,6 +25,7 @@ const stroRoutes = require("./routes/stroRoutes");
 const rfiRoutes = require("./routes/rfiRoutes");
 const merchantRoutes = require("./routes/merchantRoutes");
 const mccCodeRoutes = require("./routes/mccCodeRoutes");
+const { authenticateToken } = require("./middleware/authMiddleware");
 const { ensureComplianceSchema } = require("./services/schema");
 const { showTransactionDetailsPage } = require("./controllers/transactionController");
 
@@ -39,7 +40,7 @@ app.use("/api/mcc-codes", mccCodeRoutes);
 const officerRoutes = require("./routes/officerRoutes");
 app.use("/api/officer", officerRoutes);
 
-app.get("/transaction/:id", showTransactionDetailsPage);
+app.get("/transaction/:id", authenticateToken, showTransactionDetailsPage);
 app.get("/stro", (req, res) => res.redirect("/stro-alerts.html"));
 
 

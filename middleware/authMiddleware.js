@@ -1,12 +1,18 @@
+require("dotenv").config();
 const jwt = require("jsonwebtoken");
-const JWT_SECRET = process.env.JWT_SECRET || "compliance_jwt_secret_2024";
+
+if (!process.env.JWT_SECRET) {
+  throw new Error("JWT_SECRET environment variable is required.");
+}
+
+const JWT_SECRET = process.env.JWT_SECRET;
 const VALID_ROLES = new Set(["admin", "analyst", "stro"]);
 
 function normalizeRole(role) {
   return String(role || "").trim().toLowerCase();
 }
 
-exports.authenticate = (req, res, next) => {
+function authenticateToken(req, res, next) {
   const authHeader = req.headers["authorization"];
   const bearerToken = authHeader && authHeader.split(" ")[1];
   const cookieToken = String(req.headers.cookie || "")
@@ -21,7 +27,10 @@ exports.authenticate = (req, res, next) => {
     req.user = decoded;
     next();
   });
-};
+}
+
+exports.authenticateToken = authenticateToken;
+exports.authenticate = authenticateToken;
 
 exports.authorizeRoles = (...roles) => {
   const allowedRoles = new Set(roles.map(normalizeRole));

@@ -6,12 +6,23 @@ function normalizeDatabaseName(name) {
   return name.trim().replace(/^['"`]+|['"`]+$/g, "");
 }
 
+if (
+  !process.env.DB_HOST ||
+  !process.env.DB_USER ||
+  !process.env.DB_PASSWORD ||
+  !process.env.DB_NAME
+) {
+  throw new Error(
+    "Missing required database environment variables. Check your .env file."
+  );
+}
+
 const db = mysql.createPool({
-  host: process.env.DB_HOST || "dft-fyp.mysql.database.azure.com",
-  user: process.env.DB_USER || "dft_fyp",
-  password: process.env.DB_PASSWORD || "RepublicPoly2026",
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
   port: Number(process.env.DB_PORT || 3306),
-  database: normalizeDatabaseName(process.env.DB_NAME) || "soi-2026-0046-yuhan1",
+  database: normalizeDatabaseName(process.env.DB_NAME),
   ssl: process.env.DB_SSL === "true"
     ? { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== "false" }
     : undefined,

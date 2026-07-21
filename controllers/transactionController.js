@@ -1373,6 +1373,26 @@ exports.dismissAlert = async (req, res) => {
   }
 };
 
+exports.closeAlert = async (req, res) => {
+  try {
+    const alert = await getAlertById(req.params.id);
+
+    if (!alert) return res.status(404).json({ message: "Alert not found" });
+
+    if (!["Escalated", "Escalated to STRO"].includes(alert.status)) {
+      return res.status(400).json({ message: "Only escalated alerts can be closed" });
+    }
+
+    await updateAlertStatus(req.params.id, "Closed", req.user.id, null, "close_case");
+    await logAudit("alert_closed", alert, `Escalated alert closed by STRO user ${req.user.id}`);
+
+    res.json({ message: "Escalated alert successfully closed" });
+  } catch (err) {
+    console.error("closeAlert error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 function formatEscalationReport(alert) {
   let triggeredRules = alert.triggered_rules;
 

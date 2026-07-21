@@ -3,6 +3,7 @@ const router = express.Router();
 
 const stroController = require("../controllers/stroController");
 const stroReviewController = require("../controllers/stroControllers");
+const { closeAlert } = require("../controllers/transactionController");
 const rfiController = require("../controllers/rfiController");
 const {
   authenticate,
@@ -21,6 +22,7 @@ router.get("/outcomes", allowAnalyst, stroController.getStroOutcomes);
 // STRO case review and STR drafting API.
 router.get("/alerts", allowStro, stroController.getEscalatedAlerts);
 router.get("/alerts/:id", allowStro, stroController.getEscalatedAlert);
+router.post("/alerts/:id/close", allowStro, closeAlert);
 router.get("/alerts/:id/str-draft", allowStro, stroController.getStrDraft);
 router.post("/alerts/:id/str-draft/generate", allowStro, stroController.generateStrDraftForAlert);
 router.put("/str-drafts/:id", allowStro, stroController.saveStrDraft);
