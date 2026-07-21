@@ -394,12 +394,12 @@
           </a>
 
           <button
-            type="submit"
-            name="decision"
-            value="feedback"
-            class="btn btn-feedback"
-          >
-            Send Feedback to Analyst
+           type="submit"
+           name="decision"
+           value="send_feedback"
+           class="btn btn-feedback"
+           >
+           Send Feedback to Analyst
           </button>
 
           <button
@@ -417,24 +417,24 @@
 
   </div>
 
-  <script>
-    const reviewForm = document.querySelector("form");
-    const feedbackBox = document.getElementById("stro_feedback");
-    const feedbackButton = document.querySelector(
-      'button[value="feedback"]'
-    );
+ <script>
+  const reviewForm = document.querySelector("form");
+  const feedbackBox = document.getElementById("stro_feedback");
+  const feedbackButton = document.querySelector(
+    'button[value="send_feedback"]'
+  );
 
-    feedbackButton.addEventListener("click", function (event) {
-      if (!feedbackBox.value.trim()) {
-        event.preventDefault();
+  feedbackButton.addEventListener("click", function (event) {
+    if (!feedbackBox.value.trim()) {
+      event.preventDefault();
 
-        alert(
-          "Please enter feedback before returning the draft."
-        );
+      alert(
+        "Please enter feedback before returning the draft."
+      );
 
-        feedbackBox.focus();
-      }
-    });
-  </script>
+      feedbackBox.focus();
+    }
+  });
+</script>
 </body>
 </html>

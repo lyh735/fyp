@@ -1,10 +1,10 @@
-const db = require("../config/db");
+const db = require("../config/db").promise();
 
 /**
  * Show analyst-submitted STR drafts for STRO review.
  */
-function showDashboard(req, res) {
-  const sql = `
+async function showDashboard(req, res) {
+  const sql = 
     SELECT
       s.str_id,
       s.alert_id,
@@ -54,31 +54,31 @@ function showDashboard(req, res) {
         ELSE 4
       END,
       s.updated_at DESC
-  `;
+  ;
 
-  db.query(sql, (err, drafts) => {
-    if (err) {
-      console.error("Error loading STRO dashboard:", err);
-
-      return res.status(500).send(
-        "Error loading STRO dashboard: " + err.message
-      );
-    }
+  try {
+    const [drafts] = await db.query(sql);
 
     return res.render("stroDashboard", {
       drafts,
       user: req.session?.user || null
     });
-  });
+  } catch (err) {
+    console.error("Error loading STRO dashboard:", err);
+
+    return res.status(500).send(
+      "Error loading STRO dashboard: " + err.message
+    );
+  }
 }
 
 /**
  * View one STR draft.
  */
-function viewDraft(req, res) {
+async function viewDraft(req, res) {
   const strId = req.params.strId;
 
-  const sql = `
+  const sql = 
     SELECT
       s.*,
 
@@ -112,16 +112,10 @@ function viewDraft(req, res) {
 
     WHERE s.str_id = ?
     LIMIT 1
-  `;
+  ;
 
-  db.query(sql, [strId], (err, results) => {
-    if (err) {
-      console.error("Error loading STR draft:", err);
-
-      return res.status(500).send(
-        "Error loading STR draft: " + err.message
-      );
-    }
+  try {
+    const [results] = await db.query(sql, [strId]);
 
     if (!results || results.length === 0) {
       return res.status(404).send("STR draft not found");
@@ -152,13 +146,19 @@ function viewDraft(req, res) {
       reviewed: req.query.reviewed === "1",
       user: req.session?.user || null
     });
-  });
+  } catch (err) {
+    console.error("Error loading STR draft:", err);
+
+    return res.status(500).send(
+      "Error loading STR draft: " + err.message
+    );
+  }
 }
 
 /**
  * STRO can send feedback or approve the STR draft.
  */
-function reviewDraft(req, res) {
+async function reviewDraft(req, res) {
   const strId = req.params.strId;
   const { decision, stro_feedback } = req.body;
 
@@ -209,7 +209,7 @@ function reviewDraft(req, res) {
       ? stro_feedback.trim()
       : null;
 
-  const sql = `
+  const sql = 
     UPDATE str_reports
     SET
       status = ?,
@@ -227,37 +227,33 @@ function reviewDraft(req, res) {
 
     WHERE str_id = ?
       AND status = 'pending_stro_review'
-  `;
+  ;
 
-  db.query(
-    sql,
-    [
+  try {
+    const [result] = await db.query(sql, [
       newStatus,
       reviewerId,
       feedback,
       newStatus,
       strId
-    ],
-    (err, result) => {
-      if (err) {
-        console.error("Error reviewing STR draft:", err);
+    ]);
 
-        return res.status(500).send(
-          "Error reviewing STR draft: " + err.message
-        );
-      }
-
-      if (result.affectedRows === 0) {
-        return res.status(400).send(
-          "This STR draft is not currently pending STRO review"
-        );
-      }
-
-      return res.redirect(
-        `/stro/drafts/${strId}?reviewed=1`
+    if (result.affectedRows === 0) {
+      return res.status(400).send(
+        "This STR draft is not currently pending STRO review"
       );
     }
-  );
+
+    return res.redirect(
+      /stro/drafts/${strId}?reviewed=1
+    );
+  } catch (err) {
+    console.error("Error reviewing STR draft:", err);
+
+    return res.status(500).send(
+      "Error reviewing STR draft: " + err.message
+    );
+  }
 }
 
 /*
