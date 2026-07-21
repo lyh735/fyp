@@ -22,7 +22,6 @@ const { authenticate, authorizeRoles } = require("../middleware/authMiddleware")
 const allowAllRoles = authorizeRoles("admin", "analyst", "stro");
 const allowAdmin = authorizeRoles("admin");
 const allowAnalyst = authorizeRoles("analyst");
-const allowAnalystOrStro = authorizeRoles("analyst", "stro");
 
 router.post("/transactions",        authenticate, allowAdmin, createTransaction);
 router.post("/transactions/upload", authenticate, allowAdmin, uploadTransactions);
@@ -36,7 +35,7 @@ router.delete("/rules/:id",         authenticate, allowAdmin, deleteComplianceRu
 router.get ("/mcc-risk",            authenticate, allowAllRoles, getMccRiskProfiles);
 router.put ("/mcc-risk/:id",        authenticate, allowAdmin, updateMccRiskProfile);
 router.post("/alerts/:id/read",     authenticate, allowAnalyst, markAlertRead);
-router.post("/alerts/:id/dismiss",  authenticate, allowAnalystOrStro, dismissAlert);
+router.post("/alerts/:id/dismiss",  authenticate, allowAnalyst, dismissAlert);
 router.post("/alerts/:id/escalate", authenticate, allowAnalyst, escalateAlert);
 router.post("/simulate",            authenticate, allowAdmin, simulate);
 

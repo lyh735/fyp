@@ -377,6 +377,12 @@ exports.generateSTRDraft = (req, res) => {
 
     const alert = results[0];
 
+    if (alert.status !== "Escalated to STRO") {
+      return res.status(400).send(
+        "STR draft can only be generated for escalated cases."
+      );
+    }
+
     const strReference = "STR-" + new Date().getFullYear() + "-" + Date.now();
 
     const narrativeText = `

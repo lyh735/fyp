@@ -169,6 +169,12 @@ exports.generateStrDraftForAlert = async (req, res) => {
       return res.status(404).json({ message: "Escalated alert not found" });
     }
 
+    if (alert.status !== "Escalated to STRO") {
+      return res.status(400).json({
+        message: "STR draft can only be generated for escalated cases."
+      });
+    }
+
     const result = await generateStrDraft(alert);
     const existing = await loadLatestDraft(alert.alert_id);
     let draftId;
