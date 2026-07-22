@@ -13,7 +13,6 @@ const {
 const allowAnalyst = authorizeRoles("analyst");
 const allowStro = authorizeRoles("stro");
 const allowAnalystOrStro = authorizeRoles("analyst", "stro");
-const allowStroOrAdmin = authorizeRoles("stro", "admin");
 
 router.use(authenticate);
 
@@ -31,8 +30,8 @@ router.get("/rfi/:id/pdf", allowStro, rfiController.exportPdf);
 router.get("/rfi/:id/response-file", allowStro, rfiController.downloadResponseFile);
 
 // Server-rendered STRO review workflow retained for existing links.
-router.get("/dashboard", allowStroOrAdmin, stroReviewController.showDashboard);
-router.get("/drafts/:strId", allowStroOrAdmin, stroReviewController.viewDraft);
-router.post("/drafts/:strId/review", allowStroOrAdmin, stroReviewController.reviewDraft);
+router.get("/dashboard", allowStro, stroReviewController.showDashboard);
+router.get("/drafts/:strId", allowStro, stroReviewController.viewDraft);
+router.post("/drafts/:strId/review", allowStro, stroReviewController.reviewDraft);
 
 module.exports = router;

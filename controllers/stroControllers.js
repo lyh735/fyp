@@ -198,13 +198,7 @@ async function reviewDraft(req, res) {
     );
   }
 
-  const reviewerId = Number(
-    req.session?.user?.userId ||
-    req.session?.user?.user_id ||
-    req.user?.userId ||
-    req.user?.user_id ||
-    1
-  );
+  const reviewerId = Number(req.user?.id);
 
   if (
     !Number.isInteger(reviewerId) ||

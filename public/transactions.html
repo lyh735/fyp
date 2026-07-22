@@ -395,7 +395,7 @@ function renderTransactions() {
   if (!body) return;
 
   const data = currentTransactionFilter === "attention"
-    ? allTransactions.filter(t => t.risk_level === "High" || t.risk_level === "Medium")
+    ? allTransactions.filter(t => ["Critical", "High", "Medium"].includes(t.risk_level))
     : currentTransactionFilter
       ? allTransactions.filter(t => t.risk_level === currentTransactionFilter)
       : allTransactions;
@@ -408,7 +408,7 @@ function renderTransactions() {
   if (filterValue) {
     filterValue.textContent = currentTransactionFilter
       ? currentTransactionFilter === "attention"
-        ? "Medium / High Risk"
+        ? "Critical / High / Medium Risk"
         : `${currentTransactionFilter} Risk`
       : "";
   }
@@ -447,7 +447,7 @@ async function loadTransactions() {
   const res = await apiFetch("/api/transactions");
   if (!res) return;
   const data = await res.json();
-  const priority = { High: 3, Medium: 2, Low: 1 };
+  const priority = { Critical: 4, High: 3, Medium: 2, Low: 1 };
   data.sort((a, b) => {
     const scoreA = parseFloat(a.risk_score) || 0;
     const scoreB = parseFloat(b.risk_score) || 0;
@@ -468,6 +468,7 @@ async function loadTransactions() {
   const lowCount = data.filter(t => t.risk_level === "Low").length;
   const mediumCount = data.filter(t => t.risk_level === "Medium").length;
   const highCount = data.filter(t => t.risk_level === "High").length;
+  const criticalCount = data.filter(t => t.risk_level === "Critical").length;
   const setText = (id, value) => {
     const el = document.getElementById(id);
     if (el) el.textContent = value;
@@ -476,7 +477,7 @@ async function loadTransactions() {
   setText("statTxnTotal", data.length);
   setText("statLow", lowCount);
   setText("statMedium", mediumCount);
-  setText("statAttention", highCount + mediumCount);
+  setText("statAttention", criticalCount + highCount + mediumCount);
   setText("statHigh", highCount);
   setText("statSuspicious", data.filter(t => t.status === "suspicious").length);
 }
@@ -485,7 +486,7 @@ async function loadAlerts() {
   const res = await apiFetch("/api/alerts");
   if (!res) return;
   const data = await res.json();
-  const priority = { High: 3, Medium: 2, Low: 1 };
+  const priority = { Critical: 4, High: 3, Medium: 2, Low: 1 };
   data.sort((a, b) => {
     if (!!a.read_at !== !!b.read_at) return a.read_at ? 1 : -1;
     const levelA = priority[a.risk_level] || 1;

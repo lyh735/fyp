@@ -75,8 +75,8 @@
         <div id="historyMessage" class="message" style="margin:16px 22px 0"></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Reference</th><th>Merchant / Transaction</th><th>Requested By</th><th>Requested Documents</th><th>Status</th><th>Dates</th><th>Actions</th></tr></thead>
-            <tbody id="historyBody"><tr><td colspan="7"><div class="empty-state"><p>Loading RFI history...</p></div></td></tr></tbody>
+            <thead><tr><th>Reference</th><th>Merchant / Transaction</th><th>Requested By</th><th>Requested Documents</th><th>Merchant Response</th><th>Status</th><th>Dates</th><th>Actions</th></tr></thead>
+            <tbody id="historyBody"><tr><td colspan="8"><div class="empty-state"><p>Loading RFI history...</p></div></td></tr></tbody>
           </table>
         </div>
       </section>
@@ -135,13 +135,13 @@
     const query = document.getElementById('historySearch').value.trim().toLowerCase();
     const filter = document.getElementById('statusFilter').value;
     const rows = historyRows.filter(row => {
-      const searchable = `${row.reference_no} ${row.merchant_name} ${row.merchant_id} ${row.transaction_id} ${row.analyst_name}`.toLowerCase();
+      const searchable = `${row.reference_no} ${row.merchant_name} ${row.merchant_id} ${row.transaction_id} ${row.analyst_name} ${row.response_message || ''}`.toLowerCase();
       const statusMatches = filter === 'all' || (filter === 'overdue' ? row.is_overdue : row.status === filter);
       return searchable.includes(query) && statusMatches;
     });
     const body = document.getElementById('historyBody');
     if (!rows.length) {
-      body.innerHTML = '<tr><td colspan="7"><div class="empty-state"><p>No matching RFIs found.</p></div></td></tr>';
+      body.innerHTML = '<tr><td colspan="8"><div class="empty-state"><p>No matching RFIs found.</p></div></td></tr>';
       return;
     }
     body.innerHTML = rows.map(row => {
@@ -151,20 +151,61 @@
       const viewAction = isStro
         ? ''
         : `<a class="btn btn-primary small-btn" href="/api/officer/alerts/${Number(row.alert_id)}/rfi">View</a>`;
-      const responseAction = isStro && row.response_attachment
-        ? `<a class="btn btn-secondary small-btn" href="/api/stro/rfi/${Number(row.rfi_id)}/response-file">Response</a>`
+      const responsePath = isStro
+        ? `/api/stro/rfi/${Number(row.rfi_id)}/response-file`
+        : `/api/officer/rfi/${Number(row.rfi_id)}/response-file`;
+      const responseAction = row.response_attachment
+        ? `<button type="button" class="btn btn-secondary small-btn response-download" data-url="${responsePath}">Download file</button>`
         : '';
+      const responseMessage = row.response_message
+        ? `<div class="doc-list">${escapeHtml(row.response_message)}</div>`
+        : `<span class="subtext">${row.status === 'Responded' ? 'No response message provided.' : 'Awaiting merchant response.'}</span>`;
       return `
         <tr class="${row.is_overdue ? 'overdue-row' : ''}">
           <td><div class="rfi-ref">${escapeHtml(row.reference_no)}</div><div class="subtext">Alert #${Number(row.alert_id)}</div></td>
           <td><strong>${escapeHtml(row.merchant_name || row.merchant_id || '-')}</strong><div class="subtext">${escapeHtml(row.transaction_id)}</div></td>
           <td>${escapeHtml(row.analyst_name || '-')}</td>
           <td><div class="doc-list">${row.requested_documents.map(escapeHtml).join('<br>') || '-'}</div></td>
+          <td>${responseMessage}${responseAction ? `<div class="history-actions" style="margin-top:8px">${responseAction}</div>` : ''}</td>
           <td><span class="pill ${statusClass(row)}">${row.is_overdue ? 'Overdue' : escapeHtml(row.status)}</span></td>
           <td><div>Created: ${escapeHtml(formatDate(row.created_at))}</div><div class="subtext">Sent: ${escapeHtml(formatDate(row.sent_at))}</div><div class="subtext">Due: ${escapeHtml(formatDate(row.due_at))}</div>${row.responded_at ? `<div class="subtext">Responded: ${escapeHtml(formatDate(row.responded_at))}</div>` : ''}</td>
-          <td><div class="history-actions">${viewAction}<a class="btn btn-secondary small-btn" href="${pdfPath}">PDF</a>${responseAction}</div></td>
+          <td><div class="history-actions">${viewAction}<a class="btn btn-secondary small-btn" href="${pdfPath}">PDF</a></div></td>
         </tr>`;
     }).join('');
+    body.querySelectorAll('.response-download').forEach(button => {
+      button.addEventListener('click', () => downloadResponseFile(button.dataset.url, button));
+    });
+  }
+
+  async function downloadResponseFile(url, button) {
+    const originalLabel = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Downloading...';
+    try {
+      const response = await apiFetch(url, { headers: {} });
+      if (!response) return;
+      if (!response.ok) {
+        showMessage('historyMessage', await response.text() || 'Unable to download the merchant response file');
+        return;
+      }
+
+      const disposition = response.headers.get('Content-Disposition') || '';
+      const match = disposition.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
+      let filename = match ? match[1] : 'merchant-response';
+      try { filename = decodeURIComponent(filename); } catch {}
+
+      const blobUrl = URL.createObjectURL(await response.blob());
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(blobUrl);
+    } finally {
+      button.disabled = false;
+      button.textContent = originalLabel;
+    }
   }
 
   async function loadHistory() {
@@ -173,7 +214,7 @@
     const data = await response.json();
     if (!response.ok) {
       showMessage('historyMessage', data.message || 'Unable to load RFI history');
-      document.getElementById('historyBody').innerHTML = '<tr><td colspan="7"><div class="empty-state"><p>Unable to load RFI history.</p></div></td></tr>';
+      document.getElementById('historyBody').innerHTML = '<tr><td colspan="8"><div class="empty-state"><p>Unable to load RFI history.</p></div></td></tr>';
       return;
     }
     historyRows = data;

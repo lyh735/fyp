@@ -4,7 +4,7 @@
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
-    "test": "node tests/riskEngine.test.js && node tests/strEscalation.test.js && node tests/stroNotifications.test.js"
+    "test": "node tests/riskEngine.test.js && node tests/strEscalation.test.js && node tests/stroNotifications.test.js && node tests/stroReview.test.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

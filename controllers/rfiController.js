@@ -140,7 +140,7 @@ exports.getAnalystRfiHistory = async (req, res) => {
       SELECT r.rfi_id, r.alert_id, r.reference_no, r.requested_documents,
              r.additional_remarks, r.status, r.created_at, r.updated_at,
              r.sent_at, r.due_at, r.responded_at, r.is_sent,
-             r.response_attachment,
+             r.response_message, r.response_attachment,
              a.transaction_id, a.risk_level, a.priority,
              m.merchant_id, m.merchant_name, u.name AS analyst_name,
              CASE

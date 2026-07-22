@@ -57,19 +57,6 @@
         Alerts
         <span id="alertCount" class="badge notification-badge" style="margin-left:auto;display:none" aria-label="Unread alerts"></span>
       </div>
-      <div class="nav-item" id="analystRfiHistoryNav" style="display:none" onclick="window.location.href='/analyst-rfi-history.html'">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/>
-        </svg>
-        My RFI History
-      </div>
-      <div class="nav-item" id="analystStroOutcomesNav" style="display:none" onclick="window.location.href='/stro-alerts.html'">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M4 4h16v16H4z"/><path d="M8 12l3 3 5-6"/>
-        </svg>
-        STRO Outcomes
-        <span id="analystStroNotificationBadge" class="badge notification-badge" style="margin-left:auto;display:none" aria-label="STR drafts returned with feedback"></span>
-      </div>
       <div class="nav-item" onclick="window.location.href='/rules.html'">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M9 3h6l1 2h4v16H4V5h4l1-2z"/>
@@ -83,6 +70,23 @@
           <path d="M14 2v6h6M9 13h8M9 17h8"/>
         </svg>
         Audit Report
+      </div>
+
+      <div id="analystNav" style="display:none">
+        <div class="nav-section-label">Analyst Review</div>
+        <div class="nav-item" onclick="window.location.href='/analyst-rfi-history.html'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/>
+          </svg>
+          My RFI History
+        </div>
+        <div class="nav-item" onclick="window.location.href='/stro-alerts.html'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 4h16v16H4z"/><path d="M8 12l3 3 5-6"/>
+          </svg>
+          STRO Outcomes
+          <span id="analystStroNotificationBadge" class="badge notification-badge" style="margin-left:auto;display:none" aria-label="STR drafts returned with feedback"></span>
+        </div>
       </div>
 
       <div id="adminNav" style="display:none">
@@ -305,8 +309,7 @@ if (String(user.role).trim().toLowerCase() === "stro") {
   document.getElementById("stroNav").style.display = "block";
 }
 if (String(user.role).trim().toLowerCase() === "analyst") {
-  document.getElementById("analystRfiHistoryNav").style.display = "flex";
-  document.getElementById("analystStroOutcomesNav").style.display = "flex";
+  document.getElementById("analystNav").style.display = "block";
 }
 
 async function loadStrNotifications() {
@@ -519,7 +522,7 @@ function renderTransactions() {
   if (!body) return;
 
   const data = currentTransactionFilter === "attention"
-    ? allTransactions.filter(t => t.risk_level === "High" || t.risk_level === "Medium")
+    ? allTransactions.filter(t => ["Critical", "High", "Medium"].includes(t.risk_level))
     : currentTransactionFilter
       ? allTransactions.filter(t => t.risk_level === currentTransactionFilter)
       : allTransactions;
@@ -532,7 +535,7 @@ function renderTransactions() {
   if (filterValue) {
     filterValue.textContent = currentTransactionFilter
       ? currentTransactionFilter === "attention"
-        ? "Medium / High Risk"
+        ? "Critical / High / Medium Risk"
         : `${currentTransactionFilter} Risk`
       : "";
   }
@@ -571,7 +574,7 @@ async function loadTransactions() {
   const res = await apiFetch("/api/transactions");
   if (!res) return;
   const data = await res.json();
-  const priority = { High: 3, Medium: 2, Low: 1 };
+  const priority = { Critical: 4, High: 3, Medium: 2, Low: 1 };
   data.sort((a, b) => {
     const scoreA = parseFloat(a.risk_score) || 0;
     const scoreB = parseFloat(b.risk_score) || 0;
@@ -592,6 +595,7 @@ async function loadTransactions() {
   const lowCount = data.filter(t => t.risk_level === "Low").length;
   const mediumCount = data.filter(t => t.risk_level === "Medium").length;
   const highCount = data.filter(t => t.risk_level === "High").length;
+  const criticalCount = data.filter(t => t.risk_level === "Critical").length;
   const setText = (id, value) => {
     const el = document.getElementById(id);
     if (el) el.textContent = value;
@@ -600,7 +604,7 @@ async function loadTransactions() {
   setText("statTxnTotal", data.length);
   setText("statLow", lowCount);
   setText("statMedium", mediumCount);
-  setText("statAttention", highCount + mediumCount);
+  setText("statAttention", criticalCount + highCount + mediumCount);
   setText("statHigh", highCount);
   setText("statSuspicious", data.filter(t => t.status === "suspicious").length);
 }
@@ -609,7 +613,7 @@ async function loadAlerts() {
   const res = await apiFetch("/api/alerts");
   if (!res) return;
   const data = await res.json();
-  const priority = { High: 3, Medium: 2, Low: 1 };
+  const priority = { Critical: 4, High: 3, Medium: 2, Low: 1 };
   data.sort((a, b) => {
     if (!!a.read_at !== !!b.read_at) return a.read_at ? 1 : -1;
     const levelA = priority[a.risk_level] || 1;

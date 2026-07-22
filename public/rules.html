@@ -627,7 +627,9 @@ function renderRules() {
         <td>
           <div class="table-actions">
             <button type="button" class="btn btn-secondary" onclick="editRule(${Number(rule.rule_id)})">Edit</button>
-            <button type="button" class="btn btn-danger" onclick="deleteRule(${Number(rule.rule_id)})">Deactivate</button>
+            ${Number(rule.is_active) === 1
+              ? `<button type="button" class="btn btn-danger" onclick="deleteRule(${Number(rule.rule_id)})">Deactivate</button>`
+              : `<button type="button" class="btn btn-success" onclick="activateRule(${Number(rule.rule_id)})">Activate</button>`}
           </div>
         </td>` : ""}
     </tr>
@@ -814,6 +816,38 @@ async function deleteRule(ruleId) {
 
   showToast("Rule Status", data.message || "Rule deactivated successfully.");
   if (Number(editingRuleId) === Number(ruleId)) resetRuleForm();
+  await loadRules();
+}
+
+async function activateRule(ruleId) {
+  const rule = rules.find((item) => Number(item.rule_id) === Number(ruleId));
+  if (!rule) {
+    showToast("Rule Status", "Rule not found.");
+    return;
+  }
+  if (!confirm("Activate this rule? It will affect new transactions.")) return;
+
+  const res = await apiFetch(`/api/rules/${ruleId}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      rule_name: rule.rule_name,
+      rule_type: rule.rule_type,
+      description: rule.description,
+      threshold_value: rule.threshold_value,
+      threshold_count: rule.threshold_count,
+      time_window_seconds: rule.time_window_seconds,
+      points: rule.points,
+      is_active: true,
+    }),
+  });
+  if (!res) return;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    showToast("Rule Status", data.message || "Unable to activate rule.");
+    return;
+  }
+
+  showToast("Rule Status", "Rule activated successfully.");
   await loadRules();
 }
 
