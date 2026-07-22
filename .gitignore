@@ -2,3 +2,5 @@
 node_modules/
 venv/
 *.log
+uploads/rfi-responses/*
+!uploads/rfi-responses/.gitkeep
