@@ -169,6 +169,41 @@
       color: white;
     }
 
+    .approval-dialog {
+      width: min(92vw, 480px);
+      border: none;
+      border-radius: 14px;
+      padding: 0;
+      box-shadow: 0 20px 55px rgba(0, 0, 0, 0.25);
+    }
+
+    .approval-dialog::backdrop {
+      background: rgba(15, 23, 42, 0.58);
+    }
+
+    .approval-dialog-content {
+      padding: 24px;
+    }
+
+    .approval-dialog-content h3 {
+      margin: 0 0 10px;
+      font-size: 21px;
+    }
+
+    .approval-dialog-content p {
+      margin: 0;
+      color: #555;
+      line-height: 1.5;
+    }
+
+    .approval-dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
     .empty-message {
       color: #777;
       font-style: italic;
@@ -406,16 +441,58 @@
           </button>
 
           <button
-            type="submit"
-            name="decision"
+            type="button"
+            id="openApprovalConfirmation"
             value="approve"
             class="btn btn-approve"
           >
             Approve Draft
           </button>
 
+          <button
+            type="submit"
+            id="confirmedApproveSubmit"
+            name="decision"
+            value="approve"
+            hidden
+          >
+            Confirm Approval
+          </button>
+
         </div>
       </form>
+
+      <dialog
+        id="approvalConfirmation"
+        class="approval-dialog"
+        aria-labelledby="approvalConfirmationTitle"
+      >
+        <div class="approval-dialog-content">
+          <h3 id="approvalConfirmationTitle">Confirm STR Approval</h3>
+          <p>
+            Are you sure you want to approve this draft? This records the
+            STRO decision and marks the STR as approved.
+          </p>
+
+          <div class="approval-dialog-actions">
+            <button
+              type="button"
+              id="cancelApproval"
+              class="btn btn-back"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="button"
+              id="confirmApproval"
+              class="btn btn-approve"
+            >
+              Confirm Approval
+            </button>
+          </div>
+        </div>
+      </dialog>
     </div>
 
   </div>
@@ -425,6 +502,21 @@
   const feedbackBox = document.getElementById("stro_feedback");
   const feedbackButton = document.querySelector(
     'button[value="send_feedback"]'
+  );
+  const approvalDialog = document.getElementById(
+    "approvalConfirmation"
+  );
+  const openApprovalButton = document.getElementById(
+    "openApprovalConfirmation"
+  );
+  const cancelApprovalButton = document.getElementById(
+    "cancelApproval"
+  );
+  const confirmApprovalButton = document.getElementById(
+    "confirmApproval"
+  );
+  const confirmedApproveSubmit = document.getElementById(
+    "confirmedApproveSubmit"
   );
 
   feedbackButton.addEventListener("click", function (event) {
@@ -437,6 +529,26 @@
 
       feedbackBox.focus();
     }
+  });
+
+  openApprovalButton.addEventListener("click", function () {
+    if (typeof approvalDialog.showModal === "function") {
+      approvalDialog.showModal();
+      return;
+    }
+
+    if (window.confirm("Are you sure you want to approve this STR draft?")) {
+      reviewForm.requestSubmit(confirmedApproveSubmit);
+    }
+  });
+
+  cancelApprovalButton.addEventListener("click", function () {
+    approvalDialog.close();
+  });
+
+  confirmApprovalButton.addEventListener("click", function () {
+    approvalDialog.close();
+    reviewForm.requestSubmit(confirmedApproveSubmit);
   });
 </script>
 </body>

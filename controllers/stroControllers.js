@@ -224,7 +224,10 @@ async function reviewDraft(req, res) {
     SET
       status = ?,
       stro_reviewed_by = ?,
-      stro_feedback = ?,
+      stro_feedback = CASE
+        WHEN ? = 'feedback_required' THEN ?
+        ELSE stro_feedback
+      END,
       stro_reviewed_at = NOW(),
 
       approved_at = CASE
@@ -240,9 +243,20 @@ async function reviewDraft(req, res) {
   `;
 
   try {
+    const [drafts] = await db.query(
+      "SELECT alert_id FROM str_reports WHERE str_id = ? LIMIT 1",
+      [strId]
+    );
+
+    if (!drafts || drafts.length === 0) {
+      return res.status(404).send("STR draft not found");
+    }
+
+    const alertId = drafts[0].alert_id;
     const [result] = await db.query(sql, [
       newStatus,
       reviewerId,
+      newStatus,
       feedback,
       newStatus,
       strId
@@ -253,6 +267,19 @@ async function reviewDraft(req, res) {
         "This STR draft is not currently pending STRO review"
       );
     }
+
+    await db.query(
+      `INSERT INTO case_actions
+       (alert_id, user_id, action_type, status_after_action, remarks)
+       VALUES (?, ?, ?, ?, ?)`,
+      [
+        alertId,
+        reviewerId,
+        decision === "approve" ? "stro_approved" : "stro_feedback_sent",
+        decision === "approve" ? "approved_by_stro" : "feedback_required",
+        decision === "approve" ? "STR approved by STRO" : feedback
+      ]
+    );
 
     return res.redirect(
       `/stro/drafts/${strId}?reviewed=1`
