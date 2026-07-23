@@ -1,0 +1,10 @@
+transaction_id,merchant_id,amount,currency,transaction_type,payment_method,txn_time,terminal_id,ip_address,country,transaction_status,customer_risk_profile,masked_payment_ref,payment_gateway_ref,card_bin,masked_card_number,card_presence,ip_country,ip_country_verified
+RTTX-INVALID-001,,25,SGD,online,PayNow,2026-07-22 10:00:00,,203.0.113.20,Singapore,success,low,PAY-RTTX-INVALID-001,GW-RTTX-INVALID-001,411111,411111******1111,not_present,Singapore,1
+RTTX-INVALID-002,NO-SUCH-MERCHANT,25,SGD,online,PayNow,2026-07-22 10:05:00,,203.0.113.20,Singapore,success,low,PAY-RTTX-INVALID-002,GW-RTTX-INVALID-002,411111,411111******1111,not_present,Singapore,1
+RTTX-INVALID-003,RTM-FNB-LOW-001,,SGD,online,PayNow,2026-07-22 10:10:00,,203.0.113.20,Singapore,success,low,PAY-RTTX-INVALID-003,GW-RTTX-INVALID-003,411111,411111******1111,not_present,Singapore,1
+RTTX-INVALID-004,RTM-FNB-LOW-001,0,SGD,online,PayNow,2026-07-22 10:15:00,,203.0.113.20,Singapore,success,low,PAY-RTTX-INVALID-004,GW-RTTX-INVALID-004,411111,411111******1111,not_present,Singapore,1
+RTTX-INVALID-005,RTM-FNB-LOW-001,-15,SGD,online,PayNow,2026-07-22 10:20:00,,203.0.113.20,Singapore,success,low,PAY-RTTX-INVALID-005,GW-RTTX-INVALID-005,411111,411111******1111,not_present,Singapore,1
+RTTX-INVALID-006,RTM-FNB-LOW-001,25,,online,PayNow,2026-07-22 10:25:00,,203.0.113.20,Singapore,success,low,PAY-RTTX-INVALID-006,GW-RTTX-INVALID-006,411111,411111******1111,not_present,Singapore,1
+RTTX-INVALID-007,RTM-FNB-LOW-001,25,SGD,online,PayNow,,,203.0.113.20,Singapore,success,low,PAY-RTTX-INVALID-007,GW-RTTX-INVALID-007,411111,411111******1111,not_present,Singapore,1
+RTTX-INVALID-008,RTM-FNB-LOW-001,25,SGD,mobile_app,PayNow,2026-07-22 10:35:00,,203.0.113.20,Singapore,success,low,PAY-RTTX-INVALID-008,GW-RTTX-INVALID-008,411111,411111******1111,not_present,Singapore,1
+RTTX-INVALID-009,RTM-FNB-LOW-001,25,SGD,online,PayNow,2026-07-22 10:40:00,,203.0.113.20,Singapore,success,low,,,411111,411111******1111,not_present,Singapore,1

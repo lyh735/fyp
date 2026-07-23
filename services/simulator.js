@@ -93,7 +93,7 @@ function generateCustomerRiskProfile() {
 }
 
 function generateTransactionStatus() {
-  return weightedPick(["success", "completed", "failed", "declined"], [0.86, 0.08, 0.04, 0.02]);
+  return weightedPick(["success", "completed"], [0.92, 0.08]);
 }
 
 const COUNTRIES = [

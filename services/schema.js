@@ -420,8 +420,9 @@ async function ensureCurrentSchemaCompatibility() {
           THEN 'Repeated failed or declined payment attempts'
           ELSE rule_name
         END,
-        description = 'Flags repeated failed or declined payment attempts using the same payment identifier.',
+        description = 'Inactive future enhancement. Failed, declined and cancelled transactions do not enter compliance monitoring under the current project scope.',
         time_window_seconds = COALESCE(time_window_seconds, time_window_minutes * 60, 600),
+        is_active = 0,
         updated_at = NOW()
     WHERE rule_type = 'cancellation_velocity'
       AND NOT EXISTS (
@@ -647,7 +648,7 @@ async function ensureDefaultRules(createdBy = null) {
     {
       rule_name: "High transaction velocity",
       rule_type: "transaction_velocity",
-      description: "Flags successful or pending transaction velocity by payment identifier. Failed and declined transactions are excluded and evaluated by failed_attempt_velocity.",
+      description: "Flags successful or completed transaction velocity by payment identifier. Failed, declined and cancelled transactions are captured only as intake statuses and are not monitored.",
       threshold_value: null,
       threshold_count: 6,
       time_window_minutes: 1,
@@ -680,24 +681,24 @@ async function ensureDefaultRules(createdBy = null) {
     {
       rule_name: "Repeated failed or declined payment attempts",
       rule_type: "failed_attempt_velocity",
-      description: "Flags at least 3 failed or declined attempts for the same payment identifier within 10 minutes.",
+      description: "Inactive future enhancement. Failed, declined and cancelled transactions do not enter compliance monitoring under the current project scope.",
       threshold_value: null,
       threshold_count: 3,
       time_window_minutes: 10,
       time_window_seconds: 600,
       points: 15,
-      is_active: 1,
+      is_active: 0,
     },
     {
       rule_name: "Failed attempts followed by success",
       rule_type: "failure_then_success",
-      description: "Flags a successful transaction after at least 3 failed or declined attempts for the same payment identifier within 10 minutes.",
+      description: "Inactive future enhancement. Failed-payment sequences are excluded from active merchant-focused monitoring under the current project scope.",
       threshold_value: null,
       threshold_count: 3,
       time_window_minutes: 10,
       time_window_seconds: 600,
       points: 30,
-      is_active: 1,
+      is_active: 0,
     },
     {
       rule_name: "Possible duplicate successful transaction",

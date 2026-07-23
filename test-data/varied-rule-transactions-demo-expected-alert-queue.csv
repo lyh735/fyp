@@ -1,0 +1,16 @@
+rank,transaction_id,txn_time,priority_score,official_risk_score,notes
+1,RTDEMO-020,2026-07-23 21:30:00,195,65,Expected queue rank 1 by priority score 195
+2,RTDEMO-021-10,2026-07-23 21:35:27,165,55,Expected queue rank 2 by priority score 165
+3,RTDEMO-019,2026-07-23 10:40:00,150,50,Priority 150
+4,RTDEMO-022,2026-07-23 10:50:00,135,45,Same priority 135; newer transaction time than RTDEMO-018
+5,RTDEMO-018,2026-07-23 10:35:00,135,45,Priority 135
+6,RTDEMO-006,2026-07-23 09:25:00,135,45,Priority 135
+7,RTDEMO-010-02,2026-07-23 10:05:30,120,40,Priority 120
+8,RTDEMO-005,2026-07-23 09:20:00,120,40,Priority 120
+9,RTDEMO-013-041,2026-07-23 21:20:00,105,35,Priority 105
+10,RTDEMO-012-061,2026-07-23 15:00:00,90,30,Priority 90
+11,RTDEMO-017,2026-07-23 10:30:00,35,35,Suspicious medium MCC case.
+12,RTDEMO-009-03,2026-07-23 10:00:00,35,35,Priority 35
+13,RTDEMO-007-10,2026-07-23 09:30:27,30,30,Priority 30
+14,RTDEMO-004,2026-07-23 09:15:00,30,30,MCC expected_max_amount fallback.
+15,RTDEMO-003,2026-07-23 09:10:00,30,30,Merchant max threshold source.

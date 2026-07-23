@@ -754,16 +754,20 @@ function renderResult(data) {
   if (!summary) return showPageMessage(data.message || "Import failed");
   const stats = [
     [summary.total, "Total"], [summary.succeeded, "Processed"],
+    [summary.not_monitored || 0, "Not monitored"],
     [summary.failed, "Failed"], [summary.alerts_created, "Alerts"],
   ];
   document.getElementById("resultStats").innerHTML = stats.map(([value, label]) =>
     `<div class="result-stat"><strong>${value}</strong><span>${label}</span></div>`
   ).join("");
   const failures = data.results.filter((result) => result.status === "failed");
+  const notMonitored = data.results.filter((result) => result.status === "not_monitored");
   document.getElementById("errorList").innerHTML = failures.map((failure) =>
     `<li>Row ${failure.row}${failure.transaction_id ? ` (${escapeHtml(failure.transaction_id)})` : ""}: ${escapeHtml((failure.errors || []).join("; "))}</li>`
-  ).join("");
-  document.getElementById("errorList").style.display = failures.length ? "block" : "none";
+  ).concat(notMonitored.map((item) =>
+    `<li>Row ${item.row}${item.transaction_id ? ` (${escapeHtml(item.transaction_id)})` : ""}: Not monitored - ${escapeHtml(item.rejection_reason || "Only SUCCESS or COMPLETED transactions enter compliance monitoring")}</li>`
+  )).join("");
+  document.getElementById("errorList").style.display = failures.length || notMonitored.length ? "block" : "none";
   document.getElementById("resultCard").style.display = "block";
   document.getElementById("resultCard").scrollIntoView({ behavior: "smooth", block: "start" });
 }

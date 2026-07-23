@@ -1,0 +1,18 @@
+expected_rank_by_transaction_time,transaction_id,txn_time,official_risk_score,mcc_points,priority_multiplier,priority_score,notes
+1,TXN-RS-022,2026-07-22 21:30:00,65,15,3.00,195,Expected queue rank 1 by priority score 195
+2,TXN-RS-025-10,2026-07-22 21:35:27,55,15,3.00,165,Expected queue rank 2 by priority score 165
+3,TXN-RS-019,2026-07-22 10:40:00,50,20,3.00,150,Priority 150
+4,TXN-RS-021,2026-07-22 10:50:00,45,15,3.00,135,"Priority 135, newest among same-priority high-MCC amount cases by transaction time"
+5,TXN-RS-018,2026-07-22 10:35:00,45,15,3.00,135,"Priority 135, newer than TXN-RS-006 by transaction time"
+6,TXN-RS-006,2026-07-22 09:25:00,45,15,3.00,135,Priority 135
+7,TXN-RS-024-04,2026-07-22 11:05:45,40,15,3.00,120,Priority 120
+8,TXN-RS-010-02,2026-07-22 10:00:30,40,15,3.00,120,Priority 120
+9,TXN-RS-005,2026-07-22 09:20:00,40,15,3.00,120,Priority 120
+10,TXN-RS-013-041,2026-07-22 21:20:00,35,15,3.00,105,Priority 105
+11,TXN-RS-012-061,2026-07-22 15:00:00,30,15,3.00,90,Priority 90
+12,TXN-RS-020,2026-07-22 10:45:00,45,15,1.00,45,Priority 45 only if use_priority_multiplier is disabled for MCC 4829 before import
+13,TXN-RS-017,2026-07-22 10:30:00,35,5,1.00,35,Priority 35
+14,TXN-RS-009-03,2026-07-22 09:55:00,35,5,1.00,35,Priority 35
+15,TXN-RS-007-10,2026-07-22 09:30:27,30,5,1.00,30,Priority 30
+16,TXN-RS-004,2026-07-22 09:15:00,30,0,1.00,30,"Expected lower queue item: priority 30, newer than TXN-RS-003 by transaction time"
+17,TXN-RS-003,2026-07-22 09:10:00,30,0,1.00,30,Expected lower queue item: priority 30

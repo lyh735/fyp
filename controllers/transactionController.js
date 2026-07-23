@@ -13,7 +13,15 @@ const {
   updateMerchantCategoryProfile,
 } = require("../services/complianceRuleService");
 
-const FAILED_ATTEMPT_STATUSES = Object.freeze(["failed", "declined"]);
+const MONITORED_TRANSACTION_STATUSES = Object.freeze(["success", "completed"]);
+
+function normalizeTransactionStatus(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function isMonitorableTransactionStatus(value) {
+  return MONITORED_TRANSACTION_STATUSES.includes(normalizeTransactionStatus(value));
+}
 
 async function withRetries(operation, attempts = 3) {
   let lastError;
@@ -295,14 +303,12 @@ async function getVelocityCount(txn, rule, identity) {
       WHERE txn_time >= TIMESTAMPADD(SECOND, ?, ?)
         AND txn_time <= ?
         AND ${identity.column} = ?
-        AND LOWER(COALESCE(transaction_status, '')) NOT IN ('failed', 'declined')
+        AND LOWER(transaction_status) IN ('success', 'completed')
     `,
     [-windowSeconds, txn.timestamp, txn.timestamp, identity.value]
   );
 
-  const currentStatus = String(txn.status || "").trim().toLowerCase();
-  const currentCountsForGeneralVelocity = !FAILED_ATTEMPT_STATUSES.includes(currentStatus);
-  return Number(rows[0]?.count || 0) + (currentCountsForGeneralVelocity ? 1 : 0);
+  return Number(rows[0]?.count || 0) + (isMonitorableTransactionStatus(txn.status) ? 1 : 0);
 }
 
 async function getSmallTransactionCount(txn, rule, identity, merchantCategoryRisk) {
@@ -315,13 +321,14 @@ async function getSmallTransactionCount(txn, rule, identity, merchantCategoryRis
       FROM transactions
       WHERE txn_time >= TIMESTAMPADD(SECOND, ?, ?)
         AND txn_time <= ?
+        AND LOWER(transaction_status) IN ('success', 'completed')
         AND amount < ?
         AND ${identity.column} = ?
     `,
     [-windowSeconds, txn.timestamp, txn.timestamp, amountLimit, identity.value]
   );
 
-  return Number(rows[0]?.count || 0) + (Number(txn.amount) < amountLimit ? 1 : 0);
+  return Number(rows[0]?.count || 0) + (isMonitorableTransactionStatus(txn.status) && Number(txn.amount) < amountLimit ? 1 : 0);
 }
 
 async function getLargeTransactionCount(txn, merchant, merchantCategoryRisk, rule, identity) {
@@ -344,13 +351,14 @@ async function getLargeTransactionCount(txn, merchant, merchantCategoryRisk, rul
       FROM transactions
       WHERE txn_time >= TIMESTAMPADD(SECOND, ?, ?)
         AND txn_time <= ?
+        AND LOWER(transaction_status) IN ('success', 'completed')
         AND amount > ?
         AND ${identity.column} = ?
     `,
     [-windowSeconds, txn.timestamp, txn.timestamp, largeAmountThreshold, identity.value]
   );
 
-  return Number(rows[0]?.count || 0) + (Number(txn.amount) > largeAmountThreshold ? 1 : 0);
+  return Number(rows[0]?.count || 0) + (isMonitorableTransactionStatus(txn.status) && Number(txn.amount) > largeAmountThreshold ? 1 : 0);
 }
 
 async function getRepeatedIdenticalAmountPattern(txn, rule, identity) {
@@ -377,6 +385,7 @@ async function getRepeatedIdenticalAmountPattern(txn, rule, identity) {
         AND txn_time <= ?
         AND transaction_id <> ?
         AND merchant_id = ?
+        AND LOWER(transaction_status) IN ('success', 'completed')
         AND amount BETWEEN ? AND ?
     `,
     [
@@ -394,10 +403,11 @@ async function getRepeatedIdenticalAmountPattern(txn, rule, identity) {
   const priorCount = Number(rows[0]?.count || 0);
   const priorDistinctIdentifierCount = Number(rows[0]?.distinct_identifier_count || 0);
   const sameIdentifierCount = Number(rows[0]?.same_identifier_count || 0);
+  const includeCurrent = isMonitorableTransactionStatus(txn.status);
   return {
-    count: priorCount + 1,
-    distinctIdentifierCount: priorDistinctIdentifierCount + (sameIdentifierCount > 0 ? 0 : 1),
-    sameIdentifierCount: sameIdentifierCount + (identity ? 1 : 0),
+    count: priorCount + (includeCurrent ? 1 : 0),
+    distinctIdentifierCount: priorDistinctIdentifierCount + (includeCurrent && sameIdentifierCount === 0 ? 1 : 0),
+    sameIdentifierCount: sameIdentifierCount + (includeCurrent && identity ? 1 : 0),
   };
 }
 
@@ -408,12 +418,13 @@ async function getDailyActivity(txn) {
       FROM transactions
       WHERE merchant_id = ?
         AND DATE(txn_time) = DATE(?)
+        AND LOWER(transaction_status) IN ('success', 'completed')
     `,
     [txn.merchant_id, txn.timestamp]
   );
   return {
-    count: Number(rows[0]?.count || 0) + 1,
-    value: Number(rows[0]?.value || 0) + Number(txn.amount || 0),
+    count: Number(rows[0]?.count || 0) + (isMonitorableTransactionStatus(txn.status) ? 1 : 0),
+    value: Number(rows[0]?.value || 0) + (isMonitorableTransactionStatus(txn.status) ? Number(txn.amount || 0) : 0),
   };
 }
 
@@ -426,6 +437,7 @@ async function getMerchantDailyAverages(merchantId, beforeTimestamp) {
         FROM transactions
         WHERE merchant_id = ?
           AND txn_time < ?
+          AND LOWER(transaction_status) IN ('success', 'completed')
         GROUP BY DATE(txn_time)
       ) daily
     `,
@@ -557,6 +569,92 @@ async function processTransaction(payload, req, validationOptions = {}) {
       : null;
   }
 
+  if (!isMonitorableTransactionStatus(txn.status)) {
+    const result = {
+      baseRuleScore: 0,
+      base_rule_score: 0,
+      mccRiskPoints: 0,
+      mcc_risk_points: 0,
+      officialRiskScore: 0,
+      official_risk_score: 0,
+      rawRiskScore: 0,
+      raw_risk_score: 0,
+      displayedRiskScore: 0,
+      displayed_risk_score: 0,
+      priorityMultiplier: 1,
+      priority_multiplier: 1,
+      priorityScore: 0,
+      priority_score: 0,
+      mcc: { code: merchant?.mcc_code || null, category: null, riskLevel: null },
+      risk_score: 0,
+      risk_level: "Low",
+      status: "Not monitored",
+      triggered_rules: [],
+      triggeredRules: [],
+      alert_required: false,
+      alert_status: null,
+      processing_status: "Not monitored",
+      alert_id: null,
+      decision: "Not monitored",
+      rejection_reason: "Only SUCCESS or COMPLETED transactions enter compliance monitoring",
+    };
+
+    await logAudit(
+      "transaction_not_monitored",
+      txn,
+      `Payment status ${txn.status || "unknown"} captured but excluded from compliance monitoring`
+    );
+
+    await query(
+      `
+        INSERT INTO transactions
+          (
+            transaction_id, merchant_id, masked_payment_ref,
+            card_bin, masked_card_number, card_presence,
+            terminal_id, payment_gateway_ref,
+            payment_method, transaction_type, amount, currency, ip_address,
+            country, ip_country, customer_risk_profile, txn_time, transaction_status, risk_score, risk_level,
+            base_rule_score, mcc_risk_points, raw_risk_score, displayed_risk_score,
+            priority_multiplier, priority_score, triggered_rules, processing_status, source_type
+          )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        txn.transaction_id,
+        txn.merchant_id,
+        txn.masked_payment_ref,
+        txn.card_bin,
+        txn.masked_card_number,
+        txn.card_presence,
+        txn.terminal_id,
+        txn.payment_gateway_ref,
+        txn.payment_method,
+        txn.transaction_type,
+        txn.amount,
+        txn.currency,
+        txn.ip_address,
+        txn.country,
+        txn.ip_country,
+        txn.customer_risk_profile,
+        txn.timestamp,
+        txn.status || "success",
+        0,
+        "Low",
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        JSON.stringify([]),
+        "Not monitored",
+        txn.source_type,
+      ]
+    );
+
+    return { txn, result, validation };
+  }
+
   const rules = await getActiveRulesByType();
   const paymentIdentifier = getPaymentActivityIdentifier(txn);
   const merchantCategoryRisk = getRule(rules, "merchant_category_risk", "merchant_profile")
@@ -573,8 +671,6 @@ async function processTransaction(payload, req, validationOptions = {}) {
     velocityCount,
     smallTransactionCount,
     largeTransactionCount,
-    failedAttemptCount,
-    previousFailureCount,
     duplicatePattern,
     repeatedIdenticalPattern,
     dailyActivity,
@@ -583,8 +679,6 @@ async function processTransaction(payload, req, validationOptions = {}) {
     getVelocityCount(txn, velocityRule, paymentIdentifier),
     getSmallTransactionCount(txn, smallRule, paymentIdentifier, merchantCategoryRisk),
     getLargeTransactionCount(txn, merchant, merchantCategoryRisk, largeRule, paymentIdentifier),
-    getFailedAttemptCount(txn, rules.failed_attempt_velocity, paymentIdentifier),
-    getPreviousFailureCount(txn, rules.failure_then_success, paymentIdentifier),
     getDuplicatePattern(txn, duplicateRule, paymentIdentifier),
     getRepeatedIdenticalAmountPattern(txn, identicalRule, paymentIdentifier),
     dailyActivityPromise,
@@ -600,8 +694,6 @@ async function processTransaction(payload, req, validationOptions = {}) {
     velocityCount,
     smallTransactionCount,
     largeTransactionCount,
-    failedAttemptCount,
-    previousFailureCount,
     duplicatePatternCount: duplicatePattern.count,
     previousDuplicateTransaction: duplicatePattern.previous,
     repeatedIdenticalAmountCount: repeatedIdenticalPattern.count,
@@ -1069,7 +1161,11 @@ exports.uploadTransactions = async (req, res) => {
 
       results.push({
         row: index + 2,
-        status: processed.result.decision === "Rejected" ? "rejected" : "processed",
+        status: processed.result.decision === "Not monitored"
+          ? "not_monitored"
+          : processed.result.decision === "Rejected"
+            ? "rejected"
+            : "processed",
         ...buildApiResponse(processed.txn, processed.result),
       });
     } catch (err) {
@@ -1083,9 +1179,10 @@ exports.uploadTransactions = async (req, res) => {
   }
 
   const succeeded = results.filter((result) =>
-    result.status === "processed" || result.status === "rejected"
+    result.status === "processed" || result.status === "rejected" || result.status === "not_monitored"
   ).length;
   const rejected = results.filter((result) => result.status === "rejected").length;
+  const notMonitored = results.filter((result) => result.status === "not_monitored").length;
   const alertsCreated = results.filter((result) => result.alert_id).length;
 
   res.status(succeeded > 0 ? 200 : 422).json({
@@ -1095,6 +1192,7 @@ exports.uploadTransactions = async (req, res) => {
       succeeded,
       failed: rows.length - succeeded,
       rejected,
+      not_monitored: notMonitored,
       alerts_created: alertsCreated,
     },
     results,

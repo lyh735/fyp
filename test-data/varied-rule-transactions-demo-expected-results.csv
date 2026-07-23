@@ -1,0 +1,23 @@
+transaction_id,txn_time,merchant_id,amount,expected_triggered_rules,expected_base_rule_score,expected_mcc_points,expected_official_risk_score,expected_priority_multiplier,expected_priority_score,expected_alert_created,expected_alert_queue_order,notes
+RTDEMO-001,2026-07-23 09:00:00,RTM-FNB-LOW-001,20,None,0,0,0,1,0,No,,Normal low-risk F&B transaction.
+RTDEMO-002,2026-07-23 09:05:00,RTM-MONEY-HIGH-001,100,None,0,0,0,1,0,No,,High-risk MCC alone should not create alert.
+RTDEMO-003,2026-07-23 09:10:00,RTM-GROCERY-MAX-001,200,large_transaction,30,0,30,1,30,Yes,,Merchant max threshold source.
+RTDEMO-004,2026-07-23 09:15:00,RTM-FASTFOOD-MCC-001,175,large_transaction,30,0,30,1,30,Yes,,MCC expected_max_amount fallback.
+RTDEMO-005,2026-07-23 09:20:00,RTM-MONEY-HIGH-001,6000,merchant_average_deviation,25,15,40,3,120,Yes,Priority 120,Above 5x average but below merchant max.
+RTDEMO-006,2026-07-23 09:25:00,RTM-MONEY-HIGH-001,11000,large_transaction only; merchant_average_deviation supporting,30,15,45,3,135,Yes,Priority 135,Amount double-count prevention.
+RTDEMO-007-10,2026-07-23 09:30:27,RTM-ELEC-MED-001,110,transaction_velocity,25,5,30,1,30,Yes,Priority 30,10 successful transactions within 30 seconds.
+RTDEMO-008-05,2026-07-23 09:39:00,RTM-FNB-LOW-001,9,repeated_small_transactions,20,0,20,1,20,No,,Five low-value successful transactions within 5 minutes.
+RTDEMO-009-03,2026-07-23 10:00:00,RTM-ELEC-MED-001,1330,frequent_large_transactions,30,5,35,1,35,Yes,Priority 35,Three large transactions within 30 minutes.
+RTDEMO-010-02,2026-07-23 10:05:30,RTM-MONEY-HIGH-001,888,duplicate_payment_identifier,25,15,40,3,120,Yes,Priority 120,"Same merchant, amount, currency and payment reference within 60 seconds."
+RTDEMO-011-04,2026-07-23 10:13:00,RTM-RETAIL-LOW-001,19.9,repeated_identical_amounts,15,0,15,1,15,No,,"Same amount, different payment references."
+RTDEMO-012-061,2026-07-23 15:00:00,RTM-MONEY-HIGH-001,17,daily_transaction_count_spike,15,15,30,3,90,Yes,Priority 90,Exceeds MCC daily count default 60.
+RTDEMO-013-041,2026-07-23 21:20:00,RTM-MONEY-HIGH-001,3000,daily_transaction_value_spike,20,15,35,3,105,Yes,Priority 105,Exceeds MCC daily value default 120000.
+RTDEMO-014,2026-07-23 10:15:00,RTM-BAR-HOURS-001,50,outside_operating_hours,10,5,15,1,15,No,,Before merchant operating start 17:00.
+RTDEMO-015,2026-07-23 10:20:00,RTM-RETAIL-LOW-001,25,ip_validation,10,0,10,1,10,No,,Online row with invalid IP text.
+RTDEMO-016,2026-07-23 10:25:00,RTM-RETAIL-LOW-001,26,data_quality,20,0,20,1,20,No,,Blank-space references to test missing monitoring reference.
+RTDEMO-017,2026-07-23 10:30:00,RTM-ELEC-MED-001,3500,large_transaction,30,5,35,1,35,Yes,,Suspicious medium MCC case.
+RTDEMO-018,2026-07-23 10:35:00,RTM-MONEY-HIGH-001,12000,large_transaction,30,15,45,3,135,Yes,Priority 135,Suspicious high MCC case.
+RTDEMO-019,2026-07-23 10:40:00,RTM-BET-VHIGH-001,6000,large_transaction,30,20,50,3,150,Yes,Priority 150,Suspicious very-high MCC case.
+RTDEMO-020,2026-07-23 21:30:00,RTM-MONEY-HIGH-001,11000,large_transaction; daily_transaction_value_spike,50,15,65,3,195,Yes,Expected queue rank 1 by priority score 195,Multi-rule: amount + daily value + high MCC.
+RTDEMO-021-10,2026-07-23 21:35:27,RTM-MONEY-HIGH-001,90,transaction_velocity; daily_transaction_count_spike,40,15,55,3,165,Yes,Expected queue rank 2 by priority score 165,Velocity and daily count use different windows.
+RTDEMO-022,2026-07-23 10:50:00,RTM-MONEY-HIGH-001,13000,large_transaction,30,15,45,3,135,Yes,Same priority 135; newer transaction time than RTDEMO-018,Same priority score tie demonstration.

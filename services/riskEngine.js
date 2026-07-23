@@ -220,6 +220,39 @@ function appendSupportingObservation(triggeredRules, preferredRuleTypes, observa
 }
 
 function evaluateTransaction(txn, context = {}) {
+  if (!isSuccessStatus(txn.status)) {
+    return {
+      baseRuleScore: 0,
+      base_rule_score: 0,
+      mccRiskPoints: 0,
+      mcc_risk_points: 0,
+      officialRiskScore: 0,
+      official_risk_score: 0,
+      rawRiskScore: 0,
+      raw_risk_score: 0,
+      displayedRiskScore: 0,
+      displayed_risk_score: 0,
+      priorityMultiplier: 1,
+      priority_multiplier: 1,
+      priorityScore: 0,
+      priority_score: 0,
+      mcc: {
+        code: context.merchantCategoryRisk?.mcc_code || context.merchant?.mcc_code || null,
+        category: context.merchantCategoryRisk?.category_name || null,
+        riskLevel: context.merchantCategoryRisk?.risk_level || null,
+      },
+      risk_score: 0,
+      risk_level: "Low",
+      status: "Not monitored",
+      triggered_rules: [],
+      triggeredRules: [],
+      alert_required: false,
+      alert_status: null,
+      decision: "Not monitored",
+      rejection_reason: "Only SUCCESS or COMPLETED transactions enter compliance monitoring",
+    };
+  }
+
   let baseRuleScore = 0;
   const triggered_rules = [];
   const scoredGroups = new Set();
@@ -391,53 +424,6 @@ function evaluateTransaction(txn, context = {}) {
     if (!addedVelocityObservations.has(observation)) {
       addBaseRule(observation.group, observation.rule, observation.message, observation.evidence, observation.points);
     }
-  }
-
-  const failedRule = getRule(rules, "failed_attempt_velocity");
-  const failedThreshold = Number(failedRule?.threshold_count || 0);
-  if (
-    failedRule &&
-    failedThreshold > 0 &&
-    isFailedAttemptStatus(txn.status) &&
-    Number(context.failedAttemptCount || 0) >= failedThreshold
-  ) {
-    addBaseRule("failed_attempt_velocity", failedRule, "Repeated failed or declined payment attempts detected", {
-      actual_count: Number(context.failedAttemptCount || 0),
-      required_count: failedThreshold,
-      window_seconds: Number(failedRule.time_window_seconds || 0),
-      current_status: normalizeStatus(txn.status),
-      counted_statuses: FAILED_ATTEMPT_STATUSES,
-      payment_identifier_type: paymentIdentifier?.type || null,
-    });
-  }
-
-  const failureThenSuccessRule = getRule(rules, "failure_then_success");
-  const failureThenSuccessThreshold = Number(failureThenSuccessRule?.threshold_count || 0);
-  if (
-    failureThenSuccessRule &&
-    failureThenSuccessThreshold > 0 &&
-    isSuccessStatus(txn.status) &&
-    Number(context.previousFailureCount || 0) >= failureThenSuccessThreshold
-  ) {
-    addBaseRule("failure_then_success", failureThenSuccessRule, "Failed attempts were followed by a successful payment", {
-      previous_failure_count: Number(context.previousFailureCount || 0),
-      required_failure_count: failureThenSuccessThreshold,
-      window_seconds: Number(failureThenSuccessRule.time_window_seconds || 0),
-      payment_identifier_type: paymentIdentifier?.type || null,
-      overlapPolicy: "failure_then_success_replaces_failed_attempt_velocity_for_same_failed_sequence",
-      supportingObservations: failedRule ? [{
-        rule_type: failedRule.rule_type,
-        rule_name: failedRule.rule_name,
-        points_not_added: rulePoints(failedRule),
-        evidence: {
-          actual_count: Number(context.previousFailureCount || 0),
-          required_count: Number(failedRule.threshold_count || 0),
-          window_seconds: Number(failedRule.time_window_seconds || 0),
-          counted_statuses: FAILED_ATTEMPT_STATUSES,
-          payment_identifier_type: paymentIdentifier?.type || null,
-        },
-      }] : [],
-    });
   }
 
   const duplicateRule = getRule(rules, "duplicate_payment_identifier", "duplicate_transaction");

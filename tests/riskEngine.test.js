@@ -298,47 +298,77 @@ const tests = [
     assert.strictEqual(result.triggered_rules[0].evidence.supportingObservations[0].rule_type, "transaction_velocity");
   }],
 
-  ["failed transactions trigger failed velocity only when general velocity count excludes them", () => {
-    const result = evaluate({
-      txn: { status: "DECLINED" },
-      rules: {
-        transaction_velocity: rule("transaction_velocity", { points: 25, threshold_count: 3, time_window_seconds: 60 }),
-        failed_attempt_velocity: rule("failed_attempt_velocity", { points: 15, threshold_count: 3, time_window_seconds: 600 }),
-      },
-      context: { velocityCount: 0, failedAttemptCount: 3 },
-    });
-    assert.strictEqual(result.baseRuleScore, 15);
-    assert.ok(!triggeredRule(result, "transaction_velocity"));
-    assert.ok(triggeredRule(result, "failed_attempt_velocity"));
-  }],
-
-  ["successful transactions trigger general velocity only", () => {
+  ["SUCCESS transaction is scored", () => {
     const result = evaluate({
       txn: { status: "SUCCESS" },
       rules: {
         transaction_velocity: rule("transaction_velocity", { points: 25, threshold_count: 3, time_window_seconds: 60 }),
-        failed_attempt_velocity: rule("failed_attempt_velocity", { points: 15, threshold_count: 3, time_window_seconds: 600 }),
       },
-      context: { velocityCount: 3, failedAttemptCount: 3 },
+      context: { velocityCount: 3 },
     });
     assert.strictEqual(result.baseRuleScore, 25);
     assert.ok(triggeredRule(result, "transaction_velocity"));
-    assert.ok(!triggeredRule(result, "failed_attempt_velocity"));
+    assert.strictEqual(result.alert_required, false);
   }],
 
-  ["failure followed by success scores 30 and keeps failed-attempt evidence without stacking", () => {
+  ["COMPLETED transaction is scored", () => {
     const result = evaluate({
-      txn: { status: "SUCCESS" },
+      txn: { status: "COMPLETED" },
       rules: {
-        failed_attempt_velocity: rule("failed_attempt_velocity", { points: 15, threshold_count: 3, time_window_seconds: 600 }),
-        failure_then_success: rule("failure_then_success", { points: 30, threshold_count: 3, time_window_seconds: 600 }),
+        transaction_velocity: rule("transaction_velocity", { points: 25, threshold_count: 3, time_window_seconds: 60 }),
       },
-      context: { failedAttemptCount: 3, previousFailureCount: 3 },
+      context: { velocityCount: 3 },
     });
-    assert.strictEqual(result.baseRuleScore, 30);
-    assert.ok(triggeredRule(result, "failure_then_success"));
-    assert.ok(!triggeredRule(result, "failed_attempt_velocity"));
-    assert.strictEqual(triggeredRule(result, "failure_then_success").evidence.supportingObservations[0].rule_type, "failed_attempt_velocity");
+    assert.strictEqual(result.baseRuleScore, 25);
+    assert.ok(triggeredRule(result, "transaction_velocity"));
+  }],
+
+  ["FAILED transaction is not scored and does not alert", () => {
+    const result = evaluate({
+      txn: { status: "FAILED", amount: 50000 },
+      rules: {
+        transaction_velocity: rule("transaction_velocity", { points: 25, threshold_count: 3, time_window_seconds: 60 }),
+        large_transaction: rule("large_transaction", { points: 30, threshold_value: 1000 }),
+      },
+      context: { velocityCount: 3 },
+    });
+    assert.strictEqual(result.baseRuleScore, 0);
+    assert.strictEqual(result.officialRiskScore, 0);
+    assert.strictEqual(result.alert_required, false);
+    assert.strictEqual(result.status, "Not monitored");
+    assert.ok(!triggeredRule(result, "transaction_velocity"));
+    assert.ok(!triggeredRule(result, "large_transaction"));
+  }],
+
+  ["DECLINED transaction is not scored and does not alert", () => {
+    const result = evaluate({
+      txn: { status: "DECLINED", amount: 50000 },
+      rules: {
+        transaction_velocity: rule("transaction_velocity", { points: 25, threshold_count: 3, time_window_seconds: 60 }),
+        repeated_identical_amounts: rule("repeated_identical_amounts", { points: 15, threshold_count: 4, time_window_seconds: 300 }),
+      },
+      context: { velocityCount: 3, repeatedIdenticalAmountCount: 4 },
+    });
+    assert.strictEqual(result.baseRuleScore, 0);
+    assert.strictEqual(result.officialRiskScore, 0);
+    assert.strictEqual(result.alert_required, false);
+    assert.strictEqual(result.status, "Not monitored");
+    assert.strictEqual(result.triggered_rules.length, 0);
+  }],
+
+  ["CANCELLED transaction is not scored and does not alert", () => {
+    const result = evaluate({
+      txn: { status: "CANCELLED", amount: 50000 },
+      rules: {
+        daily_transaction_count_spike: rule("daily_transaction_count_spike", { points: 15, threshold_count: 1 }),
+        daily_transaction_value_spike: rule("daily_transaction_value_spike", { points: 20, threshold_value: 1 }),
+      },
+      context: { dailyTransactionCount: 999, dailyTransactionValue: 999999, dailyCountThreshold: 1, dailyValueThreshold: 1 },
+    });
+    assert.strictEqual(result.baseRuleScore, 0);
+    assert.strictEqual(result.officialRiskScore, 0);
+    assert.strictEqual(result.alert_required, false);
+    assert.strictEqual(result.status, "Not monitored");
   }],
 
   ["customer risk rule is ignored by merchant-focused engine", () => {
@@ -350,6 +380,8 @@ const tests = [
     assert.strictEqual(result.baseRuleScore, 0);
     assert.strictEqual(result.triggered_rules.length, 0);
     assert.strictEqual(SUPPORTED_RULE_TYPES.includes("customer_risk"), false);
+    assert.strictEqual(SUPPORTED_RULE_TYPES.includes("failed_attempt_velocity"), false);
+    assert.strictEqual(SUPPORTED_RULE_TYPES.includes("failure_then_success"), false);
   }],
 
   ["IP-country mismatch does not score when inactive or absent from active rules", () => {

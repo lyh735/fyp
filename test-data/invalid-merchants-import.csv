@@ -1,0 +1,9 @@
+merchant_id,merchant_name,business_category,mcc_code,merchant_average_amount,merchant_max_transaction_amount,merchant_risk_score,risk_level,operating_hours_start,operating_hours_end,country,has_physical_location,status
+,Missing Merchant ID Test,Food and beverage,5812,45,250,0,Low,10:00,22:00,Singapore,Yes,active
+RTM-INVALID-002,,Retail,5942,25,300,0,Low,09:00,21:00,Singapore,Yes,active
+RTM-INVALID-003,TechHub Electronics Test,Electronics,9999,400,,10,Medium,10:00,20:00,Singapore,Yes,active
+RTM-DUPLICATE-001,Duplicate Merchant A,Money services,4829,1000,10000,30,High,09:00,21:00,Singapore,Yes,active
+RTM-DUPLICATE-001,Duplicate Merchant B,Gambling,7995,200,5000,40,High,00:00,23:59,Singapore,No,active
+RTM-INVALID-006,Daily Fresh Grocery Test,Grocery,5411,25,120,0,Low,22:00,09:00,Singapore,Yes,active
+RTM-INVALID-007,Campus Fast Food Test,Fast food,5814,-10,,0,Low,08:00,22:00,Singapore,Yes,active
+RTM-INVALID-008,Riverside Bar Test,Bar and nightlife,5813,60,500,10,Medium,17:00,23:30,Singapore,Yes,paused

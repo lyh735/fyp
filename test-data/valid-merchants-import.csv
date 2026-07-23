@@ -1,0 +1,9 @@
+merchant_id,merchant_name,business_category,mcc_code,merchant_average_amount,merchant_max_transaction_amount,merchant_risk_score,risk_level,operating_hours_start,operating_hours_end,country,has_physical_location,status
+RTM-FNB-LOW-001,Jade Restaurant Test Branch,Food and beverage,5812,45,250,0,Low,10:00,22:00,Singapore,Yes,active
+RTM-RETAIL-LOW-001,Harbourfront Bookstore Test,Retail,5942,25,300,0,Low,09:00,21:00,Singapore,Yes,active
+RTM-ELEC-MED-001,TechHub Electronics Test,Electronics,5732,400,,10,Medium,10:00,20:00,Singapore,Yes,active
+RTM-MONEY-HIGH-001,QuickRemit Test Counter,Money services,4829,1000,10000,30,High,09:00,21:00,Singapore,Yes,active
+RTM-BET-VHIGH-001,Lucky Bet Test Online,Gambling,7995,200,5000,40,High,00:00,23:59,Singapore,No,active
+RTM-GROCERY-MAX-001,Daily Fresh Grocery Test,Grocery,5411,25,120,0,Low,07:00,23:00,Singapore,Yes,active
+RTM-FASTFOOD-MCC-001,Campus Fast Food Test,Fast food,5814,12,,0,Low,08:00,22:00,Singapore,Yes,active
+RTM-BAR-HOURS-001,Riverside Bar Test,Bar and nightlife,5813,60,500,10,Medium,17:00,23:30,Singapore,Yes,active

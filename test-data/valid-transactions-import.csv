@@ -1,0 +1,7 @@
+transaction_id,merchant_id,amount,currency,transaction_type,payment_method,txn_time,terminal_id,ip_address,country,transaction_status,customer_risk_profile,masked_payment_ref,payment_gateway_ref,card_bin,masked_card_number,card_presence,ip_country,ip_country_verified
+RTTX-VALID-001,RTM-FNB-LOW-001,22,SGD,online,PayNow,2026-07-22 09:00:00,,203.0.113.20,Singapore,success,low,PAY-RTTX-VALID-001,GW-RTTX-VALID-001,411111,411111******1111,not_present,Singapore,1
+RTTX-VALID-002,RTM-RETAIL-LOW-001,28,SGD,online,Visa,2026-07-22 09:05:00,,203.0.113.20,Singapore,completed,low,PAY-RTTX-VALID-002,GW-RTTX-VALID-002,411111,411111******1111,not_present,Singapore,1
+RTTX-VALID-003,RTM-ELEC-MED-001,450,SGD,online,Mastercard,2026-07-22 09:10:00,,203.0.113.20,Singapore,success,low,PAY-RTTX-VALID-003,GW-RTTX-VALID-003,520000,411111******1111,not_present,Singapore,1
+RTTX-VALID-004,RTM-MONEY-HIGH-001,900,SGD,online,PayNow,2026-07-22 09:15:00,,203.0.113.20,Singapore,success,low,PAY-RTTX-VALID-004,GW-RTTX-VALID-004,411111,411111******1111,not_present,Singapore,1
+RTTX-VALID-005,RTM-GROCERY-MAX-001,35,SGD,online,GrabPay,2026-07-22 09:20:00,,203.0.113.20,Singapore,success,low,PAY-RTTX-VALID-005,GW-RTTX-VALID-005,411111,411111******1111,not_present,Singapore,1
+RTTX-VALID-006,RTM-BAR-HOURS-001,65,SGD,face_to_face,Visa,2026-07-22 19:30:00,TERM-RTM-BAR-001,,Singapore,success,low,PAY-RTTX-VALID-006,GW-RTTX-VALID-006,411111,411111******1111,present,Singapore,1

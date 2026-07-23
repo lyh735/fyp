@@ -11,7 +11,6 @@ const RULE_TYPE_ALIASES = Object.freeze({
 const SUPPORTED_RULE_TYPES = Object.freeze([
   "large_transaction",
   "transaction_velocity",
-  "failed_attempt_velocity",
   "repeated_small_transactions",
   "frequent_large_transactions",
   "outside_operating_hours",
@@ -21,7 +20,6 @@ const SUPPORTED_RULE_TYPES = Object.freeze([
   "merchant_category_risk",
   "duplicate_payment_identifier",
   "repeated_identical_amounts",
-  "failure_then_success",
   "data_quality",
   "ip_validation",
   "ip_country_mismatch",
