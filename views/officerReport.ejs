@@ -9,239 +9,940 @@
   <link
     href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
     rel="stylesheet"
-  />
+  >
+
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+  >
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
+    :root {
+      --page-bg: #f3f6fb;
+      --card-bg: #ffffff;
+      --border-color: #e7ebf1;
+      --text-dark: #182230;
+      --text-muted: #667085;
+      --primary: #2563eb;
+      --warning: #f59e0b;
+      --danger: #dc3545;
+      --success: #198754;
+      --secondary: #64748b;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
-      background: #f4f6f9;
+      margin: 0;
+      background: var(--page-bg);
+      color: var(--text-dark);
+      font-family: Inter, Arial, sans-serif;
     }
 
-    .report-card {
-      background: white;
-      border-radius: 14px;
-      padding: 30px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-      margin-bottom: 25px;
+    .page-wrapper {
+      max-width: 1500px;
+      margin: 0 auto;
+      padding: 32px 24px 50px;
     }
 
-    .metric-box {
-      border-radius: 14px;
-      padding: 30px;
-      color: white;
-      text-align: center;
-      height: 100%;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.12);
-    }
-
-    .metric-number {
-      font-size: 48px;
-      font-weight: bold;
-    }
-
-    .metric-title {
-      font-size: 17px;
-      margin-top: 10px;
-    }
-
-    .page-header {
-      background: white;
-      border-radius: 14px;
-      padding: 25px 30px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-      margin-bottom: 25px;
+    .top-navigation {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 20px;
     }
 
     .back-btn {
       border-radius: 10px;
       font-weight: 600;
+      padding: 10px 18px;
     }
 
-    .insight-box {
-      background: #f8f9fa;
+    .generated-time {
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    .page-header {
+      background:
+        linear-gradient(
+          135deg,
+          rgba(37, 99, 235, 0.10),
+          rgba(255, 255, 255, 0.95)
+        );
+      border: 1px solid rgba(37, 99, 235, 0.15);
+      border-radius: 18px;
+      padding: 30px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+      margin-bottom: 24px;
+    }
+
+    .page-title {
+      font-size: 32px;
+      font-weight: 750;
+      margin-bottom: 8px;
+    }
+
+    .page-subtitle {
+      color: var(--text-muted);
+      margin: 0;
+    }
+
+    .header-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .header-actions .btn {
+      border-radius: 10px;
+      font-weight: 600;
+    }
+
+    .metric-card {
+      position: relative;
+      overflow: hidden;
+      min-height: 170px;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 23px;
+      box-shadow: 0 7px 22px rgba(15, 23, 42, 0.06);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .metric-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.10);
+    }
+
+    .metric-card::after {
+      content: "";
+      position: absolute;
+      width: 95px;
+      height: 95px;
+      right: -28px;
+      bottom: -35px;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: 0.08;
+    }
+
+    .metric-primary {
+      color: var(--primary);
+      border-top: 4px solid var(--primary);
+    }
+
+    .metric-warning {
+      color: var(--warning);
+      border-top: 4px solid var(--warning);
+    }
+
+    .metric-danger {
+      color: var(--danger);
+      border-top: 4px solid var(--danger);
+    }
+
+    .metric-success {
+      color: var(--success);
+      border-top: 4px solid var(--success);
+    }
+
+    .metric-secondary {
+      color: var(--secondary);
+      border-top: 4px solid var(--secondary);
+    }
+
+    .metric-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+
+    .metric-icon {
+      width: 46px;
+      height: 46px;
+      display: grid;
+      place-items: center;
       border-radius: 12px;
-      padding: 22px;
+      background: currentColor;
+      color: white;
+      font-size: 21px;
+    }
+
+    .metric-label {
+      color: var(--text-muted);
+      font-size: 14px;
+      font-weight: 650;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .metric-value {
+      color: var(--text-dark);
+      font-size: 39px;
+      line-height: 1;
+      font-weight: 780;
+      margin-bottom: 10px;
+    }
+
+    .metric-description {
+      color: var(--text-muted);
+      font-size: 13px;
+      margin: 0;
+    }
+
+    .report-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 18px;
+      padding: 27px;
+      box-shadow: 0 7px 22px rgba(15, 23, 42, 0.06);
+      margin-bottom: 24px;
+      height: calc(100% - 24px);
+    }
+
+    .section-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .section-title {
+      font-size: 21px;
+      font-weight: 750;
+      margin: 0 0 5px;
+    }
+
+    .section-description {
+      color: var(--text-muted);
+      font-size: 14px;
+      margin: 0;
+    }
+
+    .chart-wrapper {
+      position: relative;
+      height: 330px;
+    }
+
+    .status-row {
+      margin-bottom: 20px;
+    }
+
+    .status-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .status-heading {
+      display: flex;
+      justify-content: space-between;
+      gap: 15px;
+      margin-bottom: 8px;
+    }
+
+    .status-name {
+      font-weight: 650;
+    }
+
+    .status-value {
+      color: var(--text-muted);
+      font-weight: 650;
+    }
+
+    .progress {
+      height: 11px;
+      background: #eef1f5;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      border-radius: 999px;
+    }
+
+    .performance-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .performance-item {
+      border: 1px solid var(--border-color);
+      background: #fafbfc;
+      border-radius: 14px;
+      padding: 20px;
+    }
+
+    .performance-value {
+      font-size: 29px;
+      font-weight: 760;
+      line-height: 1.1;
+      margin-bottom: 7px;
+    }
+
+    .performance-label {
+      color: var(--text-muted);
+      font-size: 14px;
+      margin-bottom: 11px;
+    }
+
+    .performance-note {
+      font-size: 13px;
+      margin: 0;
+    }
+
+    .insight-card {
       height: 100%;
-      border-left: 5px solid #0d6efd;
+      border: 1px solid var(--border-color);
+      border-radius: 15px;
+      padding: 22px;
+      background: #ffffff;
+      position: relative;
+      overflow: hidden;
     }
 
-    .conclusion-box {
-      background: #eef5ff;
-      border-left: 6px solid #0d6efd;
+    .insight-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 5px;
+      background: var(--insight-color);
+    }
+
+    .insight-icon {
+      display: grid;
+      place-items: center;
+      width: 43px;
+      height: 43px;
       border-radius: 12px;
-      padding: 25px;
+      color: var(--insight-color);
+      background: color-mix(
+        in srgb,
+        var(--insight-color) 12%,
+        white
+      );
+      font-size: 20px;
+      margin-bottom: 15px;
+    }
+
+    .insight-title {
+      font-size: 17px;
+      font-weight: 750;
+      margin-bottom: 9px;
+    }
+
+    .insight-text {
+      color: var(--text-muted);
+      font-size: 14px;
+      line-height: 1.65;
+      margin-bottom: 13px;
+    }
+
+    .insight-result {
+      font-size: 13px;
+      font-weight: 650;
+      margin: 0;
+    }
+
+    .attention-box {
+      background: linear-gradient(135deg, #fff7ed, #ffffff);
+      border: 1px solid #fed7aa;
+      border-left: 6px solid var(--warning);
+      border-radius: 15px;
+      padding: 22px;
+    }
+
+    .attention-number {
+      font-size: 30px;
+      font-weight: 780;
+      color: #c2410c;
+    }
+
+    .empty-message {
+      color: var(--text-muted);
+      text-align: center;
+      padding: 30px;
+    }
+
+    @media (max-width: 991px) {
+      .page-header {
+        flex-direction: column;
+        align-items: flex-start !important;
+      }
+
+      .performance-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .chart-wrapper {
+        height: 290px;
+      }
+    }
+
+    @media (max-width: 576px) {
+      .page-wrapper {
+        padding: 20px 14px 35px;
+      }
+
+      .top-navigation {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .page-title {
+        font-size: 26px;
+      }
+
+      .header-actions {
+        width: 100%;
+      }
+
+      .header-actions .btn {
+        flex: 1;
+      }
+
+      .report-card,
+      .page-header {
+        padding: 21px;
+      }
     }
   </style>
-  <link rel="stylesheet" href="/css/workflow.css">
 </head>
 
 <body>
 
+<script src="/js/auth.js"></script>
+
+<script>
+  if (!requireAuth()) {
+    throw new Error("Authentication required");
+  }
+</script>
+
 <%
-  const currentRole = String(
-    typeof user !== "undefined" && user ? user.role : ""
-  ).trim().toLowerCase();
-  const isAnalyst = currentRole === "analyst";
-  const isStro = currentRole === "stro";
+  const totalAlerts = Number(report.total_alerts || 0);
+  const pendingAlerts = Number(report.pending_alerts || 0);
+  const escalatedAlerts = Number(report.escalated_alerts || 0);
+  const reviewedAlerts = Number(report.reviewed_alerts || 0);
+  const dismissedAlerts = Number(report.dismissed_alerts || 0);
+
+  const resolvedAlerts = reviewedAlerts + dismissedAlerts;
+  const actionedAlerts =
+    reviewedAlerts + dismissedAlerts + escalatedAlerts;
+
+  const pendingRate = totalAlerts > 0
+    ? ((pendingAlerts / totalAlerts) * 100).toFixed(1)
+    : "0.0";
+
+  const escalationRate = totalAlerts > 0
+    ? ((escalatedAlerts / totalAlerts) * 100).toFixed(1)
+    : "0.0";
+
+  const resolutionRate = totalAlerts > 0
+    ? ((resolvedAlerts / totalAlerts) * 100).toFixed(1)
+    : "0.0";
+
+  const actionRate = totalAlerts > 0
+    ? ((actionedAlerts / totalAlerts) * 100).toFixed(1)
+    : "0.0";
+
+  const pendingProgress = Math.min(Number(pendingRate), 100);
+  const escalationProgress = Math.min(Number(escalationRate), 100);
+  const resolutionProgress = Math.min(Number(resolutionRate), 100);
+
+  const alertsRequiringAttention =
+    pendingAlerts + escalatedAlerts;
 %>
 
-<script src="/js/auth.js"></script>
-<script>if (!requireAuth()) throw new Error("Authentication required");</script>
+<div class="page-wrapper">
 
-<div class="container mt-5 mb-5">
-
-  <div class="mb-4 d-flex justify-content-between align-items-center">
-    <a href="/dashboard.html" class="btn btn-dark px-4 py-2 shadow-sm back-btn">
-      ← Back to Dashboard
+  <div class="top-navigation">
+    <a
+      href="/dashboard.html"
+      class="btn btn-dark shadow-sm back-btn"
+    >
+      <i class="bi bi-arrow-left me-1"></i>
+      Back to Dashboard
     </a>
 
-    <div class="text-muted">
-      Generated: <%= new Date().toLocaleString() %>
+    <div class="generated-time">
+      <i class="bi bi-clock-history me-1"></i>
+      Generated:
+      <%= new Date().toLocaleString("en-SG") %>
     </div>
   </div>
 
-  <div class="page-header d-flex justify-content-between align-items-center">
+  <div
+    class="page-header d-flex justify-content-between align-items-center"
+  >
     <div>
-      <h1 class="mb-2">Compliance Monitoring Reports</h1>
-      <p class="text-muted mb-0">
-        AML/CFT alert investigation analytics dashboard
+      <div class="text-primary fw-semibold mb-2">
+        <i class="bi bi-shield-check me-1"></i>
+        AML/CFT Monitoring
+      </div>
+
+      <h1 class="page-title">
+        Compliance Monitoring Report
+      </h1>
+
+      <p class="page-subtitle">
+        Operational overview of alert volumes, investigation
+        status and compliance review performance.
       </p>
     </div>
 
-    <div>
-      <a href="/alerts.html" class="btn btn-primary me-2">
-        Alerts
+    <div class="header-actions">
+      <a href="/alerts.html" class="btn btn-primary">
+        <i class="bi bi-bell me-1"></i>
+        View Alerts
       </a>
 
-      <a href="/api/officer/audit-logs" class="btn btn-outline-dark">
+      <a
+        href="/api/officer/audit-logs"
+        class="btn btn-outline-dark"
+      >
+        <i class="bi bi-journal-text me-1"></i>
         Audit Logs
       </a>
 
-      <% if (isAnalyst) { %>
-        <a href="/stro-alerts.html" class="btn btn-outline-primary ms-2">
-          STRO Outcomes
-        </a>
-      <% } %>
-
-      <% if (isStro) { %>
-        <a href="/stro/dashboard" class="btn btn-outline-primary ms-2">
-          STR Review
-        </a>
-        <a href="/stro-alerts.html" class="btn btn-outline-primary ms-2">
-          Escalated Alerts
-        </a>
-      <% } %>
+      <a
+        href="/stro-alerts.html"
+        class="btn btn-outline-primary"
+      >
+        <i class="bi bi-file-earmark-check me-1"></i>
+        STRO Alerts
+      </a>
     </div>
   </div>
 
-  <div class="row">
+  <!-- KPI CARDS -->
+  <div class="row g-4 mb-4">
 
-    <div class="col-md-3 mb-4">
-      <div class="metric-box bg-primary">
-        <div class="metric-number">
-          <%= report.total_alerts || 0 %>
+    <div class="col-xl col-md-4 col-sm-6">
+      <div class="metric-card metric-primary">
+        <div class="metric-top">
+          <div class="metric-label">Total Alerts</div>
+
+          <div class="metric-icon">
+            <i class="bi bi-bell-fill"></i>
+          </div>
         </div>
-        <div class="metric-title">
-          Total Alerts
+
+        <div class="metric-value">
+          <%= totalAlerts %>
         </div>
+
+        <p class="metric-description">
+          Alerts generated by the monitoring system.
+        </p>
       </div>
     </div>
 
-    <div class="col-md-3 mb-4">
-      <div class="metric-box bg-warning text-dark">
-        <div class="metric-number">
-          <%= report.pending_alerts || 0 %>
+    <div class="col-xl col-md-4 col-sm-6">
+      <div class="metric-card metric-warning">
+        <div class="metric-top">
+          <div class="metric-label">Pending Review</div>
+
+          <div class="metric-icon">
+            <i class="bi bi-hourglass-split"></i>
+          </div>
         </div>
-        <div class="metric-title">
-          Pending Review
+
+        <div class="metric-value">
+          <%= pendingAlerts %>
         </div>
+
+        <p class="metric-description">
+          <%= pendingRate %>% of all alerts await review.
+        </p>
       </div>
     </div>
 
-    <div class="col-md-3 mb-4">
-      <div class="metric-box bg-danger">
-        <div class="metric-number">
-          <%= report.escalated_alerts || 0 %>
+    <div class="col-xl col-md-4 col-sm-6">
+      <div class="metric-card metric-danger">
+        <div class="metric-top">
+          <div class="metric-label">Escalated</div>
+
+          <div class="metric-icon">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+          </div>
         </div>
-        <div class="metric-title">
-          Escalated Alerts
+
+        <div class="metric-value">
+          <%= escalatedAlerts %>
         </div>
+
+        <p class="metric-description">
+          <%= escalationRate %>% require priority investigation.
+        </p>
       </div>
     </div>
 
-    <div class="col-md-3 mb-4">
-      <div class="metric-box bg-success">
-        <div class="metric-number">
-          <%= report.reviewed_alerts || 0 %>
+    <div class="col-xl col-md-6 col-sm-6">
+      <div class="metric-card metric-success">
+        <div class="metric-top">
+          <div class="metric-label">Reviewed</div>
+
+          <div class="metric-icon">
+            <i class="bi bi-check-circle-fill"></i>
+          </div>
         </div>
-        <div class="metric-title">
-          Reviewed Alerts
+
+        <div class="metric-value">
+          <%= reviewedAlerts %>
         </div>
+
+        <p class="metric-description">
+          Alerts completed through officer review.
+        </p>
+      </div>
+    </div>
+
+    <div class="col-xl col-md-6 col-sm-6">
+      <div class="metric-card metric-secondary">
+        <div class="metric-top">
+          <div class="metric-label">Dismissed</div>
+
+          <div class="metric-icon">
+            <i class="bi bi-x-circle-fill"></i>
+          </div>
+        </div>
+
+        <div class="metric-value">
+          <%= dismissedAlerts %>
+        </div>
+
+        <p class="metric-description">
+          Alerts closed without further escalation.
+        </p>
       </div>
     </div>
 
   </div>
 
+  <!-- CHART AND STATUS OVERVIEW -->
+  <div class="row g-4">
+
+    <div class="col-lg-5">
+      <div class="report-card">
+
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">
+              Alert Status Distribution
+            </h2>
+
+            <p class="section-description">
+              Current distribution across investigation stages.
+            </p>
+          </div>
+
+          <span class="badge text-bg-light border">
+            <%= totalAlerts %> total
+          </span>
+        </div>
+
+        <% if (totalAlerts > 0) { %>
+          <div class="chart-wrapper">
+            <canvas id="statusChart"></canvas>
+          </div>
+        <% } else { %>
+          <div class="empty-message">
+            No alert information is currently available.
+          </div>
+        <% } %>
+
+      </div>
+    </div>
+
+    <div class="col-lg-7">
+      <div class="report-card">
+
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">
+              Investigation Progress
+            </h2>
+
+            <p class="section-description">
+              Operational workload and alert-handling progress.
+            </p>
+          </div>
+        </div>
+
+        <div class="status-row">
+          <div class="status-heading">
+            <span class="status-name">
+              Pending Review
+            </span>
+
+            <span class="status-value">
+              <%= pendingAlerts %>
+              (<%= pendingRate %>%)
+            </span>
+          </div>
+
+          <div class="progress">
+            <div
+              class="progress-bar bg-warning"
+              role="progressbar"
+              style="width: <%= pendingProgress %>%"
+              aria-valuenow="<%= pendingProgress %>"
+              aria-valuemin="0"
+              aria-valuemax="100"
+            ></div>
+          </div>
+        </div>
+
+        <div class="status-row">
+          <div class="status-heading">
+            <span class="status-name">
+              Escalated for Investigation
+            </span>
+
+            <span class="status-value">
+              <%= escalatedAlerts %>
+              (<%= escalationRate %>%)
+            </span>
+          </div>
+
+          <div class="progress">
+            <div
+              class="progress-bar bg-danger"
+              role="progressbar"
+              style="width: <%= escalationProgress %>%"
+              aria-valuenow="<%= escalationProgress %>"
+              aria-valuemin="0"
+              aria-valuemax="100"
+            ></div>
+          </div>
+        </div>
+
+        <div class="status-row">
+          <div class="status-heading">
+            <span class="status-name">
+              Resolved or Dismissed
+            </span>
+
+            <span class="status-value">
+              <%= resolvedAlerts %>
+              (<%= resolutionRate %>%)
+            </span>
+          </div>
+
+          <div class="progress">
+            <div
+              class="progress-bar bg-success"
+              role="progressbar"
+              style="width: <%= resolutionProgress %>%"
+              aria-valuenow="<%= resolutionProgress %>"
+              aria-valuemin="0"
+              aria-valuemax="100"
+            ></div>
+          </div>
+        </div>
+
+        <hr class="my-4">
+
+        <div class="performance-grid">
+
+          <div class="performance-item">
+            <div class="performance-value text-primary">
+              <%= actionRate %>%
+            </div>
+
+            <div class="performance-label">
+              Actioned Alerts
+            </div>
+
+            <p class="performance-note text-muted">
+              Reviewed, dismissed or escalated.
+            </p>
+          </div>
+
+          <div class="performance-item">
+            <div class="performance-value text-success">
+              <%= resolutionRate %>%
+            </div>
+
+            <div class="performance-label">
+              Resolution Rate
+            </div>
+
+            <p class="performance-note text-muted">
+              Reviewed or dismissed alerts.
+            </p>
+          </div>
+
+          <div class="performance-item">
+            <div class="performance-value text-danger">
+              <%= escalationRate %>%
+            </div>
+
+            <div class="performance-label">
+              Escalation Rate
+            </div>
+
+            <p class="performance-note text-muted">
+              Cases requiring further investigation.
+            </p>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ATTENTION SUMMARY -->
+  <div class="attention-box mb-4">
+    <div
+      class="d-flex flex-column flex-md-row
+             justify-content-between align-items-md-center gap-3"
+    >
+      <div>
+        <h3 class="h5 fw-bold mb-2">
+          <i class="bi bi-exclamation-circle me-1"></i>
+          Alerts Requiring Attention
+        </h3>
+
+        <p class="text-muted mb-0">
+          Pending and escalated alerts should be prioritised
+          to reduce investigation delays and operational backlog.
+        </p>
+      </div>
+
+      <div class="text-md-end">
+        <div class="attention-number">
+          <%= alertsRequiringAttention %>
+        </div>
+
+        <div class="text-muted small">
+          pending or escalated cases
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DYNAMIC INSIGHTS -->
   <div class="report-card">
-    <h3 class="mb-4">Compliance Summary</h3>
 
-    <table class="table table-bordered align-middle">
-      <tr>
-        <th>Total Alerts Generated</th>
-        <td><%= report.total_alerts || 0 %></td>
-      </tr>
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">
+          Compliance Insights and Recommended Actions
+        </h2>
 
-      <tr>
-        <th>Pending Review Alerts</th>
-        <td><%= report.pending_alerts || 0 %></td>
-      </tr>
+        <p class="section-description">
+          Key observations generated from the current alert status.
+        </p>
+      </div>
+    </div>
 
-      <tr>
-        <th>Escalated Alerts</th>
-        <td><%= report.escalated_alerts || 0 %></td>
-      </tr>
+    <div class="row g-4">
 
-      <tr>
-        <th>Reviewed Alerts</th>
-        <td><%= report.reviewed_alerts || 0 %></td>
-      </tr>
+      <div class="col-lg-4">
+        <div
+          class="insight-card"
+          style="--insight-color: #dc3545;"
+        >
+          <div class="insight-icon">
+            <i class="bi bi-shield-exclamation"></i>
+          </div>
 
-      <tr>
-        <th>Dismissed Alerts</th>
-        <td><%= report.dismissed_alerts || 0 %></td>
-      </tr>
-    </table>
-  </div>
+          <h3 class="insight-title">
+            Escalated Investigations
+          </h3>
 
+          <p class="insight-text">
+            There are
+            <strong><%= escalatedAlerts %></strong>
+            escalated alerts, representing
+            <strong><%= escalationRate %>%</strong>
+            of the total alert population.
+          </p>
 
-
-  <div class="report-card">
-    <h3 class="mb-4">Risk Insights</h3>
-
-    <div class="row">
-
-      <div class="col-md-4 mb-3">
-        <div class="insight-box">
-          <h5 class="text-danger">High Risk Alerts</h5>
-          <p class="mb-0">
-            Escalated transactions may indicate suspicious activity and should be prioritised for investigation.
+          <p class="insight-result text-danger">
+            <% if (escalatedAlerts > 0) { %>
+              Prioritise these cases for enhanced due diligence.
+            <% } else { %>
+              No escalated cases currently require attention.
+            <% } %>
           </p>
         </div>
       </div>
 
-      <div class="col-md-4 mb-3">
-        <div class="insight-box">
-          <h5 class="text-warning">Pending Reviews</h5>
-          <p class="mb-0">
-            Pending alerts are still awaiting officer review and should be monitored to avoid investigation delays.
+      <div class="col-lg-4">
+        <div
+          class="insight-card"
+          style="--insight-color: #f59e0b;"
+        >
+          <div class="insight-icon">
+            <i class="bi bi-hourglass-bottom"></i>
+          </div>
+
+          <h3 class="insight-title">
+            Review Backlog
+          </h3>
+
+          <p class="insight-text">
+            <strong><%= pendingAlerts %></strong>
+            alerts remain pending, accounting for
+            <strong><%= pendingRate %>%</strong>
+            of all generated alerts.
+          </p>
+
+          <p class="insight-result text-warning">
+            <% if (Number(pendingRate) >= 70) { %>
+              High backlog detected. Additional review capacity is recommended.
+            <% } else if (pendingAlerts > 0) { %>
+              Continue monitoring outstanding alerts to avoid delays.
+            <% } else { %>
+              No pending-review backlog is currently recorded.
+            <% } %>
           </p>
         </div>
       </div>
 
-      <div class="col-md-4 mb-3">
-        <div class="insight-box">
-          <h5 class="text-success">Monitoring Efficiency</h5>
-          <p class="mb-0">
-            Reviewed and dismissed alerts help officers manage false positives and improve review accuracy.
+      <div class="col-lg-4">
+        <div
+          class="insight-card"
+          style="--insight-color: #198754;"
+        >
+          <div class="insight-icon">
+            <i class="bi bi-graph-up-arrow"></i>
+          </div>
+
+          <h3 class="insight-title">
+            Review Effectiveness
+          </h3>
+
+          <p class="insight-text">
+            <strong><%= resolvedAlerts %></strong>
+            alerts have been reviewed or dismissed, producing
+            a resolution rate of
+            <strong><%= resolutionRate %>%</strong>.
+          </p>
+
+          <p class="insight-result text-success">
+            <% if (Number(resolutionRate) >= 70) { %>
+              Alert resolution performance is currently strong.
+            <% } else if (resolvedAlerts > 0) { %>
+              Resolution progress is recorded but can be improved.
+            <% } else { %>
+              No resolved alerts are currently recorded.
+            <% } %>
           </p>
         </div>
       </div>
@@ -250,6 +951,82 @@
   </div>
 
 </div>
+
+<script>
+  const totalAlerts = <%- JSON.stringify(totalAlerts) %>;
+
+  if (totalAlerts > 0) {
+    const chartCanvas = document.getElementById("statusChart");
+
+    new Chart(chartCanvas, {
+      type: "doughnut",
+
+      data: {
+        labels: [
+          "Pending Review",
+          "Escalated",
+          "Reviewed",
+          "Dismissed"
+        ],
+
+        datasets: [{
+          data: [
+            <%- JSON.stringify(pendingAlerts) %>,
+            <%- JSON.stringify(escalatedAlerts) %>,
+            <%- JSON.stringify(reviewedAlerts) %>,
+            <%- JSON.stringify(dismissedAlerts) %>
+          ],
+
+          backgroundColor: [
+            "#f59e0b",
+            "#dc3545",
+            "#198754",
+            "#64748b"
+          ],
+
+          borderColor: "#ffffff",
+          borderWidth: 4,
+          hoverOffset: 7
+        }]
+      },
+
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: "66%",
+
+        plugins: {
+          legend: {
+            position: "bottom",
+
+            labels: {
+              usePointStyle: true,
+              pointStyle: "circle",
+              padding: 20,
+              font: {
+                size: 13
+              }
+            }
+          },
+
+          tooltip: {
+            callbacks: {
+              label(context) {
+                const value = Number(context.raw || 0);
+
+                const percentage = totalAlerts > 0
+                  ? ((value / totalAlerts) * 100).toFixed(1)
+                  : "0.0";
+
+                return `${context.label}: ${value} (${percentage}%)`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+</script>
 
 </body>
 </html>
