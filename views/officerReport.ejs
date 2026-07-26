@@ -430,6 +430,10 @@
 </script>
 
 <%
+  const currentRole = String(user?.role || "").trim().toLowerCase();
+  const canViewStroWorkspace =
+    currentRole === "analyst" || currentRole === "stro";
+
   const totalAlerts = Number(report.total_alerts || 0);
   const pendingAlerts = Number(report.pending_alerts || 0);
   const escalatedAlerts = Number(report.escalated_alerts || 0);
@@ -515,13 +519,17 @@
         Audit Logs
       </a>
 
-      <a
-        href="/stro-alerts.html"
-        class="btn btn-outline-primary"
-      >
-        <i class="bi bi-file-earmark-check me-1"></i>
-        STRO Alerts
-      </a>
+      <% if (canViewStroWorkspace) { %>
+        <a
+          href="/stro-alerts.html"
+          class="btn btn-outline-primary"
+        >
+          <i class="bi bi-file-earmark-check me-1"></i>
+          <%= currentRole === "analyst"
+            ? "STRO Outcomes"
+            : "Escalated Alerts" %>
+        </a>
+      <% } %>
     </div>
   </div>
 
